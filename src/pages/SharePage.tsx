@@ -10,9 +10,10 @@ interface SharePageProps {
   onShareUrl: (url: string) => Promise<{ mode: "created" | "merged" | "penalized"; message: string }>;
   getDuplicatePreview: (url: string) => { exists: boolean; sameUser: boolean; contributors: number; totalShares: number };
   onToast: (message: string) => void;
+  onLogout: () => void;
 }
 
-export const SharePage = ({ activeUser, onShareUrl, getDuplicatePreview, onToast }: SharePageProps) => {
+export const SharePage = ({ activeUser, onShareUrl, getDuplicatePreview, onToast, onLogout }: SharePageProps) => {
   const { language } = useI18n();
   const [url, setUrl] = useState("");
   const navigate = useNavigate();
@@ -32,7 +33,7 @@ export const SharePage = ({ activeUser, onShareUrl, getDuplicatePreview, onToast
 
   return (
     <main>
-      <TopBar user={activeUser} />
+      <TopBar user={activeUser} onLogout={onLogout} />
       <section className="page-section narrow">
         <h2>{pick(language, "Comparte un enlace", "Share a link")}</h2>
         <p className="section-intro">{pick(language, "Wee lo coloca en su tema y lo valora para separar señal de ruido.", "Wee places it in its topic and evaluates it to separate signal from noise.")}</p>

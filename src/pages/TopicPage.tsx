@@ -1,4 +1,4 @@
-import { useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { CommentsPanel } from "../components/CommentsPanel";
 import { Icon } from "../components/Icon";
@@ -14,9 +14,12 @@ interface TopicPageProps {
   users: User[];
   posts: Post[];
   onOpenShareModal?: () => void;
+  onLogout: () => void;
   activeUserId: string | null;
   onAddComment: (postId: string, text: string) => Promise<{ ok: boolean; message: string; post?: Post }>;
   onVoteCommentAura: (postId: string, commentId: string) => Promise<{ ok: boolean; message: string; post?: Post }>;
+  onAdminDeleteComment: (postId: string, commentId: string) => Promise<{ ok: boolean; message: string }>;
+  onAdminRenameTopic: (fromTopic: string, toTopic: string) => Promise<{ ok: boolean; message: string }>;
   onToast: (message: string) => void;
 }
 
@@ -25,15 +28,23 @@ export const TopicPage = ({
   users,
   posts,
   onOpenShareModal,
+  onLogout,
   activeUserId,
   onAddComment,
   onVoteCommentAura,
+  onAdminDeleteComment,
+  onAdminRenameTopic,
   onToast
 }: TopicPageProps) => {
   const { language } = useI18n();
   const params = useParams();
   const navigate = useNavigate();
   const topic = params.topic ?? "";
+  const [renameTopic, setRenameTopic] = useState(topic);
+  const isAdmin = activeUser.role === "admin";
+  useEffect(() => {
+    setRenameTopic(topic);
+  }, [topic]);
   const usersById = useMemo(() => new Map(users.map((user) => [user.id, user])), [users]);
 
   const topicPosts = rankTopicPosts(posts.filter((post) => post.topics.includes(topic)), topic).map((post) => ({
@@ -44,7 +55,7 @@ export const TopicPage = ({
 
   return (
     <main>
-      <TopBar user={activeUser} onOpenShare={onOpenShareModal} />
+      <TopBar user={activeUser} onOpenShare={onOpenShareModal} onLogout={onLogout} />
       <section className="page-section">
         <div className="section-head">
           <h2><Icon name="tag" /> {pick(language, "Hilo", "Thread")}: {topic}</h2>
@@ -52,6 +63,28 @@ export const TopicPage = ({
             <Icon name="arrowLeft" /> {pick(language, "Volver", "Back")}
           </Link>
         </div>
+        {isAdmin ? (
+          <div className="detail-actions">
+            <input
+              value={renameTopic}
+              onChange={(event) => setRenameTopic(event.target.value)}
+              placeholder={pick(language, "Renombrar tema", "Rename topic")}
+            />
+            <button
+              type="button"
+              className="btn"
+              onClick={async () => {
+                const result = await onAdminRenameTopic(topic, renameTopic);
+                onToast(result.message);
+                if (result.ok) {
+                  navigate(`/topic/${renameTopic.trim().toLowerCase().replace(/\s+/g, "-")}`);
+                }
+              }}
+            >
+              {pick(language, "Renombrar tema", "Rename topic")}
+            </button>
+          </div>
+        ) : null}
         <p className="section-intro">{pick(language, "Timeline del tema, ordenado por relevancia, Aura comunitaria y actualidad.", "Topic timeline, sorted by relevance, community Aura and recency.")}</p>
         {topicPosts.length === 0 ? (
           <article className="empty-state">
@@ -75,6 +108,8 @@ export const TopicPage = ({
                     activeUserId={activeUserId}
                     onAddComment={onAddComment}
                     onVoteCommentAura={onVoteCommentAura}
+                    onDeleteComment={onAdminDeleteComment}
+                    canModerateComments={isAdmin}
                     onToast={onToast}
                     compact
                   />

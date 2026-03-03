@@ -13,6 +13,7 @@ interface SettingsPageProps {
   onExport: () => Promise<void>;
   onImport: (file: File) => Promise<void>;
   onOpenShareModal?: () => void;
+  onLogout: () => void;
 }
 
 const parseCsv = (value: string): string[] =>
@@ -31,7 +32,8 @@ export const SettingsPage = ({
   onSave,
   onExport,
   onImport,
-  onOpenShareModal
+  onOpenShareModal,
+  onLogout
 }: SettingsPageProps) => {
   const { language } = useI18n();
   const [preferredTopics, setPreferredTopics] = useState<string[]>([]);
@@ -144,7 +146,7 @@ export const SettingsPage = ({
 
   return (
     <main>
-      <TopBar user={activeUser} onOpenShare={onOpenShareModal} />
+      <TopBar user={activeUser} onOpenShare={onOpenShareModal} onLogout={onLogout} />
       <section className="page-section">
         <h2><Icon name="settings" /> {pick(language, "Preferencias", "Preferences")}</h2>
         <p className="section-intro">

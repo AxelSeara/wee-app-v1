@@ -3,14 +3,15 @@ import { useNavigate } from "react-router-dom";
 import { Avatar } from "../components/Avatar";
 import { Icon } from "../components/Icon";
 import { generateAlias } from "../lib/aliasGenerator";
+import { isStrongPassword } from "../lib/auth";
 import { pick, useI18n } from "../lib/i18n";
 import type { AppLanguage, User } from "../lib/types";
 
 interface LoginPageProps {
   users: User[];
-  onLogin: (userId: string) => void;
   onCreateOrLogin: (
     alias: string,
+    password: string,
     avatarDataUrl?: string,
     language?: AppLanguage
   ) => Promise<{ user: User; isNewUser: boolean }>;
@@ -24,9 +25,12 @@ const fileToDataUrl = (file: File): Promise<string> =>
     reader.readAsDataURL(file);
   });
 
-export const LoginPage = ({ users, onLogin, onCreateOrLogin }: LoginPageProps) => {
+export const LoginPage = ({ users, onCreateOrLogin }: LoginPageProps) => {
   const { language } = useI18n();
+  const [view, setView] = useState<"landing" | "login" | "register">("landing");
   const [alias, setAlias] = useState("");
+  const [password, setPassword] = useState("");
+  const [passwordConfirm, setPasswordConfirm] = useState("");
   const [avatarDataUrl, setAvatarDataUrl] = useState<string | undefined>(undefined);
   const [profileLanguage, setProfileLanguage] = useState<AppLanguage>("es");
   const [error, setError] = useState<string | null>(null);
@@ -34,8 +38,26 @@ export const LoginPage = ({ users, onLogin, onCreateOrLogin }: LoginPageProps) =
   const navigate = useNavigate();
 
   const sortedUsers = useMemo(() => [...users].sort((a, b) => b.createdAt - a.createdAt), [users]);
+  const aliasMatchesExisting = useMemo(() => users.some((user) => user.alias.toLowerCase() === alias.trim().toLowerCase()), [users, alias]);
 
-  const submit = async (event: FormEvent) => {
+  const resetCommonState = (): void => {
+    setError(null);
+    setPassword("");
+    setPasswordConfirm("");
+    setAvatarDataUrl(undefined);
+  };
+
+  const goToLogin = (): void => {
+    resetCommonState();
+    setView("login");
+  };
+
+  const goToRegister = (): void => {
+    resetCommonState();
+    setView("register");
+  };
+
+  const submitLogin = async (event: FormEvent) => {
     event.preventDefault();
     setError(null);
     const cleanAlias = alias.trim();
@@ -43,92 +65,254 @@ export const LoginPage = ({ users, onLogin, onCreateOrLogin }: LoginPageProps) =
       setError(pick(language, "El alias es obligatorio.", "Alias is required.", "O alias é obrigatorio."));
       return;
     }
+    if (!password.trim()) {
+      setError(pick(language, "La contraseña es obligatoria.", "Password is required.", "O contrasinal é obrigatorio."));
+      return;
+    }
+    const existing = users.find((user) => user.alias.toLowerCase() === cleanAlias.toLowerCase());
+    if (!existing) {
+      setError(pick(language, "Ese alias no existe todavía. Regístralo primero.", "That alias does not exist yet. Register it first.", "Ese alias aínda non existe. Rexístrao primeiro."));
+      return;
+    }
     try {
-      const result = await onCreateOrLogin(cleanAlias, avatarDataUrl, profileLanguage);
-      if (result.isNewUser) {
-        setShowWelcome(true);
+      await onCreateOrLogin(cleanAlias, password);
+      navigate("/home");
+    } catch (err) {
+      const code = err instanceof Error ? err.message : "";
+      if (code === "INVALID_PASSWORD") {
+        setError(pick(language, "Contraseña incorrecta.", "Incorrect password.", "Contrasinal incorrecto."));
         return;
       }
-      navigate("/home");
-    } catch {
+      setError(pick(language, "No pudimos entrar con ese alias.", "We could not sign in with that alias.", "Non puidemos entrar con ese alias."));
+    }
+  };
+
+  const submitRegister = async (event: FormEvent) => {
+    event.preventDefault();
+    setError(null);
+    const cleanAlias = alias.trim();
+    if (!cleanAlias) {
+      setError(pick(language, "El alias es obligatorio.", "Alias is required.", "O alias é obrigatorio."));
+      return;
+    }
+    if (!password.trim()) {
+      setError(pick(language, "La contraseña es obligatoria.", "Password is required.", "O contrasinal é obrigatorio."));
+      return;
+    }
+    if (aliasMatchesExisting) {
+      setError(pick(language, "Ese alias ya existe. Elige otro.", "That alias already exists. Pick another one.", "Ese alias xa existe. Escolle outro."));
+      return;
+    }
+    if (password !== passwordConfirm) {
+      setError(pick(language, "Las contraseñas no coinciden.", "Passwords do not match.", "Os contrasinais non coinciden."));
+      return;
+    }
+    if (!isStrongPassword(password)) {
+      setError(
+        pick(
+          language,
+          "La contraseña debe tener al menos 4 caracteres (modo test).",
+          "Password must be at least 4 characters (testing mode).",
+          "O contrasinal debe ter polo menos 4 caracteres (modo test)."
+        )
+      );
+      return;
+    }
+    try {
+      const result = await onCreateOrLogin(cleanAlias, password, avatarDataUrl, profileLanguage);
+      if (!result.isNewUser) {
+        setError(pick(language, "Ese alias ya existe. Inicia sesión.", "That alias already exists. Sign in instead.", "Ese alias xa existe. Inicia sesión."));
+        return;
+      }
+      setShowWelcome(true);
+    } catch (err) {
+      const code = err instanceof Error ? err.message : "";
+      if (code === "WEAK_PASSWORD") {
+        setError(
+          pick(
+            language,
+            "La contraseña debe tener al menos 4 caracteres (modo test).",
+            "Password must be at least 4 characters (testing mode).",
+            "O contrasinal debe ter polo menos 4 caracteres (modo test)."
+          )
+        );
+        return;
+      }
       setError(pick(language, "No pudimos entrar con ese alias.", "We could not sign in with that alias.", "Non puidemos entrar con ese alias."));
     }
   };
 
   return (
-    <main className="auth-layout">
-      <section className="auth-card">
-        <h1>Wee</h1>
-        <p>{pick(language, "Comparte con tu gente, crea hilos por tema y filtra mejor lo que merece la pena.", "Share with your people, create topic threads and filter better what is worth it.")}</p>
+    <main className={view === "register" ? "auth-layout" : "auth-layout auth-layout-single"}>
+      {view === "landing" ? (
+        <section className="auth-card auth-card-entry">
+          <h1 className="auth-hero-title">
+            <span className="auth-hero-brand">Wee</span>
+            <span className="auth-hero-claim">
+              {pick(
+                language,
+                "Comparte con tu gente. Crea hilos por tema.",
+                "Share with your people. Create topic threads.",
+                "Comparte coa túa xente. Crea fíos por tema."
+              )}
+            </span>
+          </h1>
+          <p>{pick(language, "Microcomunidades para compartir mejor que en chats dispersos.", "Microcommunities to share better than in scattered chats.", "Microcomunidades para compartir mellor ca en chats dispersos.")}</p>
+          <div className="auth-entry-actions">
+            <button type="button" className="btn btn-primary" onClick={goToRegister}>
+              <Icon name="spark" /> {pick(language, "Registrarme", "Register", "Rexistrarme")}
+            </button>
+            <button type="button" className="btn" onClick={goToLogin}>
+              <Icon name="user" /> {pick(language, "Login", "Login", "Login")}
+            </button>
+          </div>
+        </section>
+      ) : null}
 
-        <form onSubmit={submit} className="stack">
-          <label>
-            {pick(language, "Tu alias", "Your alias", "O teu alias")}
-            <div className="alias-row">
-              <input value={alias} onChange={(event) => setAlias(event.target.value)} placeholder={pick(language, "Ej: Alex", "Ex: Alex")} />
-              <button
-                type="button"
-                className="btn dice-btn"
-                onClick={() => setAlias(generateAlias())}
-                title={pick(language, "Generar alias aleatorio", "Generate random alias")}
-              >
-                <Icon name="dice" size={14} />
+      {view === "login" ? (
+        <section className="auth-card auth-card-main">
+          <div className="section-head">
+            <h2>{pick(language, "Login", "Login", "Login")}</h2>
+            <button type="button" className="btn" onClick={() => setView("landing")}>
+              <Icon name="arrowLeft" /> {pick(language, "Volver", "Back", "Volver")}
+            </button>
+          </div>
+
+          <form onSubmit={submitLogin} className="stack">
+            <label>
+              {pick(language, "Tu alias", "Your alias", "O teu alias")}
+              <input value={alias} onChange={(event) => setAlias(event.target.value)} placeholder={pick(language, "Ej: Alex", "Ex: Alex", "Ex: Alex")} />
+            </label>
+            <label>
+              {pick(language, "Contraseña", "Password", "Contrasinal")}
+              <input
+                type="password"
+                value={password}
+                onChange={(event) => setPassword(event.target.value)}
+                placeholder={pick(language, "Tu contraseña", "Your password", "O teu contrasinal")}
+              />
+            </label>
+            {error ? <p className="error">{error}</p> : null}
+            <button type="submit" className="btn btn-primary">
+              <Icon name="spark" /> {pick(language, "Entrar", "Continue", "Entrar")}
+            </button>
+          </form>
+        </section>
+      ) : null}
+
+      {view === "register" ? (
+        <>
+          <section className="auth-card auth-card-main">
+            <div className="section-head">
+              <h2>{pick(language, "Registro", "Register", "Rexistro")}</h2>
+              <button type="button" className="btn" onClick={() => setView("landing")}>
+                <Icon name="arrowLeft" /> {pick(language, "Volver", "Back", "Volver")}
               </button>
             </div>
-          </label>
 
-          <label>
-            {pick(language, "Foto de perfil (opcional)", "Profile photo (optional)")}
-            <input
-              type="file"
-              accept="image/*"
-              onChange={async (event) => {
-                const file = event.target.files?.[0];
-                if (!file) return;
-                const encoded = await fileToDataUrl(file);
-                setAvatarDataUrl(encoded);
-              }}
-            />
-          </label>
+            <form onSubmit={submitRegister} className="stack">
+              <div className="auth-form-grid">
+                <div className="stack">
+                  <label>
+                    {pick(language, "Tu alias", "Your alias", "O teu alias")}
+                    <div className="alias-row">
+                      <input value={alias} onChange={(event) => setAlias(event.target.value)} placeholder={pick(language, "Ej: Alex", "Ex: Alex", "Ex: Alex")} />
+                      <button
+                        type="button"
+                        className="btn dice-btn"
+                        onClick={() => setAlias(generateAlias())}
+                        title={pick(language, "Generar alias aleatorio", "Generate random alias", "Xerar alias aleatorio")}
+                      >
+                        <Icon name="dice" size={14} />
+                      </button>
+                    </div>
+                  </label>
 
-          <label>
-            {pick(language, "Idioma del perfil", "Profile language")}
-            <select value={profileLanguage} onChange={(event) => setProfileLanguage(event.target.value as AppLanguage)}>
-              <option value="es">Español</option>
-              <option value="en">English</option>
-              <option value="gl">Galego</option>
-            </select>
-          </label>
+                  <label>
+                    {pick(language, "Contraseña", "Password", "Contrasinal")}
+                    <input
+                      type="password"
+                      value={password}
+                      onChange={(event) => setPassword(event.target.value)}
+                      placeholder={pick(language, "Tu contraseña", "Your password", "O teu contrasinal")}
+                    />
+                  </label>
+                  <label>
+                    {pick(language, "Repite contraseña", "Repeat password", "Repite contrasinal")}
+                    <input
+                      type="password"
+                      value={passwordConfirm}
+                      onChange={(event) => setPasswordConfirm(event.target.value)}
+                      placeholder={pick(language, "Repite tu contraseña", "Repeat your password", "Repite o teu contrasinal")}
+                    />
+                  </label>
+                  <p className="hint">
+                    {pick(
+                      language,
+                      "Modo test: mínimo 4 caracteres.",
+                      "Testing mode: minimum 4 characters.",
+                      "Modo test: mínimo 4 caracteres."
+                    )}
+                  </p>
+                </div>
 
-          {error ? <p className="error">{error}</p> : null}
+                <aside className="auth-upload-side">
+                  <h3><Icon name="camera" /> {pick(language, "Foto de perfil", "Profile photo", "Imaxe de perfil")}</h3>
+                  <p className="hint">{pick(language, "Opcional, pero ayuda a reconocer a cada miembro.", "Optional, but helps identify each member.", "Opcional, pero axuda a recoñecer cada membro.")}</p>
+                  <input
+                    type="file"
+                    accept="image/*"
+                    onChange={async (event) => {
+                      const file = event.target.files?.[0];
+                      if (!file) return;
+                      const encoded = await fileToDataUrl(file);
+                      setAvatarDataUrl(encoded);
+                    }}
+                  />
+                </aside>
+              </div>
 
-          <button type="submit" className="btn btn-primary">
-            <Icon name="spark" /> {pick(language, "Entrar", "Continue")}
-          </button>
-        </form>
-      </section>
+              <label>
+                {pick(language, "Idioma del perfil", "Profile language", "Idioma do perfil")}
+                <select value={profileLanguage} onChange={(event) => setProfileLanguage(event.target.value as AppLanguage)}>
+                  <option value="es">Español</option>
+                  <option value="en">English</option>
+                  <option value="gl">Galego</option>
+                </select>
+              </label>
 
-      <section className="auth-card">
-        <h2><Icon name="user" /> {pick(language, "Entrar con usuario existente", "Sign in with an existing profile")}</h2>
-        {sortedUsers.length === 0 ? <p>{pick(language, "Aún no hay usuarios creados en este navegador.", "There are no profiles created in this browser yet.")}</p> : null}
-        <ul className="user-list">
-          {sortedUsers.map((user) => (
-            <li key={user.id}>
-              <button
-                type="button"
-                className="user-option"
-                onClick={() => {
-                  onLogin(user.id);
-                  navigate("/home");
-                }}
-              >
-                <Avatar user={user} size={34} />
-                <span>{user.alias}</span>
+              {error ? <p className="error">{error}</p> : null}
+
+              <button type="submit" className="btn btn-primary">
+                <Icon name="spark" /> {pick(language, "Crear cuenta", "Create account", "Crear conta")}
               </button>
-            </li>
-          ))}
-        </ul>
-      </section>
+            </form>
+          </section>
+
+          <section className="auth-card auth-card-community">
+            <h2><Icon name="users" /> {pick(language, "Ya están en la comunidad", "Already in the community", "Xa están na comunidade")}</h2>
+            {sortedUsers.length === 0 ? <p>{pick(language, "Aún no hay usuarios creados en este navegador.", "There are no profiles created in this browser yet.", "Aínda non hai usuarios creados neste navegador.")}</p> : null}
+            <ul className="user-list">
+              {sortedUsers.map((user) => (
+                <li key={user.id}>
+                  <button
+                    type="button"
+                    className="user-option"
+                    onClick={() => {
+                      setAlias(user.alias);
+                      setError(null);
+                    }}
+                  >
+                    <Avatar user={user} size={34} />
+                    <span>{user.alias}</span>
+                    {user.role === "admin" ? <span className="badge">{pick(language, "Admin", "Admin", "Admin")}</span> : null}
+                  </button>
+                </li>
+              ))}
+            </ul>
+          </section>
+        </>
+      ) : null}
 
       {showWelcome ? (
         <section className="modal-overlay" role="dialog" aria-modal="true" aria-label={pick(language, "Bienvenida a Wee", "Welcome to Wee")}>

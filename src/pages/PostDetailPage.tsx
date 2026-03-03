@@ -22,11 +22,15 @@ interface PostDetailPageProps {
   users: User[];
   posts: Post[];
   onOpenShareModal?: () => void;
+  onLogout: () => void;
   activeUserId: string | null;
   onOpenExternalSource: (postId: string) => Promise<void>;
   onRatePost: (postId: string, vote: 1 | -1) => Promise<{ ok: boolean; message: string }>;
   onAddComment: (postId: string, text: string) => Promise<{ ok: boolean; message: string; post?: Post }>;
   onVoteCommentAura: (postId: string, commentId: string) => Promise<{ ok: boolean; message: string; post?: Post }>;
+  onAdminDeleteComment: (postId: string, commentId: string) => Promise<{ ok: boolean; message: string }>;
+  onAdminDeletePost: (postId: string) => Promise<{ ok: boolean; message: string }>;
+  onAdminUpdatePostTopic: (postId: string, nextTopic: string) => Promise<{ ok: boolean; message: string }>;
   onToast: (message: string) => void;
 }
 
@@ -43,11 +47,15 @@ export const PostDetailPage = ({
   users,
   posts,
   onOpenShareModal,
+  onLogout,
   activeUserId,
   onOpenExternalSource,
   onRatePost,
   onAddComment,
   onVoteCommentAura,
+  onAdminDeleteComment,
+  onAdminDeletePost,
+  onAdminUpdatePostTopic,
   onToast
 }: PostDetailPageProps) => {
   const { language } = useI18n();
@@ -58,10 +66,13 @@ export const PostDetailPage = ({
   const [current, setCurrent] = useState<Post | null>(postFromState);
   const [ratingBusy, setRatingBusy] = useState(false);
   const [justOpenedExternal, setJustOpenedExternal] = useState(false);
+  const [adminTopic, setAdminTopic] = useState("");
+  const isAdmin = activeUser.role === "admin";
 
   useEffect(() => {
     setCurrent(postFromState);
     setJustOpenedExternal(false);
+    setAdminTopic(postFromState?.topics?.[0] ?? "");
   }, [postFromState]);
 
   const related = useMemo(() => {
@@ -89,7 +100,7 @@ export const PostDetailPage = ({
   if (!current) {
     return (
       <main>
-        <TopBar user={activeUser} onOpenShare={onOpenShareModal} />
+        <TopBar user={activeUser} onOpenShare={onOpenShareModal} onLogout={onLogout} />
         <section className="page-section narrow">
           <h2>{pick(language, "Noticia no encontrada", "Post not found")}</h2>
           <p className="hint">{pick(language, "Puede que se haya eliminado o que se haya fusionado con un duplicado.", "It may have been deleted or merged with a duplicate.")}</p>
@@ -101,7 +112,7 @@ export const PostDetailPage = ({
 
   return (
     <main>
-      <TopBar user={activeUser} onOpenShare={onOpenShareModal} />
+      <TopBar user={activeUser} onOpenShare={onOpenShareModal} onLogout={onLogout} />
 
       <section className="page-section detail-layout">
         <article className="detail-main">
@@ -235,6 +246,42 @@ export const PostDetailPage = ({
               ))}
             </ul>
           </details>
+
+          {isAdmin ? (
+            <section className="score-details">
+              <h3>{pick(language, "Moderación admin", "Admin moderation")}</h3>
+              <div className="detail-actions">
+                <input
+                  value={adminTopic}
+                  onChange={(event) => setAdminTopic(event.target.value)}
+                  placeholder={pick(language, "Nuevo tema", "New topic")}
+                />
+                <button
+                  type="button"
+                  className="btn"
+                  onClick={async () => {
+                    const result = await onAdminUpdatePostTopic(current.id, adminTopic);
+                    onToast(result.message);
+                  }}
+                >
+                  {pick(language, "Cambiar tema", "Change topic")}
+                </button>
+                <button
+                  type="button"
+                  className="btn"
+                  onClick={async () => {
+                    const okDelete = window.confirm(pick(language, "¿Eliminar esta noticia?", "Delete this post?"));
+                    if (!okDelete) return;
+                    const result = await onAdminDeletePost(current.id);
+                    onToast(result.message);
+                    if (result.ok) navigate("/home");
+                  }}
+                >
+                  {pick(language, "Eliminar noticia", "Delete post")}
+                </button>
+              </div>
+            </section>
+          ) : null}
         </article>
 
         <aside className="detail-side">
@@ -275,6 +322,8 @@ export const PostDetailPage = ({
           activeUserId={activeUserId}
           onAddComment={onAddComment}
           onVoteCommentAura={onVoteCommentAura}
+          onDeleteComment={onAdminDeleteComment}
+          canModerateComments={isAdmin}
           onPostUpdate={setCurrent}
           onToast={onToast}
         />

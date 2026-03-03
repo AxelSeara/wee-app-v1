@@ -201,6 +201,19 @@ export const updateUser = async (user: User): Promise<void> => {
   }
 };
 
+export const deleteUserById = async (userId: string): Promise<void> => {
+  if (hasIndexedDB()) {
+    const db = await getDb();
+    await db.delete("users", userId);
+    await db.delete("preferences", userId);
+    return;
+  }
+  const users = lsRead<User>(LS_KEYS.users).filter((entry) => entry.id !== userId);
+  const preferences = lsRead<UserPreferences>(LS_KEYS.preferences).filter((entry) => entry.userId !== userId);
+  lsWrite(LS_KEYS.users, users);
+  lsWrite(LS_KEYS.preferences, preferences);
+};
+
 export const addPost = async (post: Post): Promise<void> => {
   const normalized = normalizePostForDedup(post);
   if (hasIndexedDB()) {

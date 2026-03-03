@@ -10,13 +10,14 @@ interface TopBarProps {
   searchValue?: string;
   onSearchChange?: (value: string) => void;
   onOpenShare?: () => void;
+  onLogout?: () => void;
 }
 
-export const TopBar = ({ user, searchValue, onSearchChange, onOpenShare }: TopBarProps) => (
-  <TopBarInner user={user} searchValue={searchValue} onSearchChange={onSearchChange} onOpenShare={onOpenShare} />
+export const TopBar = ({ user, searchValue, onSearchChange, onOpenShare, onLogout }: TopBarProps) => (
+  <TopBarInner user={user} searchValue={searchValue} onSearchChange={onSearchChange} onOpenShare={onOpenShare} onLogout={onLogout} />
 );
 
-const TopBarInner = ({ user, searchValue, onSearchChange, onOpenShare }: TopBarProps) => {
+const TopBarInner = ({ user, searchValue, onSearchChange, onOpenShare, onLogout }: TopBarProps) => {
   const { language } = useI18n();
   const [open, setOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement | null>(null);
@@ -111,6 +112,19 @@ const TopBarInner = ({ user, searchValue, onSearchChange, onOpenShare }: TopBarP
               <Link to="/settings" role="menuitem" className="user-menu-item" onClick={() => setOpen(false)}>
                 <Icon name="settings" size={13} /> {pick(language, "Ajustes", "Settings")}
               </Link>
+              {onLogout ? (
+                <button
+                  type="button"
+                  role="menuitem"
+                  className="user-menu-item user-menu-item-danger"
+                  onClick={() => {
+                    setOpen(false);
+                    onLogout();
+                  }}
+                >
+                  <Icon name="logout" size={13} /> {pick(language, "Cerrar sesión", "Log out", "Pechar sesión")}
+                </button>
+              ) : null}
             </div>
           ) : null}
         </div>

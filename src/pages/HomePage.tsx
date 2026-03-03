@@ -19,6 +19,7 @@ interface HomePageProps {
   userInfluenceAuraById: Map<string, number>;
   userCommunityStatsById: Map<string, UserCommunityStats>;
   onOpenShareModal: () => void;
+  onLogout: () => void;
 }
 
 const groupByTopic = (posts: Post[]): Array<{ topic: string; posts: Post[] }> => {
@@ -43,13 +44,15 @@ export const HomePage = ({
   userQualityValueById,
   userInfluenceAuraById,
   userCommunityStatsById,
-  onOpenShareModal
+  onOpenShareModal,
+  onLogout
 }: HomePageProps) => {
   const { language } = useI18n();
   const navigate = useNavigate();
   const [searchQuery, setSearchQuery] = useState("");
   const [showOnboarding, setShowOnboarding] = useState(false);
   const [activeSection, setActiveSection] = useState("popular-section");
+  const [showAllActiveUsers, setShowAllActiveUsers] = useState(false);
   const visiblePosts = useMemo(
     () => filterPosts({ ...DEFAULT_FILTERS, query: searchQuery }),
     [filterPosts, searchQuery]
@@ -139,6 +142,38 @@ export const HomePage = ({
       .sort((a, b) => b.collaborationIndex - a.collaborationIndex || b.latestAt - a.latestAt)
       .slice(0, 4);
   }, [visiblePosts, userQualityValueById, userCommunityStatsById]);
+
+  const activeUsers = useMemo(() => {
+    const byUser = new Map<string, { recentPosts: number; latestAt: number }>();
+    const cutoff = Date.now() - 1000 * 60 * 60 * 24 * 14;
+    posts.forEach((post) => {
+      if (post.createdAt < cutoff) return;
+      const current = byUser.get(post.userId) ?? { recentPosts: 0, latestAt: 0 };
+      byUser.set(post.userId, {
+        recentPosts: current.recentPosts + 1,
+        latestAt: Math.max(current.latestAt, post.createdAt)
+      });
+    });
+
+    return users
+      .filter((user) => byUser.has(user.id))
+      .map((user) => ({ user, ...byUser.get(user.id)! }))
+      .sort((a, b) => b.recentPosts - a.recentPosts || b.latestAt - a.latestAt);
+  }, [users, posts]);
+  const allUsersForSidebar = useMemo(() => {
+    const byUser = new Map(activeUsers.map((entry) => [entry.user.id, entry]));
+    return [...users]
+      .map((user) => {
+        const stats = byUser.get(user.id);
+        return {
+          user,
+          recentPosts: stats?.recentPosts ?? 0,
+          latestAt: stats?.latestAt ?? 0
+        };
+      })
+      .sort((a, b) => b.recentPosts - a.recentPosts || b.latestAt - a.latestAt || a.user.alias.localeCompare(b.user.alias));
+  }, [users, activeUsers]);
+  const usersSidebarList = showAllActiveUsers ? allUsersForSidebar : activeUsers.slice(0, 5);
 
   const communityPulse = useMemo(() => {
     const total = visiblePosts.length;
@@ -263,7 +298,7 @@ export const HomePage = ({
 
   return (
     <main>
-      <TopBar user={activeUser} onOpenShare={onOpenShareModal} />
+      <TopBar user={activeUser} onOpenShare={onOpenShareModal} onLogout={onLogout} />
 
       {showOnboarding ? (
         <section className="page-section onboarding-card">
@@ -312,6 +347,39 @@ export const HomePage = ({
                 <Icon name="users" /> {pick(language, "Comunidad", "Community", "Comunidade")}
               </button>
             </nav>
+
+            <section className="home-users-block">
+              <div className="home-users-head">
+                <h4><Icon name="users" size={14} /> {pick(language, "Usuarios activos", "Active users", "Usuarios en activo")}</h4>
+                <span className="badge">{activeUsers.length}</span>
+              </div>
+              {usersSidebarList.length === 0 ? (
+                <p className="hint">{pick(language, "Aún sin actividad reciente.", "No recent activity yet.", "Aínda sen actividade recente.")}</p>
+              ) : (
+                <ul className="home-users-list">
+                  {usersSidebarList.map((entry) => (
+                    <li key={entry.user.id}>
+                      <Link to={`/profile/${entry.user.id}`} className="home-user-link">
+                        <span>{entry.user.alias}</span>
+                        <small>{entry.recentPosts}</small>
+                      </Link>
+                    </li>
+                  ))}
+                </ul>
+              )}
+              {users.length > 0 ? (
+                <button
+                  type="button"
+                  className="btn home-users-toggle"
+                  onClick={() => setShowAllActiveUsers((prev) => !prev)}
+                >
+                  <Icon name="eye" size={14} />
+                  {showAllActiveUsers
+                    ? pick(language, "Mostrar solo activos", "Show active only", "Amosar só activos")
+                    : pick(language, "Mostrar todos", "Show all", "Amosar todos")}
+                </button>
+              ) : null}
+            </section>
             <label className="home-sidebar-search" aria-label={pick(language, "Buscar en Wee", "Search in Wee", "Buscar en Wee")}>
               <Icon name="search" size={13} />
               <input
@@ -349,7 +417,7 @@ export const HomePage = ({
             <div className="section-head">
               <h2><Icon name="book" /> {pick(language, "Temas activos", "Active topics")}</h2>
               <Link to="/settings" className="link-btn">
-                <Icon name="settings" /> {pick(language, "Preferencias", "Preferences")}
+                <Icon name="settings" /> {pick(language, "Preferencias", "Preferences", "Preferencias")}
               </Link>
             </div>
             <p className="section-intro">{pick(language, "Cada tema funciona como un hilo: misma conversación, mismo contexto y menos duplicados.", "Each topic works as a thread: same conversation, same context and fewer duplicates.")}</p>
@@ -388,9 +456,9 @@ export const HomePage = ({
               <article className="health-main">
                 <h3><Icon name="target" /> {pick(language, "Pulso de comunidad", "Community pulse")}</h3>
                 <p>
-                  {pick(language, "Salud actual del foro", "Current forum health")}:{" "}
+                  {pick(language, "Salud actual del foro", "Current forum health", "Saúde actual do foro")}:{" "}
                   <strong>{communityPulse.healthScore}/100</strong> · {communityPulse.activeAuthors}{" "}
-                  {pick(language, "personas activas", "active people")}
+                  {pick(language, "personas activas", "active people", "persoas activas")}
                 </p>
                 <div className="health-bar">
                   <span style={{ width: `${communityPulse.healthScore}%` }} />

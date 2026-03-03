@@ -32,7 +32,19 @@
 - feedback/comentarios,
 - preferencias de usuario,
 - métricas comunitarias (`userCommunityStatsById`),
-- valor interno de influencia (`userInfluenceAuraById`).
+- valor interno de influencia (`userInfluenceAuraById`),
+- control de roles y moderación (`admin/member`).
+
+## Seguridad (modelo local)
+
+- Contraseñas:
+  - política mínima: 8+ caracteres, mayúscula, minúscula, número y símbolo.
+  - hash local con PBKDF2-SHA256 + salt por usuario.
+- Roles:
+  - primer usuario registrado pasa a `admin`.
+  - nunca se permite dejar el sistema sin al menos un admin.
+- Limitación estructural:
+  - al ser SPA local-first sin backend, la seguridad es de cliente; para seguridad multiusuario fuerte se necesita auth/autorización en servidor.
 
 ## Persistencia
 

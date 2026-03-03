@@ -16,9 +16,11 @@ interface CommentsPanelProps {
   activeUserId: string | null;
   onAddComment: (postId: string, text: string) => Promise<CommentActionResult>;
   onVoteCommentAura: (postId: string, commentId: string) => Promise<CommentActionResult>;
+  onDeleteComment?: (postId: string, commentId: string) => Promise<CommentActionResult>;
   onPostUpdate?: (post: Post) => void;
   onToast: (message: string) => void;
   compact?: boolean;
+  canModerateComments?: boolean;
 }
 
 const relativeTime = (timestamp: number, language: "es" | "en" | "gl"): string => {
@@ -47,9 +49,11 @@ export const CommentsPanel = ({
   activeUserId,
   onAddComment,
   onVoteCommentAura,
+  onDeleteComment,
   onPostUpdate,
   onToast,
-  compact = false
+  compact = false,
+  canModerateComments = false
 }: CommentsPanelProps) => {
   const { language } = useI18n();
   const [draft, setDraft] = useState("");
@@ -129,6 +133,18 @@ export const CommentsPanel = ({
                 >
                   Aura {auraCount}
                 </button>
+                {canModerateComments && onDeleteComment ? (
+                  <button
+                    type="button"
+                    className="btn aura-btn"
+                    onClick={async () => {
+                      const result = await onDeleteComment(post.id, comment.id);
+                      onToast(result.message);
+                    }}
+                  >
+                    {pick(language, "Eliminar", "Delete")}
+                  </button>
+                ) : null}
               </article>
             );
           })

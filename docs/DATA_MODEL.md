@@ -8,6 +8,8 @@
 interface User {
   id: string;
   alias: string;
+  passwordHash?: string;
+  role?: "admin" | "member";
   language?: "es" | "en" | "gl";
   avatarDataUrl?: string;
   avatarColor?: string;
@@ -19,6 +21,8 @@ interface User {
 Notas:
 - `avatarDataUrl` guarda imagen en base64 (local-only).
 - Si no hay imagen, se usa `avatarColor` + `initials`.
+- `passwordHash` se guarda con hash local (PBKDF2-SHA256, con fallback en entornos sin WebCrypto).
+- `role` controla permisos de moderación (`admin` o `member`).
 
 ### Post
 

@@ -14,6 +14,7 @@ interface UserPostsPageProps {
   onDeletePost: (postId: string) => Promise<void>;
   onToast: (message: string) => void;
   onOpenShareModal?: () => void;
+  onLogout: () => void;
 }
 
 export const UserPostsPage = ({
@@ -22,7 +23,8 @@ export const UserPostsPage = ({
   posts,
   onDeletePost,
   onToast,
-  onOpenShareModal
+  onOpenShareModal,
+  onLogout
 }: UserPostsPageProps) => {
   const { language } = useI18n();
   const params = useParams();
@@ -32,6 +34,7 @@ export const UserPostsPage = ({
   const userId = params.userId ?? activeUser.id;
   const profileUser = users.find((user) => user.id === userId) ?? activeUser;
   const isOwnProfile = profileUser.id === activeUser.id;
+  const canAdminDelete = activeUser.role === "admin";
   const [tab, setTab] = useState<"shared" | "quality" | "interest">("shared");
 
   useEffect(() => {
@@ -54,7 +57,7 @@ export const UserPostsPage = ({
 
   return (
     <main>
-      <TopBar user={activeUser} onOpenShare={onOpenShareModal} />
+      <TopBar user={activeUser} onOpenShare={onOpenShareModal} onLogout={onLogout} />
       <section className="page-section">
         <div className="profile-hero">
           <div className="profile-head">
@@ -89,7 +92,7 @@ export const UserPostsPage = ({
                 key={post.id}
                 post={post}
                 onOpenDetail={(entry) => navigate(`/post/${entry.id}`)}
-                canDelete={isOwnProfile}
+                canDelete={isOwnProfile || canAdminDelete}
                 onDelete={(postId) => {
                   const shouldDelete = window.confirm(pick(language, "¿Eliminar esta noticia de tu perfil?", "Delete this post from your profile?", "Eliminar esta nova do teu perfil?"));
                   if (!shouldDelete) return;

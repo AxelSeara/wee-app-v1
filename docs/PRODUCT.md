@@ -29,11 +29,26 @@ Wee busca que grupos pequeños compartan noticias en un espacio más útil que u
 ## Estado actual (MVP avanzado)
 
 - Auth local por alias + avatar + idioma de perfil.
+- Auth local con contraseña obligatoria y validación mínima de seguridad.
+- Primer usuario registrado pasa a rol `admin`.
 - Home con navegación lateral por secciones (`Popular`, `Temas`, `Noticias`, `Comunidad`).
 - Página de noticia (`/post/:postId`) con foco en contexto y acción comunitaria.
 - Perfil separado de publicaciones (`/profile/:userId` y `/profile/:userId/posts`).
 - Ajustes simplificados (idioma, ruido, temas y filtros).
 - Soporte i18n en ES/EN/GL.
+
+## Roles y permisos
+
+- `member`:
+  - puede publicar, comentar, votar y ver perfiles.
+  - en perfiles de otros usuarios ve publicaciones y comentarios recientes.
+- `admin`:
+  - puede cambiar tema de una noticia.
+  - puede renombrar temas globalmente.
+  - puede eliminar noticias y comentarios.
+  - puede eliminar usuarios.
+  - puede ver métricas de perfil de otros usuarios.
+  - puede nombrar o retirar admins (sin dejar la comunidad sin admins).
 
 ## Norte del producto
 

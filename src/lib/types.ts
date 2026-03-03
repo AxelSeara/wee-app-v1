@@ -4,6 +4,8 @@ export type AppLanguage = "es" | "en" | "gl";
 export interface User {
   id: string;
   alias: string;
+  passwordHash?: string;
+  role?: "admin" | "member";
   language?: AppLanguage;
   avatarDataUrl?: string;
   avatarColor?: string;

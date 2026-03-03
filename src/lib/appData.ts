@@ -3,6 +3,7 @@ import {
   addPost,
   addUser,
   deletePostById,
+  deleteUserById,
   exportAllData,
   getActiveUserId,
   getPreferences,
@@ -18,7 +19,7 @@ import {
   upsertPreferences
 } from "./store";
 import type { AppLanguage, ExportBundle, Post, SearchFilters, User, UserCommunityStats, UserPreferences } from "./types";
-import { generateAlias } from "./aliasGenerator";
+import { hashPassword, isStrongPassword, verifyPassword } from "./auth";
 import { clamp, colorFromString, generateId, getInitials, normalizeSpace } from "./utils";
 
 interface CreateOrLoginResult {
@@ -123,6 +124,19 @@ export const useAppData = () => {
     [users, activeUserId]
   );
 
+  useEffect(() => {
+    if (loading) return;
+    if (users.length === 0) return;
+    const hasAdmin = users.some((user) => user.role === "admin");
+    if (hasAdmin) return;
+    const firstUser = [...users].sort((a, b) => a.createdAt - b.createdAt)[0];
+    if (!firstUser) return;
+    void (async () => {
+      await updateUser({ ...firstUser, role: "admin" });
+      await reload();
+    })();
+  }, [users, loading, reload]);
+
   const loginWithUserId = useCallback((userId: string) => {
     setActiveUserId(userId);
     setActiveUserIdState(userId);
@@ -134,24 +148,58 @@ export const useAppData = () => {
   }, []);
 
   const createOrLogin = useCallback(
-    async (alias: string, avatarDataUrl?: string, language: AppLanguage = "es"): Promise<CreateOrLoginResult> => {
+    async (
+      alias: string,
+      password: string,
+      avatarDataUrl?: string,
+      language: AppLanguage = "es"
+    ): Promise<CreateOrLoginResult> => {
       const normalizedAlias = alias.trim().slice(0, 40);
       if (!normalizedAlias) {
         throw new Error("Alias requerido");
       }
+      const cleanPassword = password.trim();
+      if (!cleanPassword) {
+        throw new Error("PASSWORD_REQUIRED");
+      }
       const existing = users.find((user) => user.alias.toLowerCase() === normalizedAlias.toLowerCase());
       if (existing) {
-        if ((existing.language ?? "es") !== language) {
-          await updateUser({ ...existing, language });
-          await reload();
+        let updatedUser = existing;
+        if (existing.passwordHash) {
+          const valid = await verifyPassword(cleanPassword, existing.passwordHash);
+          if (!valid) throw new Error("INVALID_PASSWORD");
+          if (!existing.passwordHash.startsWith("pbkdf2$")) {
+            updatedUser = {
+              ...existing,
+              passwordHash: await hashPassword(cleanPassword)
+            };
+          }
+        } else {
+          if (!isStrongPassword(cleanPassword)) throw new Error("WEAK_PASSWORD");
+          updatedUser = {
+            ...existing,
+            passwordHash: await hashPassword(cleanPassword),
+            role: existing.role ?? "member"
+          };
         }
-        loginWithUserId(existing.id);
-        return { user: existing, isNewUser: false };
+
+        if ((updatedUser.language ?? "es") !== language || updatedUser !== existing) {
+          await updateUser({ ...updatedUser, language });
+          await reload();
+          updatedUser = { ...updatedUser, language };
+        }
+        loginWithUserId(updatedUser.id);
+        return { user: updatedUser, isNewUser: false };
       }
+
+      if (!isStrongPassword(cleanPassword)) throw new Error("WEAK_PASSWORD");
+      const isFirstUser = users.length === 0;
 
       const newUser: User = {
         id: generateId(),
         alias: normalizedAlias,
+        passwordHash: await hashPassword(cleanPassword),
+        role: isFirstUser ? "admin" : "member",
         language,
         avatarDataUrl,
         avatarColor: avatarDataUrl ? undefined : colorFromString(normalizedAlias),
@@ -189,6 +237,85 @@ export const useAppData = () => {
       await reload();
     },
     [reload]
+  );
+
+  const removeComment = useCallback(
+    async (postId: string, commentId: string) => {
+      const post = posts.find((entry) => entry.id === postId);
+      if (!post) return;
+      const nextComments = (post.comments ?? []).filter((comment) => comment.id !== commentId);
+      await updatePost({ ...post, comments: nextComments });
+      await reload();
+    },
+    [posts, reload]
+  );
+
+  const updatePostPrimaryTopic = useCallback(
+    async (postId: string, nextTopicRaw: string) => {
+      const post = posts.find((entry) => entry.id === postId);
+      if (!post) return;
+      const nextTopic = normalizeSpace(nextTopicRaw).replace(/\s+/g, "-").slice(0, 42);
+      if (!nextTopic) return;
+      const restTopics = (post.topics ?? []).filter((topic) => topic !== nextTopic);
+      await updatePost({ ...post, topics: [nextTopic, ...restTopics].slice(0, 6) });
+      await reload();
+    },
+    [posts, reload]
+  );
+
+  const renameTopicAcrossPosts = useCallback(
+    async (fromTopicRaw: string, toTopicRaw: string) => {
+      const fromTopic = normalizeSpace(fromTopicRaw);
+      const toTopic = normalizeSpace(toTopicRaw).replace(/\s+/g, "-").slice(0, 42);
+      if (!fromTopic || !toTopic || fromTopic === toTopic) return;
+      const impacted = posts.filter((post) => post.topics.includes(fromTopic));
+      for (const post of impacted) {
+        const nextTopics = post.topics.map((topic) => (topic === fromTopic ? toTopic : topic));
+        const unique = Array.from(new Set(nextTopics));
+        await updatePost({ ...post, topics: unique });
+      }
+      await reload();
+    },
+    [posts, reload]
+  );
+
+  const removeUser = useCallback(
+    async (userId: string) => {
+      const target = users.find((entry) => entry.id === userId);
+      if (!target) return;
+      const authoredPosts = posts.filter((post) => post.userId === userId);
+      for (const post of authoredPosts) {
+        await deletePostById(post.id);
+      }
+      const postsToClean = posts.filter((post) => post.userId !== userId);
+      for (const post of postsToClean) {
+        const nextComments = (post.comments ?? []).filter((comment) => comment.userId !== userId);
+        const nextFeedbacks = (post.feedbacks ?? []).filter((feedback) => feedback.userId !== userId);
+        const nextOpened = (post.openedByUserIds ?? []).filter((id) => id !== userId);
+        const nextContributorUserIds = (post.contributorUserIds ?? [post.userId]).filter((id) => id !== userId);
+        const nextContributorCounts = { ...(post.contributorCounts ?? {}) };
+        delete nextContributorCounts[userId];
+        const touched =
+          nextComments.length !== (post.comments ?? []).length ||
+          nextFeedbacks.length !== (post.feedbacks ?? []).length ||
+          nextOpened.length !== (post.openedByUserIds ?? []).length ||
+          nextContributorUserIds.length !== (post.contributorUserIds ?? [post.userId]).length ||
+          Boolean(post.contributorCounts?.[userId]);
+        if (!touched) continue;
+        await updatePost({
+          ...post,
+          comments: nextComments,
+          feedbacks: nextFeedbacks,
+          openedByUserIds: nextOpened,
+          contributorUserIds: nextContributorUserIds,
+          contributorCounts: nextContributorCounts,
+          shareCount: Object.values(nextContributorCounts).reduce((acc, value) => acc + value, 0)
+        });
+      }
+      await deleteUserById(userId);
+      await reload();
+    },
+    [users, posts, reload]
   );
 
   const updateUserAvatar = useCallback(
@@ -247,6 +374,25 @@ export const useAppData = () => {
       if (!existing) return;
       if ((existing.language ?? "es") === language) return;
       await updateUser({ ...existing, language });
+      await reload();
+    },
+    [users, reload]
+  );
+
+  const updateUserRole = useCallback(
+    async (userId: string, role: "admin" | "member") => {
+      const target = users.find((user) => user.id === userId);
+      if (!target) return;
+      if ((target.role ?? "member") === role) return;
+
+      if (role === "member") {
+        const adminCount = users.filter((user) => user.role === "admin").length;
+        if ((target.role ?? "member") === "admin" && adminCount <= 1) {
+          throw new Error("LAST_ADMIN");
+        }
+      }
+
+      await updateUser({ ...target, role });
       await reload();
     },
     [users, reload]
@@ -477,9 +623,14 @@ export const useAppData = () => {
     createPost,
     savePost,
     removePost,
+    removeComment,
+    removeUser,
+    updatePostPrimaryTopic,
+    renameTopicAcrossPosts,
     updateUserAvatar,
     updateUserAlias,
     updateUserLanguage,
+    updateUserRole,
     getPostsByTopic,
     getPostsByUser,
     getUser,

@@ -38,9 +38,14 @@ const AppRoutes = () => {
     createPost,
     savePost,
     removePost,
+    removeComment,
+    removeUser,
     updateUserAvatar,
     updateUserAlias,
     updateUserLanguage,
+    updateUserRole,
+    updatePostPrimaryTopic,
+    renameTopicAcrossPosts,
     filterPosts,
     updatePreferences,
     exportJson,
@@ -297,6 +302,91 @@ const AppRoutes = () => {
     };
   };
 
+  const onAdminDeleteComment = async (
+    postId: string,
+    commentId: string
+  ): Promise<{ ok: boolean; message: string }> => {
+    if (!activeUser || activeUser.role !== "admin") {
+      return { ok: false, message: pick(language, "Acción solo para admin.", "Admin-only action.") };
+    }
+    await removeComment(postId, commentId);
+    return { ok: true, message: pick(language, "Comentario eliminado.", "Comment deleted.") };
+  };
+
+  const onAdminDeletePost = async (postId: string): Promise<{ ok: boolean; message: string }> => {
+    if (!activeUser || activeUser.role !== "admin") {
+      return { ok: false, message: pick(language, "Acción solo para admin.", "Admin-only action.") };
+    }
+    await removePost(postId);
+    return { ok: true, message: pick(language, "Noticia eliminada.", "Post deleted.") };
+  };
+
+  const onAdminUpdatePostTopic = async (
+    postId: string,
+    nextTopic: string
+  ): Promise<{ ok: boolean; message: string }> => {
+    if (!activeUser || activeUser.role !== "admin") {
+      return { ok: false, message: pick(language, "Acción solo para admin.", "Admin-only action.") };
+    }
+    if (!nextTopic.trim()) {
+      return { ok: false, message: pick(language, "Tema no válido.", "Invalid topic.") };
+    }
+    await updatePostPrimaryTopic(postId, nextTopic);
+    return { ok: true, message: pick(language, "Tema de noticia actualizado.", "Post topic updated.") };
+  };
+
+  const onAdminRenameTopic = async (
+    fromTopic: string,
+    toTopic: string
+  ): Promise<{ ok: boolean; message: string }> => {
+    if (!activeUser || activeUser.role !== "admin") {
+      return { ok: false, message: pick(language, "Acción solo para admin.", "Admin-only action.") };
+    }
+    if (!fromTopic.trim() || !toTopic.trim() || fromTopic.trim() === toTopic.trim()) {
+      return { ok: false, message: pick(language, "Tema no válido.", "Invalid topic.") };
+    }
+    await renameTopicAcrossPosts(fromTopic, toTopic);
+    return { ok: true, message: pick(language, "Tema renombrado en el foro.", "Topic renamed in the forum.") };
+  };
+
+  const onAdminDeleteUser = async (userId: string): Promise<{ ok: boolean; message: string }> => {
+    if (!activeUser || activeUser.role !== "admin") {
+      return { ok: false, message: pick(language, "Acción solo para admin.", "Admin-only action.") };
+    }
+    if (userId === activeUser.id) {
+      return { ok: false, message: pick(language, "No puedes eliminar tu propio usuario admin.", "You cannot delete your own admin user.") };
+    }
+    const target = users.find((entry) => entry.id === userId);
+    if (target?.role === "admin") {
+      const adminCount = users.filter((entry) => entry.role === "admin").length;
+      if (adminCount <= 1) {
+        return { ok: false, message: pick(language, "Debe existir al menos un admin activo.", "At least one active admin must remain.") };
+      }
+    }
+    await removeUser(userId);
+    return { ok: true, message: pick(language, "Usuario eliminado.", "User deleted.") };
+  };
+
+  const onAdminSetUserRole = async (
+    userId: string,
+    role: "admin" | "member"
+  ): Promise<{ ok: boolean; message: string }> => {
+    if (!activeUser || activeUser.role !== "admin") {
+      return { ok: false, message: pick(language, "Acción solo para admin.", "Admin-only action.") };
+    }
+    try {
+      await updateUserRole(userId, role);
+      return {
+        ok: true,
+        message: role === "admin"
+          ? pick(language, "Usuario nombrado admin.", "User promoted to admin.")
+          : pick(language, "Usuario cambiado a miembro.", "User changed to member.")
+      };
+    } catch {
+      return { ok: false, message: pick(language, "Debe existir al menos un admin activo.", "At least one active admin must remain.") };
+    }
+  };
+
   const showToast = (message: string): void => {
     setToast(message);
     window.setTimeout(() => setToast(null), 1800);
@@ -319,7 +409,7 @@ const AppRoutes = () => {
           path="/login"
           element={
             <PageTransition>
-              <LoginPage users={users} onLogin={loginWithUserId} onCreateOrLogin={createOrLogin} />
+              <LoginPage users={users} onCreateOrLogin={createOrLogin} />
             </PageTransition>
           }
         />
@@ -339,6 +429,7 @@ const AppRoutes = () => {
                   userInfluenceAuraById={userInfluenceAuraById}
                   userCommunityStatsById={userCommunityStatsById}
                   onOpenShareModal={() => setShareModalOpen(true)}
+                  onLogout={logout}
                 />
               </PageTransition>
             </RequireAuth>
@@ -355,9 +446,12 @@ const AppRoutes = () => {
                   users={users}
                   posts={posts}
                   onOpenShareModal={() => setShareModalOpen(true)}
+                  onLogout={logout}
                   activeUserId={activeUser?.id ?? null}
                   onAddComment={onAddComment}
                   onVoteCommentAura={onVoteCommentAura}
+                  onAdminDeleteComment={onAdminDeleteComment}
+                  onAdminRenameTopic={onAdminRenameTopic}
                   onToast={showToast}
                 />
               </PageTransition>
@@ -375,11 +469,15 @@ const AppRoutes = () => {
                   users={users}
                   posts={posts}
                   onOpenShareModal={() => setShareModalOpen(true)}
+                  onLogout={logout}
                   activeUserId={activeUser?.id ?? null}
                   onOpenExternalSource={onOpenExternalSource}
                   onRatePost={onRatePost}
                   onAddComment={onAddComment}
                   onVoteCommentAura={onVoteCommentAura}
+                  onAdminDeleteComment={onAdminDeleteComment}
+                  onAdminDeletePost={onAdminDeletePost}
+                  onAdminUpdatePostTopic={onAdminUpdatePostTopic}
                   onToast={showToast}
                 />
               </PageTransition>
@@ -397,6 +495,7 @@ const AppRoutes = () => {
                   onShareUrl={onShareUrl}
                   getDuplicatePreview={getDuplicatePreview}
                   onToast={showToast}
+                  onLogout={logout}
                 />
               </PageTransition>
             </RequireAuth>
@@ -416,6 +515,8 @@ const AppRoutes = () => {
                   onLogout={logout}
                   onUpdateAvatar={updateUserAvatar}
                   onUpdateAlias={updateUserAlias}
+                  onDeleteUser={onAdminDeleteUser}
+                  onSetUserRole={onAdminSetUserRole}
                   onToast={showToast}
                   onOpenShareModal={() => setShareModalOpen(true)}
                 />
@@ -436,6 +537,7 @@ const AppRoutes = () => {
                   onDeletePost={removePost}
                   onToast={showToast}
                   onOpenShareModal={() => setShareModalOpen(true)}
+                  onLogout={logout}
                 />
               </PageTransition>
             </RequireAuth>
@@ -456,6 +558,7 @@ const AppRoutes = () => {
                   onExport={onExport}
                   onImport={onImport}
                   onOpenShareModal={() => setShareModalOpen(true)}
+                  onLogout={logout}
                 />
               </PageTransition>
             </RequireAuth>

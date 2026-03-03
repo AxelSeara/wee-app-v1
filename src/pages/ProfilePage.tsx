@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useState } from "react";
-import { Link, useParams } from "react-router-dom";
+import { Link, useNavigate, useParams } from "react-router-dom";
 import { Avatar } from "../components/Avatar";
 import { Icon } from "../components/Icon";
+import { PostCard } from "../components/PostCard";
 import { pick, translateBadge, translateRankTitle, useI18n } from "../lib/i18n";
 import { generateAlias } from "../lib/aliasGenerator";
 import { TopBar } from "../components/TopBar";
@@ -15,6 +16,8 @@ interface ProfilePageProps {
   onLogout: () => void;
   onUpdateAvatar: (userId: string, avatarDataUrl: string | undefined) => Promise<void>;
   onUpdateAlias: (userId: string, alias: string) => Promise<void>;
+  onDeleteUser: (userId: string) => Promise<{ ok: boolean; message: string }>;
+  onSetUserRole: (userId: string, role: "admin" | "member") => Promise<{ ok: boolean; message: string }>;
   onToast: (message: string) => void;
   onOpenShareModal?: () => void;
 }
@@ -35,10 +38,13 @@ export const ProfilePage = ({
   onLogout,
   onUpdateAvatar,
   onUpdateAlias,
+  onDeleteUser,
+  onSetUserRole,
   onToast,
   onOpenShareModal
 }: ProfilePageProps) => {
   const { language } = useI18n();
+  const navigate = useNavigate();
   const params = useParams();
   const userId = params.userId ?? activeUser.id;
   const profileUser = users.find((user) => user.id === userId) ?? activeUser;
@@ -54,6 +60,21 @@ export const ProfilePage = ({
     [posts, profileUser.id]
   );
   const communityStats = userCommunityStatsById.get(profileUser.id);
+  const canSeeScores = isOwnProfile || activeUser.role === "admin";
+  const canManageUser = activeUser.role === "admin" && !isOwnProfile;
+  const isTargetAdmin = (profileUser.role ?? "member") === "admin";
+  const recentComments = useMemo(
+    () =>
+      posts
+        .flatMap((post) =>
+          (post.comments ?? [])
+            .filter((comment) => comment.userId === profileUser.id)
+            .map((comment) => ({ comment, postId: post.id }))
+        )
+        .sort((a, b) => b.comment.createdAt - a.comment.createdAt)
+        .slice(0, 5),
+    [posts, profileUser.id]
+  );
 
   const generatedAlias = (): void => {
     setAliasInput(generateAlias());
@@ -61,9 +82,10 @@ export const ProfilePage = ({
 
   return (
     <main>
-      <TopBar user={activeUser} onOpenShare={onOpenShareModal} />
+      <TopBar user={activeUser} onOpenShare={onOpenShareModal} onLogout={onLogout} />
       <section className="page-section">
-        <div className="profile-hero">
+        <div className="profile-stack">
+          <div className="profile-hero">
           <div className="profile-head">
             <Avatar user={profileUser} size={74} />
             <div>
@@ -71,7 +93,7 @@ export const ProfilePage = ({
               <p>{pick(language, `${userPosts.length} noticias compartidas`, `${userPosts.length} shared posts`)}</p>
             </div>
           </div>
-          {isOwnProfile && communityStats ? (
+          {canSeeScores && communityStats ? (
             <div className="profile-rank-card">
               <h3>{translateRankTitle(language, communityStats.rankTitle)} · {pick(language, "nivel", "level")} {communityStats.level}</h3>
               <p>
@@ -155,26 +177,97 @@ export const ProfilePage = ({
             </form>
           ) : null}
 
-        </div>
+          </div>
 
-        <div className="profile-actions">
-          <Link to={`/profile/${profileUser.id}/posts`} className="btn">
-            <Icon name="news" /> {pick(language, "Ver publicaciones", "View posts", "Ver publicacións")}
-          </Link>
-          {isOwnProfile ? (
-            <button
-              type="button"
-              className="btn"
-              onClick={() => {
-                onLogout();
-              }}
-            >
-              <Icon name="logout" /> {pick(language, "Cerrar sesión", "Log out")}
-            </button>
+          {!isOwnProfile ? (
+            <article className="settings-card">
+            <h3><Icon name="comment" /> {pick(language, "Comentarios recientes", "Recent comments")}</h3>
+            {recentComments.length === 0 ? (
+              <p className="hint">{pick(language, "Todavía no hay comentarios recientes.", "No recent comments yet.")}</p>
+            ) : (
+              <div className="settings-known-topics">
+                {recentComments.map(({ comment, postId }) => (
+                  <Link key={comment.id} to={`/post/${postId}`} className="chip chip-action">
+                    {comment.text.slice(0, 72)}
+                  </Link>
+                ))}
+              </div>
+            )}
+            </article>
           ) : null}
-          <Link to="/home" className="link-btn">
-            <Icon name="arrowLeft" /> {pick(language, "Volver al inicio", "Back to home")}
-          </Link>
+
+          <article className="settings-card profile-posts-card">
+            <div className="section-head">
+              <h3><Icon name="news" /> {pick(language, "Publicaciones", "Posts", "Publicacións")}</h3>
+              {isOwnProfile ? (
+                <Link to={`/profile/${profileUser.id}/posts`} className="link-btn">
+                  <Icon name="news" /> {pick(language, "Gestionar", "Manage", "Xestionar")}
+                </Link>
+              ) : null}
+            </div>
+            {userPosts.length === 0 ? (
+              <p className="hint">
+                {pick(language, "Este perfil todavía no ha compartido noticias.", "This profile has not shared posts yet.", "Este perfil aínda non compartiu novas.")}
+              </p>
+            ) : (
+              <div className="post-grid">
+                {userPosts
+                  .slice()
+                  .sort((a, b) => b.createdAt - a.createdAt)
+                  .slice(0, 8)
+                  .map((post) => (
+                    <PostCard key={post.id} post={post} onOpenDetail={(entry) => navigate(`/post/${entry.id}`)} />
+                  ))}
+              </div>
+            )}
+          </article>
+
+          <div className="profile-actions">
+            {isOwnProfile ? (
+              <button
+                type="button"
+                className="btn"
+                onClick={() => {
+                  onLogout();
+                }}
+              >
+                <Icon name="logout" /> {pick(language, "Cerrar sesión", "Log out")}
+              </button>
+            ) : null}
+            {canManageUser ? (
+              <button
+                type="button"
+                className="btn"
+                onClick={async () => {
+                  const nextRole: "admin" | "member" = isTargetAdmin ? "member" : "admin";
+                  const result = await onSetUserRole(profileUser.id, nextRole);
+                  onToast(result.message);
+                }}
+              >
+                <Icon name="trophy" />
+                {isTargetAdmin
+                  ? pick(language, "Quitar admin", "Remove admin")
+                  : pick(language, "Nombrar admin", "Promote to admin")}
+              </button>
+            ) : null}
+            {canManageUser ? (
+              <button
+                type="button"
+                className="btn"
+                onClick={async () => {
+                  const okDelete = window.confirm(pick(language, "¿Eliminar este usuario de la comunidad?", "Delete this user from the community?"));
+                  if (!okDelete) return;
+                  const result = await onDeleteUser(profileUser.id);
+                  onToast(result.message);
+                }}
+              >
+                <Icon name="trash" /> {pick(language, "Eliminar usuario", "Delete user")}
+              </button>
+            ) : null}
+            <Link to="/home" className="link-btn">
+              <Icon name="arrowLeft" /> {pick(language, "Volver al inicio", "Back to home")}
+            </Link>
+          </div>
         </div>
       </section>
     </main>

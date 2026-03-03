@@ -157,13 +157,20 @@ export const LoginPage = ({ users, onCreateOrLogin }: LoginPageProps) => {
               )}
             </span>
           </h1>
-          <p>{pick(language, "Microcomunidades para compartir mejor que en chats dispersos.", "Microcommunities to share better than in scattered chats.", "Microcomunidades para compartir mellor ca en chats dispersos.")}</p>
+          <p>
+            {pick(
+              language,
+              "Un espacio simple para tu grupo: pegas un link, se ordena por tema y decidís mejor juntos.",
+              "A simple space for your group: paste a link, sort it by topic, and decide better together.",
+              "Un espazo simple para o teu grupo: pegas unha ligazón, ordénase por tema e decidides mellor xuntos."
+            )}
+          </p>
           <div className="auth-entry-actions">
             <button type="button" className="btn btn-primary" onClick={goToRegister}>
-              <Icon name="spark" /> {pick(language, "Registrarme", "Register", "Rexistrarme")}
+              <Icon name="spark" /> {pick(language, "Crear cuenta", "Create account", "Crear conta")}
             </button>
             <button type="button" className="btn" onClick={goToLogin}>
-              <Icon name="user" /> {pick(language, "Login", "Login", "Login")}
+              <Icon name="user" /> {pick(language, "Ya tengo cuenta", "I already have an account", "Xa teño conta")}
             </button>
           </div>
         </section>
@@ -177,6 +184,14 @@ export const LoginPage = ({ users, onCreateOrLogin }: LoginPageProps) => {
               <Icon name="arrowLeft" /> {pick(language, "Volver", "Back", "Volver")}
             </button>
           </div>
+          <p className="hint">
+            {pick(
+              language,
+              "Entra con tu alias y sigue el hilo donde lo dejaste.",
+              "Sign in with your alias and continue where you left off.",
+              "Entra co teu alias e segue o fío onde o deixaches."
+            )}
+          </p>
 
           <form onSubmit={submitLogin} className="stack">
             <label>
@@ -209,6 +224,14 @@ export const LoginPage = ({ users, onCreateOrLogin }: LoginPageProps) => {
                 <Icon name="arrowLeft" /> {pick(language, "Volver", "Back", "Volver")}
               </button>
             </div>
+            <p className="hint">
+              {pick(
+                language,
+                "Crea tu perfil en menos de un minuto. Alias, contraseña y listo.",
+                "Create your profile in under a minute. Alias, password, done.",
+                "Crea o teu perfil en menos dun minuto. Alias, contrasinal e listo."
+              )}
+            </p>
 
             <form onSubmit={submitRegister} className="stack">
               <div className="auth-form-grid">
@@ -249,9 +272,9 @@ export const LoginPage = ({ users, onCreateOrLogin }: LoginPageProps) => {
                   <p className="hint">
                     {pick(
                       language,
-                      "Modo test: mínimo 4 caracteres.",
+                      "Durante pruebas: mínimo 4 caracteres.",
                       "Testing mode: minimum 4 characters.",
-                      "Modo test: mínimo 4 caracteres."
+                      "Durante probas: mínimo 4 caracteres."
                     )}
                   </p>
                 </div>
@@ -290,7 +313,7 @@ export const LoginPage = ({ users, onCreateOrLogin }: LoginPageProps) => {
           </section>
 
           <section className="auth-card auth-card-community">
-            <h2><Icon name="users" /> {pick(language, "Ya están en la comunidad", "Already in the community", "Xa están na comunidade")}</h2>
+            <h2><Icon name="users" /> {pick(language, "Personas que ya están dentro", "People already inside", "Persoas que xa están dentro")}</h2>
             {sortedUsers.length === 0 ? <p>{pick(language, "Aún no hay usuarios creados en este navegador.", "There are no profiles created in this browser yet.", "Aínda non hai usuarios creados neste navegador.")}</p> : null}
             <ul className="user-list">
               {sortedUsers.map((user) => (
@@ -321,15 +344,15 @@ export const LoginPage = ({ users, onCreateOrLogin }: LoginPageProps) => {
             <p>
               {pick(
                 language,
-                "Aquí creamos microcomunidades para compartir contenido ordenado y verificado entre todos.",
-                "Here we build microcommunities to share organized and community-verified content."
+                "Aquí montáis una microcomunidad con contenido ordenado y contexto compartido.",
+                "Here you build a microcommunity with organized content and shared context."
               )}
             </p>
             <p>
               {pick(
                 language,
-                "Úsalo con tu grupo: publicas pegando un link y listo. Cero fricción.",
-                "Use it with your group: just paste a link and publish. Zero friction."
+                "Publicar es simple: pegas un enlace, Wee lo clasifica y el grupo decide su valor.",
+                "Publishing is simple: paste a link, Wee classifies it, and the group decides its value."
               )}
             </p>
             <div className="welcome-modal-actions">

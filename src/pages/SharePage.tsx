@@ -1,0 +1,71 @@
+import { type FormEvent, useState } from "react";
+import { useNavigate } from "react-router-dom";
+import { Icon } from "../components/Icon";
+import { pick, useI18n } from "../lib/i18n";
+import { TopBar } from "../components/TopBar";
+import type { User } from "../lib/types";
+
+interface SharePageProps {
+  activeUser: User;
+  onShareUrl: (url: string) => Promise<{ mode: "created" | "merged" | "penalized"; message: string }>;
+  getDuplicatePreview: (url: string) => { exists: boolean; sameUser: boolean; contributors: number; totalShares: number };
+  onToast: (message: string) => void;
+}
+
+export const SharePage = ({ activeUser, onShareUrl, getDuplicatePreview, onToast }: SharePageProps) => {
+  const { language } = useI18n();
+  const [url, setUrl] = useState("");
+  const navigate = useNavigate();
+  const duplicateState = getDuplicatePreview(url.trim());
+
+  const submit = async (event: FormEvent) => {
+    event.preventDefault();
+    if (!url.trim()) {
+      onToast(pick(language, "Pega una URL para compartir.", "Paste a URL to share."));
+      return;
+    }
+
+    const result = await onShareUrl(url.trim());
+    onToast(result.message);
+    navigate("/home");
+  };
+
+  return (
+    <main>
+      <TopBar user={activeUser} />
+      <section className="page-section narrow">
+        <h2>{pick(language, "Comparte un enlace", "Share a link")}</h2>
+        <p className="section-intro">{pick(language, "Wee lo coloca en su tema y lo valora para separar señal de ruido.", "Wee places it in its topic and evaluates it to separate signal from noise.")}</p>
+        <form className="stack" onSubmit={submit}>
+          <label>
+            URL
+            <input
+              type="url"
+              placeholder="https://..."
+              value={url}
+              onChange={(event) => setUrl(event.target.value)}
+              required
+            />
+          </label>
+
+          {duplicateState.exists ? (
+            <p className={duplicateState.sameUser ? "warning" : "hint"}>
+              {duplicateState.sameUser
+                ? pick(
+                    language,
+                    `Este enlace ya está en tu historial. Lo sumaremos al mismo hilo para mantenerlo ordenado. Ahora: ${duplicateState.contributors} colaboradores · ${duplicateState.totalShares} envíos.`,
+                    `This link is already in your history. We'll merge it into the same thread to keep things tidy. Now: ${duplicateState.contributors} contributors · ${duplicateState.totalShares} shares.`,
+                    `Esta ligazón xa está no teu historial. Sumarémola ao mesmo fío para mantelo ordenado. Agora: ${duplicateState.contributors} colaboradores · ${duplicateState.totalShares} envíos.`
+                  )
+                : pick(language, `Este enlace ya está en Wee: lo compartieron ${duplicateState.contributors} personas (${duplicateState.totalShares} envíos). Lo uniremos al mismo hilo.`, `This link is already in Wee: shared by ${duplicateState.contributors} users (${duplicateState.totalShares} shares). We'll merge it into the same thread.`)}
+            </p>
+          ) : null}
+
+          <button type="submit" className="btn btn-primary">
+            <Icon name="link" /> {pick(language, "Publicar en Wee", "Post on Wee")}
+          </button>
+        </form>
+      </section>
+    </main>
+  );
+};

@@ -26,6 +26,10 @@ interface PostRow {
   canonical_url: string | null;
   title: string | null;
   text: string | null;
+  preview_title: string | null;
+  preview_description: string | null;
+  preview_image_url: string | null;
+  preview_site_name: string | null;
   source_domain: string | null;
   topics: string[] | null;
   subtopics: string[] | null;
@@ -143,6 +147,10 @@ const postRowToPost = (
     canonicalUrl: row.canonical_url ?? undefined,
     title: row.title ?? undefined,
     text: row.text ?? undefined,
+    previewTitle: row.preview_title ?? undefined,
+    previewDescription: row.preview_description ?? undefined,
+    previewImageUrl: row.preview_image_url ?? undefined,
+    previewSiteName: row.preview_site_name ?? undefined,
     sourceDomain: row.source_domain ?? undefined,
     topics: row.topics && row.topics.length > 0 ? row.topics : ["misc"],
     subtopics: row.subtopics ?? [],
@@ -186,6 +194,10 @@ const postToRow = (post: Post): Omit<PostRow, "id" | "created_at"> & { created_a
   canonical_url: post.canonicalUrl ?? canonicalizeUrl(post.url) ?? null,
   title: post.title ?? null,
   text: post.text ?? null,
+  preview_title: post.previewTitle ?? null,
+  preview_description: post.previewDescription ?? null,
+  preview_image_url: post.previewImageUrl ?? null,
+  preview_site_name: post.previewSiteName ?? null,
   source_domain: post.sourceDomain ?? null,
   topics: post.topics,
   subtopics: post.subtopics ?? [],
@@ -527,7 +539,7 @@ export const listPosts = async (): Promise<Post[]> => {
   const { data: posts, error: postsError } = await client
     .from("posts")
     .select(
-      "id,user_id,created_at,url,canonical_url,title,text,source_domain,topics,subtopics,quality_label,quality_score,interest_score,flags,rationale,normalized_text"
+      "id,user_id,created_at,url,canonical_url,title,text,preview_title,preview_description,preview_image_url,preview_site_name,source_domain,topics,subtopics,quality_label,quality_score,interest_score,flags,rationale,normalized_text"
     )
     .order("created_at", { ascending: false });
   if (postsError) throw new Error(`Remote posts read failed: ${postsError.message}`);

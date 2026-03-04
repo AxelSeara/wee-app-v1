@@ -239,6 +239,10 @@ create policy "comment_aura_delete_own" on comment_aura for delete using (auth.u
 
 Para capacidades admin globales (gestión de roles, borrado de terceros, moderación transversal), aplica el **SQL v3** de admin además de este bloque v2.
 
+Si las miniaturas no se guardan en posts existentes, aplica esta migración:
+
+- [docs/sql/supabase_posts_preview_metadata_v1.sql](docs/sql/supabase_posts_preview_metadata_v1.sql)
+
 Tabla opcional para ajustes por usuario (recomendada para guardar filtros):
 
 ```sql

@@ -1,0 +1,37 @@
+name: Feature request
+description: Suggest an improvement
+labels: [enhancement]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for the suggestion. Please explain the user value and expected behavior.
+
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem to solve
+      description: What pain point are you experiencing?
+      placeholder: It's hard to...
+    validations:
+      required: true
+
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed solution
+      placeholder: We could add...
+    validations:
+      required: true
+
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives considered
+      placeholder: Other options were...
+
+  - type: textarea
+    id: context
+    attributes:
+      label: Additional context
+      description: Mockups, links, references, constraints.

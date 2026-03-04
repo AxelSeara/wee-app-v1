@@ -1,5 +1,27 @@
 export type QualityLabel = "high" | "medium" | "low" | "clickbait";
 export type AppLanguage = "es" | "en" | "gl";
+export type AuraRulesetVersion = "v1" | "v2";
+
+export interface RuleAdjustment {
+  ruleId: string;
+  delta: number;
+  evidence: string;
+}
+
+export interface ScoreBreakdown {
+  version: AuraRulesetVersion;
+  baseScore: number;
+  adjustments: RuleAdjustment[];
+  finalScore: number;
+  firedRules: string[];
+}
+
+export interface ClassificationDebugBreakdown {
+  version: AuraRulesetVersion;
+  quality: ScoreBreakdown;
+  aura: ScoreBreakdown;
+  firedRules: string[];
+}
 
 export interface User {
   id: string;
@@ -83,6 +105,25 @@ export interface ClassifyInput {
   url?: string;
   title?: string;
   text?: string;
+  publishedAt?: string;
+  rulesetVersion?: AuraRulesetVersion;
+  debug?: boolean;
+  persistBreakdown?: boolean;
+  metadata?: {
+    publisher?: string;
+    author?: string;
+    schemaTypes?: string[];
+    hasImprintOrContact?: boolean;
+    outboundUrls?: string[];
+    bodyText?: string;
+    hasOverlayPopup?: boolean;
+    adLikeNodeRatio?: number;
+    duplicateSignals?: {
+      canonicalExists?: boolean;
+      contentHashExists?: boolean;
+    };
+    publishedAt?: string;
+  };
 }
 
 export interface ClassifyOutput {
@@ -96,6 +137,7 @@ export interface ClassifyOutput {
   sourceDomain?: string;
   extractedHosts: string[];
   normalizedText: string;
+  debugBreakdown?: ClassificationDebugBreakdown;
 }
 
 export interface SearchFilters {

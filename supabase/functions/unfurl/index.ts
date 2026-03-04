@@ -18,6 +18,15 @@ interface UnfurlResponse {
   imageUrl?: string;
   siteName?: string;
   finalUrl?: string;
+  publishedAt?: string;
+  schemaTypes?: string[];
+  publisher?: string;
+  author?: string;
+  hasImprintOrContact?: boolean;
+  outboundUrls?: string[];
+  bodyText?: string;
+  hasOverlayPopup?: boolean;
+  adLikeNodeRatio?: number;
   cached: boolean;
 }
 
@@ -170,6 +179,101 @@ const pickJsonLdImage = (html: string): string | undefined => {
   return undefined;
 };
 
+const collectJsonLdEntries = (html: string): unknown[] => {
+  const scriptPattern = /<script[^>]+type=["']application\/ld\+json["'][^>]*>([\s\S]*?)<\/script>/gi;
+  const entries: unknown[] = [];
+  let match: RegExpExecArray | null;
+  while ((match = scriptPattern.exec(html))) {
+    const raw = match[1]?.trim();
+    if (!raw) continue;
+    try {
+      const parsed = JSON.parse(raw);
+      if (Array.isArray(parsed)) {
+        parsed.forEach((item) => entries.push(item));
+      } else {
+        entries.push(parsed);
+      }
+    } catch {
+      // ignore malformed JSON-LD blocks
+    }
+  }
+  return entries;
+};
+
+const pickMetaOrJsonLd = (
+  html: string,
+  keys: string[],
+  jsonLdSelector: (entry: Record<string, unknown>) => string | undefined
+): string | undefined => {
+  const fromMeta = pickMeta(html, keys);
+  if (fromMeta) return fromMeta;
+  const entries = collectJsonLdEntries(html);
+  for (const entry of entries) {
+    if (!entry || typeof entry !== "object") continue;
+    const value = jsonLdSelector(entry as Record<string, unknown>);
+    if (value) return value;
+  }
+  return undefined;
+};
+
+const extractBodyText = (html: string): string | undefined => {
+  const cleaned = html
+    .replace(/<script[\s\S]*?<\/script>/gi, " ")
+    .replace(/<style[\s\S]*?<\/style>/gi, " ")
+    .replace(/<[^>]+>/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+  if (!cleaned) return undefined;
+  return cleaned.slice(0, 8000);
+};
+
+const extractOutboundUrls = (html: string, finalUrl: string): string[] => {
+  const urls = new Set<string>();
+  const finalHost = new URL(finalUrl).hostname.toLowerCase().replace(/^www\./, "");
+  const anchorPattern = /<a\b[^>]*>/gi;
+  let match: RegExpExecArray | null;
+  while ((match = anchorPattern.exec(html))) {
+    const attrs = parseAttributes(match[0]);
+    const href = attrs.href?.trim();
+    if (!href) continue;
+    try {
+      const absolute = new URL(href, finalUrl);
+      const host = absolute.hostname.toLowerCase().replace(/^www\./, "");
+      if (host && host !== finalHost) urls.add(absolute.toString());
+    } catch {
+      // ignore malformed links
+    }
+  }
+  return Array.from(urls).slice(0, 40);
+};
+
+const detectOverlaySignals = (html: string): { hasOverlayPopup: boolean; adLikeNodeRatio: number } => {
+  const markerMatches =
+    (html.match(/subscribe|paywall|modal|overlay|newsletter|cookie-consent|ad-|advert/i) ?? []).length;
+  const nodeCount = Math.max(1, (html.match(/<div\b/gi) ?? []).length + (html.match(/<section\b/gi) ?? []).length);
+  const adLikeCount = (html.match(/ad-|advert|sponsor|promo|subscribe|paywall/gi) ?? []).length;
+  return {
+    hasOverlayPopup: markerMatches >= 4,
+    adLikeNodeRatio: Math.min(1, adLikeCount / nodeCount)
+  };
+};
+
+const extractSchemaTypes = (html: string): string[] => {
+  const entries = collectJsonLdEntries(html);
+  const types = new Set<string>();
+  for (const entry of entries) {
+    if (!entry || typeof entry !== "object") continue;
+    const typeValue = (entry as Record<string, unknown>)["@type"];
+    if (typeof typeValue === "string" && typeValue.trim()) types.add(typeValue.trim());
+    if (Array.isArray(typeValue)) {
+      typeValue.forEach((item) => {
+        if (typeof item === "string" && item.trim()) types.add(item.trim());
+      });
+    }
+  }
+  return Array.from(types).slice(0, 8);
+};
+
 const toResponseFromCache = (row: CacheRow): UnfurlResponse => ({
   title: clean(row.title, 140),
   description: clean(row.description, 320),
@@ -252,12 +356,53 @@ Deno.serve(async (req) => {
     const title = clean(pickTitle(html), 140);
     const description = clean(pickMeta(html, ["og:description", "twitter:description", "description"]), 320);
     const siteName = clean(pickMeta(html, ["og:site_name", "application-name"]), 80);
+    const publishedAt = clean(
+      pickMetaOrJsonLd(
+        html,
+        ["article:published_time", "og:published_time", "publish-date", "date"],
+        (entry) => {
+          const datePublished = entry.datePublished;
+          return typeof datePublished === "string" ? datePublished : undefined;
+        }
+      ),
+      60
+    );
+    const publisher = clean(
+      pickMetaOrJsonLd(html, ["publisher", "article:publisher"], (entry) => {
+        const raw = entry.publisher;
+        if (typeof raw === "string") return raw;
+        if (raw && typeof raw === "object" && typeof (raw as Record<string, unknown>).name === "string") {
+          return (raw as Record<string, unknown>).name as string;
+        }
+        return undefined;
+      }),
+      140
+    );
+    const author = clean(
+      pickMetaOrJsonLd(html, ["author", "article:author"], (entry) => {
+        const raw = entry.author;
+        if (typeof raw === "string") return raw;
+        if (raw && typeof raw === "object" && typeof (raw as Record<string, unknown>).name === "string") {
+          return (raw as Record<string, unknown>).name as string;
+        }
+        if (Array.isArray(raw) && raw[0] && typeof raw[0] === "object" && typeof (raw[0] as Record<string, unknown>).name === "string") {
+          return (raw[0] as Record<string, unknown>).name as string;
+        }
+        return undefined;
+      }),
+      140
+    );
 
     const imageCandidate =
       pickMeta(html, ["og:image:secure_url", "og:image", "twitter:image", "thumbnail"]) ??
       pickLinkHref(html, ["image_src"]) ??
       pickJsonLdImage(html);
     const imageUrl = clean(absoluteUrl(imageCandidate, finalUrl), 1000);
+    const schemaTypes = extractSchemaTypes(html);
+    const bodyText = clean(extractBodyText(html), 5000);
+    const outboundUrls = extractOutboundUrls(html, finalUrl);
+    const { hasOverlayPopup, adLikeNodeRatio } = detectOverlaySignals(html);
+    const hasImprintOrContact = /imprint|about|contact|contacto|aviso legal|about us/i.test(html);
 
     const now = new Date();
     const ttlMs = 1000 * 60 * 60 * 12;
@@ -284,6 +429,15 @@ Deno.serve(async (req) => {
       imageUrl,
       siteName,
       finalUrl,
+      publishedAt,
+      schemaTypes,
+      publisher,
+      author,
+      hasImprintOrContact,
+      outboundUrls,
+      bodyText,
+      hasOverlayPopup,
+      adLikeNodeRatio,
       cached: false
     };
 

@@ -7,6 +7,15 @@ export interface UrlMetadata {
   description?: string;
   imageUrl?: string;
   siteName?: string;
+  publishedAt?: string;
+  schemaTypes?: string[];
+  publisher?: string;
+  author?: string;
+  hasImprintOrContact?: boolean;
+  outboundUrls?: string[];
+  bodyText?: string;
+  hasOverlayPopup?: boolean;
+  adLikeNodeRatio?: number;
 }
 
 const withTimeout = async <T>(promise: Promise<T>, timeoutMs: number): Promise<T> => {
@@ -146,13 +155,36 @@ const edgeUnfurl = async (url: string): Promise<UrlMetadata | null> => {
       description?: string;
       imageUrl?: string;
       siteName?: string;
+      publishedAt?: string;
+      schemaTypes?: string[];
+      publisher?: string;
+      author?: string;
+      hasImprintOrContact?: boolean;
+      outboundUrls?: string[];
+      bodyText?: string;
+      hasOverlayPopup?: boolean;
+      adLikeNodeRatio?: number;
     };
     const title = clean(payload.title, 140);
     const description = clean(payload.description, 320);
     const imageUrl = clean(payload.imageUrl, 800);
     const siteName = clean(payload.siteName, 80);
     if (!title && !description && !imageUrl && !siteName) return null;
-    return { title, description, imageUrl, siteName };
+    return {
+      title,
+      description,
+      imageUrl,
+      siteName,
+      publishedAt: payload.publishedAt,
+      schemaTypes: payload.schemaTypes,
+      publisher: clean(payload.publisher, 140),
+      author: clean(payload.author, 140),
+      hasImprintOrContact: payload.hasImprintOrContact,
+      outboundUrls: payload.outboundUrls,
+      bodyText: clean(payload.bodyText, 5000),
+      hasOverlayPopup: payload.hasOverlayPopup,
+      adLikeNodeRatio: payload.adLikeNodeRatio
+    };
   } catch {
     return null;
   }

@@ -1,5 +1,7 @@
-import type { ClassifyInput, ClassifyOutput, QualityLabel } from "./types";
+import type { ClassifyInput, ClassifyOutput, QualityLabel, RuleAdjustment, ScoreBreakdown } from "./types";
 import { clamp, normalizeSpace, safeDomainFromUrl } from "./utils";
+
+export type AuraRulesetVersion = "v1" | "v2";
 
 export const TOPIC_KEYWORDS: Record<string, string[]> = {
   iran: ["iran", "teheran", "tehran", "persia", "ayatollah", "revolucion islamica"],
@@ -42,7 +44,18 @@ const CLICKBAIT_PATTERNS = [
   /\bOMG\b/i
 ];
 
-const TIER_A_DOMAINS = [
+const CURIOSITY_GAP_PATTERNS = [
+  /lo que nadie te cuenta/i,
+  /no imaginar[aá]s/i,
+  /esto pas[oó] despu[eé]s/i,
+  /the reason why/i,
+  /this is why/i,
+  /what happened next/i,
+  /you need to know/i,
+  /antes y despu[eé]s/i
+];
+
+const V2_ALLOWLIST_HIGH_DEFAULT = [
   "reuters.com",
   "apnews.com",
   "bbc.com",
@@ -53,7 +66,7 @@ const TIER_A_DOMAINS = [
   "nytimes.com"
 ];
 
-const TIER_B_DOMAINS = [
+const V2_ALLOWLIST_MID_DEFAULT = [
   "cnn.com",
   "washingtonpost.com",
   "abc.es",
@@ -63,6 +76,53 @@ const TIER_B_DOMAINS = [
   "eldiario.es",
   "20minutos.es"
 ];
+
+const V2_BLOCKLIST_DEFAULT = ["example-clickbait.com", "adf.ly", "bit.ly"];
+
+const V2_PRIMARY_SOURCES_DEFAULT = [
+  "who.int",
+  "cdc.gov",
+  "ec.europa.eu",
+  "europa.eu",
+  "gov",
+  "gob.es",
+  "boe.es",
+  "un.org",
+  "oecd.org",
+  "imf.org",
+  "worldbank.org",
+  "nature.com",
+  "science.org",
+  "arxiv.org"
+];
+
+const parseEnvList = (value: string | undefined, fallback: string[]): string[] => {
+  const parsed = (value ?? "")
+    .split(",")
+    .map((item) => item.trim().toLowerCase())
+    .filter(Boolean);
+  return parsed.length > 0 ? parsed : fallback;
+};
+
+const TIER_A_DOMAINS = parseEnvList(
+  typeof import.meta !== "undefined" ? import.meta.env?.VITE_AURA_ALLOWLIST_HIGH : undefined,
+  V2_ALLOWLIST_HIGH_DEFAULT
+);
+
+const TIER_B_DOMAINS = parseEnvList(
+  typeof import.meta !== "undefined" ? import.meta.env?.VITE_AURA_ALLOWLIST_MID : undefined,
+  V2_ALLOWLIST_MID_DEFAULT
+);
+
+const V2_BLOCKLIST_DOMAINS = parseEnvList(
+  typeof import.meta !== "undefined" ? import.meta.env?.VITE_AURA_BLOCKLIST : undefined,
+  V2_BLOCKLIST_DEFAULT
+);
+
+const PRIMARY_SOURCE_DOMAINS = parseEnvList(
+  typeof import.meta !== "undefined" ? import.meta.env?.VITE_AURA_PRIMARY_SOURCES : undefined,
+  V2_PRIMARY_SOURCES_DEFAULT
+);
 
 const SOCIAL_DOMAINS = [
   "x.com",
@@ -149,7 +209,7 @@ const TOPIC_DOMAIN_HINTS: Record<string, string[]> = {
 const TOPIC_EXCLUSIONS: Record<string, string[]> = {
   memes: ["official report", "informe oficial", "policy paper", "research paper"],
   war: ["star wars", "video game", "gameplay"],
-  tech: ["low tech", "technology transfer office"] // weak disambiguation
+  tech: ["low tech", "technology transfer office"]
 };
 
 const TOPIC_PHRASE_SIGNALS: Record<string, string[]> = {
@@ -201,6 +261,28 @@ const SUBTOPIC_KEYWORDS: Record<string, string[]> = {
   "culture/music": ["album", "concert", "music", "song", "festival"]
 };
 
+const STOPWORDS = new Set([
+  "the", "and", "for", "with", "this", "that", "from", "your", "about", "have", "has", "was", "were", "will", "would",
+  "de", "del", "la", "el", "los", "las", "que", "con", "por", "para", "una", "uno", "sobre", "como", "más", "mas"
+]);
+
+const rulesetFromEnv = (): AuraRulesetVersion => {
+  const value = (typeof import.meta !== "undefined" ? import.meta.env?.VITE_AURA_RULESET_VERSION : undefined) ?? "v1";
+  return value === "v2" ? "v2" : "v1";
+};
+
+const base64Encode = (value: string): string => {
+  if (typeof btoa === "function") {
+    return btoa(unescape(encodeURIComponent(value)));
+  }
+  return value;
+};
+
+const serialiseBreakdownFlag = (kind: "quality" | "aura", breakdown: ScoreBreakdown): string => {
+  const payload = JSON.stringify(breakdown);
+  return `${kind}_breakdown:${base64Encode(payload)}`;
+};
+
 export const normalizeInputText = (input: ClassifyInput): string => {
   const merged = `${input.title ?? ""} ${input.text ?? ""} ${input.url ?? ""}`;
   return normalizeSpace(merged);
@@ -216,7 +298,6 @@ const keywordMatchCount = (normalizedText: string, keyword: string): number => {
   if (!keyword.trim()) return 0;
   const normalizedKeyword = normalizeTopicText(keyword.trim());
 
-  // Prefix stem, e.g. "tecnolog*" matches tecnologia/tecnologico
   if (normalizedKeyword.endsWith("*")) {
     const stem = normalizedKeyword.slice(0, -1);
     const tokens = normalizedText.split(/[^a-z0-9]+/).filter(Boolean);
@@ -271,7 +352,6 @@ export const detectTopics = (normalizedText: string, sourceDomain?: string): str
     });
   }
 
-  // If location tags are present, give a slight boost to local forum relevance.
   const hasLocationTopic = Object.keys(LOCATION_KEYWORDS).some((topic) => (scores.get(topic) ?? 0) > 0);
   if (hasLocationTopic) {
     scores.set("local", (scores.get("local") ?? 0) + 1);
@@ -286,10 +366,7 @@ export const detectTopics = (normalizedText: string, sourceDomain?: string): str
     .map(([topic]) => topic)
     .slice(0, 5);
 
-  if (selected.length > 0) {
-    return selected;
-  }
-
+  if (selected.length > 0) return selected;
   return [ranked[0][0] ?? "misc"];
 };
 
@@ -305,7 +382,7 @@ const detectTopicsFromInput = (input: ClassifyInput, sourceDomain?: string): str
 
   allTopics.forEach((topic) => {
     const titleScore = topicSignalStrength(title, topic) * 2.3;
-    const textScore = topicSignalStrength(text, topic) * 1;
+    const textScore = topicSignalStrength(text, topic);
     const urlScore = topicSignalStrength(url, topic) * 0.55;
     const prepared = normalizeTopicText(`${title} ${text}`);
     const phraseHits = (TOPIC_PHRASE_SIGNALS[topic] ?? []).reduce(
@@ -344,6 +421,7 @@ const detectTopicsFromInput = (input: ClassifyInput, sourceDomain?: string): str
     if (weightB !== weightA) return weightB - weightA;
     return a[0].localeCompare(b[0]);
   });
+
   const topScore = ranked[0][1];
   const dynamicThreshold = topScore >= 6 ? 0.45 : 0.5;
   const selected = ranked
@@ -369,9 +447,7 @@ const topicRationale = (normalizedText: string, topics: string[]): string[] => {
   const lines: string[] = [];
   topics.forEach((topic) => {
     const strength = topicSignalStrength(normalizedText, topic);
-    if (strength > 0) {
-      lines.push(`Tema "${topic}" detectado con señal ${strength.toFixed(1)}.`);
-    }
+    if (strength > 0) lines.push(`Tema "${topic}" detectado con señal ${strength.toFixed(1)}.`);
   });
   return lines;
 };
@@ -416,54 +492,129 @@ const extractHosts = (text: string, url?: string): string[] => {
     if (host && !host.includes("..")) hosts.add(host);
   }
 
+  const fromMetadata = inputOutboundHosts(text);
+  fromMetadata.forEach((host) => hosts.add(host));
+
   return Array.from(hosts);
 };
 
-const scoreQuality = (input: ClassifyInput, normalizedText: string, sourceDomain?: string): {
+const inputOutboundHosts = (text: string): string[] => {
+  const hosts = new Set<string>();
+  for (const match of text.matchAll(/https?:\/\/([a-z0-9.-]+\.[a-z]{2,})/gi)) {
+    const host = (match[1] ?? "").toLowerCase();
+    if (host) hosts.add(host.replace(/^www\./, ""));
+  }
+  return Array.from(hosts);
+};
+
+const domainMatches = (domain: string | undefined, list: string[]): boolean => {
+  if (!domain) return false;
+  return list.some((item) => domain === item || domain.endsWith(`.${item}`));
+};
+
+const addAdjustment = (
+  adjustments: RuleAdjustment[],
+  ruleId: string,
+  delta: number,
+  evidence: string,
+  firedRules: Set<string>
+): number => {
+  if (!delta) return 0;
+  adjustments.push({ ruleId, delta, evidence });
+  firedRules.add(ruleId);
+  return delta;
+};
+
+const titleBodyMismatch = (title: string, body: string): { mismatch: boolean; evidence: string } => {
+  const titleTokens = normalizeTopicText(title)
+    .split(/[^a-z0-9]+/)
+    .filter((token) => token.length >= 4 && !STOPWORDS.has(token));
+  const uniqueTitleTokens = Array.from(new Set(titleTokens)).slice(0, 8);
+  if (uniqueTitleTokens.length < 3) return { mismatch: false, evidence: "No hay suficientes tokens semánticos." };
+
+  const normalizedBody = normalizeTopicText(body);
+  const missing = uniqueTitleTokens.filter((token) => !new RegExp(`\\b${escapeRegex(token)}\\b`, "i").test(normalizedBody));
+  const ratio = missing.length / uniqueTitleTokens.length;
+  return {
+    mismatch: ratio >= 0.7,
+    evidence: `tokens_title=${uniqueTitleTokens.length}; missing=${missing.length}; ratio=${ratio.toFixed(2)}`
+  };
+};
+
+const toBreakdown = (
+  version: AuraRulesetVersion,
+  baseScore: number,
+  adjustments: RuleAdjustment[],
+  min: number,
+  max: number
+): ScoreBreakdown => {
+  const raw = adjustments.reduce((acc, item) => acc + item.delta, baseScore);
+  const finalScore = clamp(Math.round(raw), min, max);
+  return {
+    version,
+    baseScore,
+    adjustments,
+    finalScore,
+    firedRules: adjustments.map((item) => item.ruleId)
+  };
+};
+
+interface QualityEvalResult {
   score: number;
   flags: string[];
   rationale: string[];
   clickbaitStrong: boolean;
-} => {
-  let score = QUALITY_BASE;
+  breakdown: ScoreBreakdown;
+}
+
+interface InterestEvalResult {
+  score: number;
+  rationale: string;
+  breakdown: ScoreBreakdown;
+}
+
+const evaluateQualityV1 = (input: ClassifyInput, normalizedText: string, sourceDomain?: string): QualityEvalResult => {
+  const adjustments: RuleAdjustment[] = [];
+  const firedRules = new Set<string>();
   const flags: string[] = [];
   const rationale: string[] = [];
-  const rawText = `${input.title ?? ""} ${input.text ?? ""}`;
 
+  const rawText = `${input.title ?? ""} ${input.text ?? ""}`;
   const hasUrl = Boolean(input.url);
+
   if (hasUrl) {
-    score += QUALITY_WEIGHTS.hasUrl;
+    addAdjustment(adjustments, "v1.has_url", QUALITY_WEIGHTS.hasUrl, "Incluye enlace", firedRules);
     rationale.push("Incluye enlace a una fuente.");
     if (input.url?.startsWith("https://")) {
-      score += QUALITY_WEIGHTS.httpsBonus;
+      addAdjustment(adjustments, "v1.https", QUALITY_WEIGHTS.httpsBonus, "Fuente HTTPS", firedRules);
       rationale.push("La fuente usa HTTPS.");
     } else {
-      score -= QUALITY_WEIGHTS.insecurePenalty;
+      addAdjustment(adjustments, "v1.insecure", -QUALITY_WEIGHTS.insecurePenalty, "Fuente no HTTPS", firedRules);
       flags.push("insecure_source");
       rationale.push("La fuente no usa HTTPS.");
     }
   } else {
-    score -= QUALITY_WEIGHTS.missingUrlPenalty;
+    addAdjustment(adjustments, "v1.no_url", -QUALITY_WEIGHTS.missingUrlPenalty, "Falta URL", firedRules);
     flags.push("no_source");
     rationale.push("Falta enlace a la fuente.");
   }
 
   if (sourceDomain) {
-    if (TIER_A_DOMAINS.some((domain) => sourceDomain.endsWith(domain))) {
-      score += QUALITY_WEIGHTS.tierA;
+    if (domainMatches(sourceDomain, TIER_A_DOMAINS)) {
+      addAdjustment(adjustments, "v1.domain_tier_a", QUALITY_WEIGHTS.tierA, `domain=${sourceDomain}`, firedRules);
       rationale.push("Fuente de alta reputación (nivel A).");
-    } else if (TIER_B_DOMAINS.some((domain) => sourceDomain.endsWith(domain))) {
-      score += QUALITY_WEIGHTS.tierB;
+    } else if (domainMatches(sourceDomain, TIER_B_DOMAINS)) {
+      addAdjustment(adjustments, "v1.domain_tier_b", QUALITY_WEIGHTS.tierB, `domain=${sourceDomain}`, firedRules);
       rationale.push("Fuente consolidada (nivel B).");
     }
 
-    if (SOCIAL_DOMAINS.some((domain) => sourceDomain.endsWith(domain))) {
+    if (domainMatches(sourceDomain, SOCIAL_DOMAINS)) {
       const hasContext = (input.text ?? "").trim().length >= 90 || /\b(seg[uú]n|according to|report[oó]|confirm[oó])\b/i.test(normalizedText);
       const isTwitterLike = sourceDomain.endsWith("x.com") || sourceDomain.endsWith("twitter.com");
-      const socialPenalty = isTwitterLike
+      const penalty = isTwitterLike
         ? (hasContext ? QUALITY_WEIGHTS.socialPenaltyTwitterContext : QUALITY_WEIGHTS.socialPenaltyTwitterNoContext)
         : (hasContext ? QUALITY_WEIGHTS.socialPenaltyContext : QUALITY_WEIGHTS.socialPenaltyNoContext);
-      score -= socialPenalty;
+      addAdjustment(adjustments, "v1.social_penalty", -penalty, `domain=${sourceDomain}; context=${hasContext}`, firedRules);
       flags.push("social_media");
       rationale.push(hasContext ? "Fuente en red social, pero con contexto adicional." : "Fuente en red social.");
     }
@@ -471,51 +622,52 @@ const scoreQuality = (input: ClassifyInput, normalizedText: string, sourceDomain
 
   const titleLength = (input.title ?? "").trim().length;
   const textLength = (input.text ?? "").trim().length;
+
   if (titleLength >= 20 && titleLength <= 110) {
-    score += QUALITY_WEIGHTS.titleInformative;
+    addAdjustment(adjustments, "v1.title_informative", QUALITY_WEIGHTS.titleInformative, `title_len=${titleLength}`, firedRules);
     rationale.push("El título tiene longitud informativa.");
   } else if (titleLength > 0 && titleLength < 8) {
-    score -= QUALITY_WEIGHTS.titleTooShortPenalty;
+    addAdjustment(adjustments, "v1.title_short", -QUALITY_WEIGHTS.titleTooShortPenalty, `title_len=${titleLength}`, firedRules);
     rationale.push("El título es demasiado corto para informar.");
   } else if (titleLength > 160) {
-    score -= QUALITY_WEIGHTS.titleTooLongPenalty;
+    addAdjustment(adjustments, "v1.title_long", -QUALITY_WEIGHTS.titleTooLongPenalty, `title_len=${titleLength}`, firedRules);
     rationale.push("El título es excesivamente largo.");
   }
 
   if (textLength >= 80 && textLength <= 1200) {
-    score += QUALITY_WEIGHTS.textStrongContext;
+    addAdjustment(adjustments, "v1.text_context", QUALITY_WEIGHTS.textStrongContext, `text_len=${textLength}`, firedRules);
     rationale.push("El texto aporta contexto suficiente.");
   } else if (textLength > 0 && textLength < 30) {
-    score -= QUALITY_WEIGHTS.textTooShortPenalty;
+    addAdjustment(adjustments, "v1.text_too_short", -QUALITY_WEIGHTS.textTooShortPenalty, `text_len=${textLength}`, firedRules);
     rationale.push("El texto es demasiado corto para validar contexto.");
   } else if (textLength > 0 && textLength < 80) {
-    score -= QUALITY_WEIGHTS.textLowContextPenalty;
+    addAdjustment(adjustments, "v1.text_low_context", -QUALITY_WEIGHTS.textLowContextPenalty, `text_len=${textLength}`, firedRules);
     rationale.push("El texto aporta poco contexto.");
   }
 
   if (titleLength === 0 && textLength < 40) {
-    score -= QUALITY_WEIGHTS.missingTitleAndShortPenalty;
+    addAdjustment(adjustments, "v1.no_title_short_text", -QUALITY_WEIGHTS.missingTitleAndShortPenalty, "Sin título + texto corto", firedRules);
     rationale.push("Publicación muy corta y sin título.");
   }
 
   if (/\b\d{1,4}\b/.test(normalizedText) || /\b\d{4}-\d{2}-\d{2}\b/.test(normalizedText)) {
-    score += QUALITY_WEIGHTS.hasNumbersOrDates;
+    addAdjustment(adjustments, "v1.numeric_evidence", QUALITY_WEIGHTS.hasNumbersOrDates, "Números o fechas", firedRules);
     rationale.push("Incluye números o fechas.");
   }
 
   if (/"[^"]+"/.test(rawText) && /\b(seg[uú]n|according to|reportó|reported|confirmó|confirmed)\b/i.test(normalizedText)) {
-    score += QUALITY_WEIGHTS.quoteWithAttribution;
+    addAdjustment(adjustments, "v1.quote_attribution", QUALITY_WEIGHTS.quoteWithAttribution, "Cita con atribución", firedRules);
     rationale.push("Incluye cita con atribución.");
   }
 
   if (/\b(rumou?r|unverified|sin confirmar|supuestamente)\b/i.test(normalizedText)) {
-    score -= QUALITY_WEIGHTS.unverifiedClaimPenalty;
+    addAdjustment(adjustments, "v1.unverified_claim", -QUALITY_WEIGHTS.unverifiedClaimPenalty, "Claim no verificado", firedRules);
     flags.push("unverified_claim");
     rationale.push("Incluye afirmaciones no verificadas.");
   }
 
   if (/(\?\?\?+|!!!+|¡¡¡+)/.test(rawText)) {
-    score -= QUALITY_WEIGHTS.excessivePunctuationPenalty;
+    addAdjustment(adjustments, "v1.excessive_punctuation", -QUALITY_WEIGHTS.excessivePunctuationPenalty, "Puntuación excesiva", firedRules);
     rationale.push("La puntuación excesiva reduce fiabilidad.");
   }
 
@@ -528,52 +680,251 @@ const scoreQuality = (input: ClassifyInput, normalizedText: string, sourceDomain
   if (capsRatio > 0.45) clickbaitStrength += 1;
 
   const clickbaitStrong = clickbaitStrength >= 2;
-  const clickbaitMedium = clickbaitStrength === 1;
   if (clickbaitStrong) {
-    score -= QUALITY_WEIGHTS.clickbaitStrongPenalty;
+    addAdjustment(adjustments, "v1.clickbait_strong", -QUALITY_WEIGHTS.clickbaitStrongPenalty, `signals=${clickbaitStrength}`, firedRules);
     flags.push("sensational");
     rationale.push("Señales fuertes de clickbait o sensacionalismo.");
-  } else if (clickbaitMedium) {
-    score -= QUALITY_WEIGHTS.clickbaitMediumPenalty;
+  } else if (clickbaitStrength === 1) {
+    addAdjustment(adjustments, "v1.clickbait_soft", -QUALITY_WEIGHTS.clickbaitMediumPenalty, `signals=${clickbaitStrength}`, firedRules);
     flags.push("sensational_soft");
     rationale.push("Se detecta un tono sensacionalista moderado.");
   }
 
+  const breakdown = toBreakdown("v1", QUALITY_BASE, adjustments, QUALITY_CAPS.min, QUALITY_CAPS.max);
+
   return {
-    score: clamp(score, QUALITY_CAPS.min, QUALITY_CAPS.max),
+    score: breakdown.finalScore,
     flags,
     rationale,
-    clickbaitStrong
+    clickbaitStrong,
+    breakdown
   };
 };
 
-const scoreInterest = (topics: string[], qualityScore: number, clickbait: boolean, createdAt?: number, textLength = 0): {
-  score: number;
-  rationale: string;
-} => {
+const evaluateQualityV2 = (input: ClassifyInput, normalizedText: string, sourceDomain?: string): QualityEvalResult => {
+  const adjustments: RuleAdjustment[] = [];
+  const firedRules = new Set<string>();
+  const flags: string[] = [];
+  const rationale: string[] = [];
+  const baseScore = 50;
+
+  const title = (input.title ?? "").trim();
+  const text = (input.text ?? "").trim();
+  const rawText = `${title} ${text}`;
+  const metadata = input.metadata;
+
+  if (input.url) {
+    addAdjustment(adjustments, "v2.has_url", 5, "Incluye enlace", firedRules);
+    if (input.url.startsWith("https://")) {
+      addAdjustment(adjustments, "v2.https", 2, "Fuente HTTPS", firedRules);
+    } else {
+      addAdjustment(adjustments, "v2.insecure", -4, "Fuente no HTTPS", firedRules);
+      flags.push("insecure_source");
+    }
+  } else {
+    addAdjustment(adjustments, "v2.no_source", -14, "Falta URL", firedRules);
+    flags.push("no_source");
+  }
+
+  if (sourceDomain) {
+    if (domainMatches(sourceDomain, V2_BLOCKLIST_DOMAINS)) {
+      addAdjustment(adjustments, "v2.domain_blocklist", -28, `domain=${sourceDomain}`, firedRules);
+      flags.push("blocked_domain");
+      rationale.push("Dominio marcado como fuente de baja confianza.");
+    } else if (domainMatches(sourceDomain, TIER_A_DOMAINS)) {
+      addAdjustment(adjustments, "v2.domain_allowlist_high", 22, `domain=${sourceDomain}`, firedRules);
+      rationale.push("Dominio en allowlist de alta confianza.");
+    } else if (domainMatches(sourceDomain, TIER_B_DOMAINS)) {
+      addAdjustment(adjustments, "v2.domain_allowlist_mid", 12, `domain=${sourceDomain}`, firedRules);
+      rationale.push("Dominio en allowlist de confianza media.");
+    } else {
+      addAdjustment(adjustments, "v2.domain_unknown_soft_penalty", -6, `domain=${sourceDomain}`, firedRules);
+      flags.push("unknown_domain");
+      rationale.push("Dominio sin historial de confianza (penalización suave).");
+    }
+
+    if (domainMatches(sourceDomain, SOCIAL_DOMAINS)) {
+      const hasContext = text.length >= 100;
+      const penalty = sourceDomain.endsWith("x.com") || sourceDomain.endsWith("twitter.com")
+        ? (hasContext ? -4 : -7)
+        : (hasContext ? -7 : -11);
+      addAdjustment(adjustments, "v2.social_media_penalty", penalty, `domain=${sourceDomain}; context=${hasContext}`, firedRules);
+      flags.push("social_media");
+    }
+  }
+
+  const hasPublisherOrAuthor = Boolean(metadata?.publisher || metadata?.author);
+  const hasImprintOrContact = Boolean(metadata?.hasImprintOrContact);
+  if (hasPublisherOrAuthor && hasImprintOrContact) {
+    addAdjustment(adjustments, "v2.publisher_author_contact", 8, "publisher/author+imprint/contact", firedRules);
+    rationale.push("La noticia aporta datos editoriales verificables.");
+  } else if (hasPublisherOrAuthor) {
+    addAdjustment(adjustments, "v2.publisher_or_author_partial", 4, "publisher/author", firedRules);
+  }
+
+  const schemaTypes = metadata?.schemaTypes ?? [];
+  const hasNewsSchema = schemaTypes.some((item) => /newsarticle|article/i.test(item));
+  if (hasNewsSchema) {
+    addAdjustment(adjustments, "v2.schema_news_article", 9, `schema=${schemaTypes.join("|")}`, firedRules);
+    rationale.push("Schema.org NewsArticle detectado.");
+  }
+
+  const publishedAt = metadata?.publishedAt || input.publishedAt;
+  if (publishedAt) {
+    const publishedTs = Date.parse(publishedAt);
+    if (Number.isFinite(publishedTs)) {
+      if (publishedTs > Date.now() + 1000 * 60 * 60) {
+        addAdjustment(adjustments, "v2.future_publication_penalty", -15, `published_at=${publishedAt}`, firedRules);
+        flags.push("future_date");
+      } else {
+        addAdjustment(adjustments, "v2.valid_publication_date", 4, `published_at=${publishedAt}`, firedRules);
+      }
+    }
+  }
+
+  const bodyText = metadata?.bodyText ?? text;
+  const wordCount = normalizeTopicText(bodyText).split(/[^a-z0-9]+/).filter(Boolean).length;
+  const charCount = bodyText.length;
+  const density = wordCount > 0 ? charCount / wordCount : 0;
+
+  if (wordCount < 60) {
+    addAdjustment(adjustments, "v2.low_text_density", -12, `word_count=${wordCount}`, firedRules);
+    flags.push("thin_content");
+    rationale.push("Contenido demasiado breve para validar bien la información.");
+  } else if (wordCount >= 120) {
+    addAdjustment(adjustments, "v2.good_text_density", 4, `word_count=${wordCount}; density=${density.toFixed(1)}`, firedRules);
+  }
+
+  if (title.length >= 20 && title.length <= 120) {
+    addAdjustment(adjustments, "v2.informative_title", 4, `title_len=${title.length}`, firedRules);
+  } else if (title.length > 0 && title.length < 9) {
+    addAdjustment(adjustments, "v2.short_title_penalty", -8, `title_len=${title.length}`, firedRules);
+  }
+
+  if (/\b\d{1,4}\b/.test(normalizedText) || /\b\d{4}-\d{2}-\d{2}\b/.test(normalizedText)) {
+    addAdjustment(adjustments, "v2.numeric_evidence", 4, "Números o fechas", firedRules);
+  }
+
+  if (/"[^"]+"/.test(rawText) && /\b(seg[uú]n|according to|reportó|reported|confirmó|confirmed)\b/i.test(normalizedText)) {
+    addAdjustment(adjustments, "v2.quote_attribution", 6, "Cita con atribución", firedRules);
+  }
+
+  const outboundHosts = (metadata?.outboundUrls ?? [])
+    .map((value) => safeDomainFromUrl(value))
+    .filter((value): value is string => Boolean(value));
+  const hasPrimarySource = outboundHosts.some((host) => domainMatches(host, PRIMARY_SOURCE_DOMAINS));
+  if (hasPrimarySource) {
+    addAdjustment(adjustments, "v2.primary_sources_bonus", 8, `hosts=${outboundHosts.join(",")}`, firedRules);
+    rationale.push("Incluye enlaces a fuentes primarias verificables.");
+  } else if (sourceDomain && !domainMatches(sourceDomain, TIER_A_DOMAINS) && !domainMatches(sourceDomain, TIER_B_DOMAINS)) {
+    addAdjustment(adjustments, "v2.no_outbound_low_rep", -10, "Sin enlaces salientes verificables", firedRules);
+  }
+
+  const clickbaitMatches = CLICKBAIT_PATTERNS.filter((pattern) => pattern.test(normalizedText)).length;
+  const curiosityMatches = CURIOSITY_GAP_PATTERNS.filter((pattern) => pattern.test(normalizedText)).length;
+  const emojiCount = (normalizedText.match(/[\u{1F300}-\u{1FAFF}]/gu) ?? []).length;
+  const capsRatio = getAllCapsRatio(rawText);
+  const mismatch = titleBodyMismatch(title, bodyText);
+
+  let clickbaitStrength = clickbaitMatches;
+  if (emojiCount >= 4) clickbaitStrength += 1;
+  if (capsRatio > 0.45) clickbaitStrength += 1;
+  if (curiosityMatches > 0) clickbaitStrength += 1;
+
+  if (curiosityMatches > 0) {
+    addAdjustment(adjustments, "v2.curiosity_gap_penalty", -8, `matches=${curiosityMatches}`, firedRules);
+    flags.push("curiosity_gap");
+  }
+
+  if (mismatch.mismatch) {
+    addAdjustment(adjustments, "v2.title_body_mismatch", -9, mismatch.evidence, firedRules);
+    flags.push("title_body_mismatch");
+    rationale.push("El título no se sostiene bien con el cuerpo disponible.");
+  }
+
+  let clickbaitStrong = false;
+  if (clickbaitStrength >= 2) {
+    clickbaitStrong = true;
+    addAdjustment(adjustments, "v2.clickbait_strong", -42, `signals=${clickbaitStrength}`, firedRules);
+    flags.push("sensational");
+  } else if (clickbaitStrength === 1) {
+    addAdjustment(adjustments, "v2.clickbait_soft", -16, `signals=${clickbaitStrength}`, firedRules);
+    flags.push("sensational_soft");
+  }
+
+  if (metadata?.hasOverlayPopup) {
+    addAdjustment(adjustments, "v2.intrusive_overlay_penalty", -8, "Overlay/popup detectado", firedRules);
+    flags.push("intrusive_overlay");
+  }
+
+  if ((metadata?.adLikeNodeRatio ?? 0) >= 0.2) {
+    addAdjustment(adjustments, "v2.ad_ratio_penalty", -6, `ad_ratio=${(metadata?.adLikeNodeRatio ?? 0).toFixed(2)}`, firedRules);
+    flags.push("ad_intrusive");
+  }
+
+  if (metadata?.duplicateSignals?.canonicalExists) {
+    addAdjustment(adjustments, "v2.duplicate_canonical_penalty", -6, "canonical duplicate", firedRules);
+    flags.push("duplicate_canonical");
+  }
+
+  if (metadata?.duplicateSignals?.contentHashExists) {
+    addAdjustment(adjustments, "v2.duplicate_content_penalty", -14, "content hash duplicate", firedRules);
+    flags.push("duplicate_content");
+  }
+
+  const breakdown = toBreakdown("v2", baseScore, adjustments, QUALITY_CAPS.min, QUALITY_CAPS.max);
+
+  return {
+    score: breakdown.finalScore,
+    flags,
+    rationale,
+    clickbaitStrong,
+    breakdown
+  };
+};
+
+const scoreInterest = (
+  topics: string[],
+  qualityScore: number,
+  clickbait: boolean,
+  createdAt: number | undefined,
+  textLength: number,
+  version: AuraRulesetVersion
+): InterestEvalResult => {
   const now = Date.now();
   const ts = createdAt ?? now;
   const ageHours = Math.max(0, (now - ts) / (1000 * 60 * 60));
 
-  let score = AURA_BASE;
+  const adjustments: RuleAdjustment[] = [];
+  const firedRules = new Set<string>();
+  const baseScore = AURA_BASE;
+
   const topicBoost = topics.reduce((acc, topic) => acc + (TOPIC_WEIGHTS[topic] ?? 6), 0) / Math.max(1, topics.length);
   const qualityNormalized = (qualityScore - 50) / 50;
   const contextBoost = 8 * Math.tanh(textLength / 220) - 2;
   const recencyBoost = 12 * Math.exp(-ageHours / 48) - 2.5;
 
-  score += topicBoost * 0.85;
-  score += qualityNormalized * 22;
-  score += contextBoost;
-  score += recencyBoost;
+  addAdjustment(adjustments, `${version}.aura_topic`, topicBoost * 0.85, `topic_boost=${topicBoost.toFixed(2)}`, firedRules);
+  addAdjustment(adjustments, `${version}.aura_quality`, qualityNormalized * 22, `quality=${qualityScore}`, firedRules);
+  addAdjustment(adjustments, `${version}.aura_context`, contextBoost, `text_len=${textLength}`, firedRules);
+  addAdjustment(adjustments, `${version}.aura_recency`, recencyBoost, `age_hours=${ageHours.toFixed(1)}`, firedRules);
 
-  score = clamp(score, AURA_CAPS.min, AURA_CAPS.max);
+  let breakdown = toBreakdown(version, baseScore, adjustments, AURA_CAPS.min, AURA_CAPS.max);
+  let score = breakdown.finalScore;
 
   if (clickbait) {
     score = Math.min(score, AURA_CAPS.clickbaitMax);
-    return { score: Math.round(score), rationale: "Aura limitada por señales de clickbait." };
+    addAdjustment(adjustments, `${version}.aura_clickbait_cap`, score - breakdown.finalScore, `cap=${AURA_CAPS.clickbaitMax}`, firedRules);
+    breakdown = {
+      ...breakdown,
+      adjustments,
+      finalScore: score,
+      firedRules: Array.from(new Set([...breakdown.firedRules, `${version}.aura_clickbait_cap`]))
+    };
+    return { score, rationale: "Aura limitada por señales de clickbait.", breakdown };
   }
 
-  return { score: Math.round(score), rationale: "Aura calculada por tema, calidad, actualidad y contexto." };
+  return { score, rationale: "Aura calculada por tema, calidad, actualidad y contexto.", breakdown };
 };
 
 const qualityLabelFromScore = (score: number, clickbaitStrong: boolean): QualityLabel => {
@@ -584,17 +935,34 @@ const qualityLabelFromScore = (score: number, clickbaitStrong: boolean): Quality
 };
 
 export const classifyPost = (input: ClassifyInput, createdAt?: number): ClassifyOutput => {
+  const version: AuraRulesetVersion = input.rulesetVersion ?? rulesetFromEnv();
   const normalizedText = normalizeInputText(input);
   const sourceDomain = safeDomainFromUrl(input.url);
   const extractedHosts = extractHosts(normalizedText, input.url);
   const topics = detectTopicsFromInput(input, sourceDomain);
   const subtopics = detectSubtopics(normalizedText, topics);
 
-  const quality = scoreQuality(input, normalizedText, sourceDomain);
-  const interest = scoreInterest(topics, quality.score, quality.clickbaitStrong, createdAt, (input.text ?? "").length);
+  const quality = version === "v2"
+    ? evaluateQualityV2(input, normalizedText, sourceDomain)
+    : evaluateQualityV1(input, normalizedText, sourceDomain);
+  const interest = scoreInterest(topics, quality.score, quality.clickbaitStrong, createdAt, (input.text ?? "").length, version);
 
   const qualityLabel = qualityLabelFromScore(quality.score, quality.clickbaitStrong);
   const rationale = [...topicRationale(normalizedText, topics), ...quality.rationale, interest.rationale];
+
+  const debugBreakdown = {
+    version,
+    quality: quality.breakdown,
+    aura: interest.breakdown,
+    firedRules: Array.from(new Set([...quality.breakdown.firedRules, ...interest.breakdown.firedRules]))
+  };
+
+  const outputFlags = [...quality.flags];
+  if (input.persistBreakdown !== false) {
+    outputFlags.push(`aura_ruleset:${version}`);
+    outputFlags.push(serialiseBreakdownFlag("quality", quality.breakdown));
+    outputFlags.push(serialiseBreakdownFlag("aura", interest.breakdown));
+  }
 
   return {
     topics,
@@ -602,10 +970,11 @@ export const classifyPost = (input: ClassifyInput, createdAt?: number): Classify
     qualityLabel,
     qualityScore: quality.score,
     interestScore: interest.score,
-    flags: quality.flags,
+    flags: Array.from(new Set(outputFlags)),
     rationale,
     sourceDomain,
     extractedHosts,
-    normalizedText
+    normalizedText,
+    debugBreakdown: input.debug ? debugBreakdown : undefined
   };
 };

@@ -14,8 +14,8 @@ import { enrichUrl } from "./lib/enrich";
 import { NotificationsContext, type AppNotification } from "./lib/notifications";
 import { trackComment, trackOpenSource, trackPageView, trackRate, trackShare } from "./lib/usageAnalytics";
 import { listPosts as listPostsFromStore } from "./lib/store";
-import type { ExportBundle } from "./lib/types";
-import { canonicalizeUrl, duplicateUrlKeys, generateId, normalizeSpace } from "./lib/utils";
+import type { AuraRulesetVersion, ExportBundle } from "./lib/types";
+import { canonicalizeUrl, duplicateUrlKeys, generateId, normalizeSpace, sha256Hex } from "./lib/utils";
 import { HomePage } from "./pages/HomePage";
 import { LoginPage } from "./pages/LoginPage";
 import { PostDetailPage } from "./pages/PostDetailPage";
@@ -213,6 +213,17 @@ const AppRoutes = () => {
     return undefined;
   };
 
+  const getContentHashFromFlags = (flags: string[] | undefined): string | undefined => {
+    const entry = (flags ?? []).find((flag) => flag.startsWith("content_hash:"));
+    return entry?.slice("content_hash:".length);
+  };
+
+  const findDuplicateByContentHash = (contentHash: string) =>
+    posts.find((post) => getContentHashFromFlags(post.flags) === contentHash);
+
+  const rulesetVersion: AuraRulesetVersion =
+    import.meta.env.VITE_AURA_RULESET_VERSION === "v2" ? "v2" : "v1";
+
   const getDuplicatePreview = (
     url: string
   ): { exists: boolean; sameUser: boolean; contributors: number; totalShares: number } => {
@@ -231,11 +242,12 @@ const AppRoutes = () => {
   const onShareUrl = async (
     url: string,
     options?: { forceTopic?: string }
-  ): Promise<{ mode: "created" | "merged" | "penalized"; message: string }> => {
+  ): Promise<{ mode: "created" | "merged" | "penalized"; message: string; debugBreakdown?: unknown }> => {
     if (!activeUser) return { mode: "created", message: pick(language, "Inicia sesión para compartir enlaces.", "Sign in to share links.") };
 
     const canonical = canonicalizeUrl(url);
     const existing = findDuplicatePost(url);
+    const debugMode = new URLSearchParams(window.location.search).get("debug") === "1";
 
     if (existing) {
       const counts = { ...(existing.contributorCounts ?? { [existing.userId]: existing.shareCount ?? 1 }) };
@@ -288,7 +300,69 @@ const AppRoutes = () => {
     const safeMetadataTitle = metadata.title && !isUnusableTitle(metadata.title) ? metadata.title : undefined;
     const derivedTitle = safeMetadataTitle ?? deriveTitleFromUrl(url) ?? pick(language, "Noticia compartida", "Shared post");
     const description = metadata.description;
-    const classified = classifyPost({ url, title: derivedTitle, text: description }, createdAt);
+    const contentHash = await sha256Hex(normalizeSpace(`${derivedTitle ?? ""} ${description ?? ""}`));
+    const duplicateByContent = findDuplicateByContentHash(contentHash);
+    if (duplicateByContent) {
+      const counts = { ...(duplicateByContent.contributorCounts ?? { [duplicateByContent.userId]: duplicateByContent.shareCount ?? 1 }) };
+      counts[activeUser.id] = (counts[activeUser.id] ?? 0) + 1;
+      const contributorUserIds = Array.from(new Set([...(duplicateByContent.contributorUserIds ?? [duplicateByContent.userId]), activeUser.id]));
+      const shareCount = Object.values(counts).reduce((acc, value) => acc + value, 0);
+      const sameUserDuplicate = counts[activeUser.id] > 1;
+
+      await savePost({
+        ...duplicateByContent,
+        canonicalUrl: canonical ?? duplicateByContent.canonicalUrl,
+        contributorCounts: counts,
+        contributorUserIds,
+        shareCount,
+        rationale: sameUserDuplicate
+          ? duplicateByContent.rationale.includes("Duplicado por hash de contenido; se aplica penalización interna")
+            ? duplicateByContent.rationale
+            : [...duplicateByContent.rationale, "Duplicado por hash de contenido; se aplica penalización interna"]
+          : duplicateByContent.rationale
+      });
+
+      trackShare({
+        mode: sameUserDuplicate ? "penalized" : "merged",
+        sourceDomain: duplicateByContent.sourceDomain,
+        primaryTopic: duplicateByContent.topics?.[0]
+      });
+
+      return {
+        mode: sameUserDuplicate ? "penalized" : "merged",
+        message: pick(
+          language,
+          `Este contenido ya existía en otro enlace. Lo unimos al mismo hilo (${contributorUserIds.length} colaboradores).`,
+          `This content already existed under another link. Merged into the same thread (${contributorUserIds.length} contributors).`
+        )
+      };
+    }
+
+    const classified = classifyPost(
+      {
+        url,
+        title: derivedTitle,
+        text: description,
+        rulesetVersion,
+        debug: debugMode,
+        metadata: {
+          publisher: metadata.publisher,
+          author: metadata.author,
+          schemaTypes: metadata.schemaTypes,
+          hasImprintOrContact: metadata.hasImprintOrContact,
+          outboundUrls: metadata.outboundUrls,
+          bodyText: metadata.bodyText,
+          hasOverlayPopup: metadata.hasOverlayPopup,
+          adLikeNodeRatio: metadata.adLikeNodeRatio,
+          publishedAt: metadata.publishedAt,
+          duplicateSignals: {
+            canonicalExists: Boolean(existing),
+            contentHashExists: Boolean(duplicateByContent)
+          }
+        }
+      },
+      createdAt
+    );
     const forcedTopic = options?.forceTopic?.trim().toLowerCase().replace(/\s+/g, "-");
     const finalTopics =
       forcedTopic && !classified.topics.includes(forcedTopic)
@@ -318,10 +392,21 @@ const AppRoutes = () => {
       qualityLabel: classified.qualityLabel,
       qualityScore: classified.qualityScore,
       interestScore: classified.interestScore,
-      flags: classified.flags,
+      flags: Array.from(new Set([...classified.flags, `content_hash:${contentHash}`])),
       rationale: classified.rationale,
       normalizedText: classified.normalizedText
     });
+
+    if (debugMode && classified.debugBreakdown) {
+      const payload = {
+        url,
+        domain: classified.sourceDomain ?? "unknown",
+        aura: classified.interestScore,
+        fired_rules: classified.debugBreakdown.firedRules
+      };
+      console.info("aura_index_debug", payload);
+      (window as Window & { __WEE_LAST_AURA_DEBUG__?: unknown }).__WEE_LAST_AURA_DEBUG__ = classified.debugBreakdown;
+    }
 
     trackShare({
       mode: "created",
@@ -336,7 +421,8 @@ const AppRoutes = () => {
         `Publicado en ${finalTopics[0] ?? "misc"} · calidad ${qualityLabelText(classified.qualityLabel, language)}.`,
         `Posted in ${finalTopics[0] ?? "misc"} · quality ${qualityLabelText(classified.qualityLabel, language)}.`,
         `Publicado en ${finalTopics[0] ?? "misc"} · calidade ${qualityLabelText(classified.qualityLabel, "gl")}.`
-      )
+      ),
+      debugBreakdown: debugMode ? classified.debugBreakdown : undefined
     };
   };
 

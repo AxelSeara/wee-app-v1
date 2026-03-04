@@ -528,6 +528,15 @@ h3 svg,
   padding-right: 0.1rem;
 }
 
+.notification-list::-webkit-scrollbar {
+  width: 8px;
+}
+
+.notification-list::-webkit-scrollbar-thumb {
+  background: #385881;
+  border-radius: 999px;
+}
+
 .notification-item {
   display: grid;
   gap: 0.16rem;
@@ -550,6 +559,12 @@ h3 svg,
 .notification-item-title {
   font-size: 0.8rem;
   color: #e7f0ff;
+  line-height: 1.3;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
 }
 
 .notification-item-post {
@@ -2189,10 +2204,16 @@ textarea::placeholder {
   display: inline-flex;
   align-items: center;
   gap: 0.35rem;
+  flex-wrap: wrap;
+  justify-content: flex-end;
 }
 
 .comments-tools {
   margin: 0 0 0.55rem;
+  border: 1px solid #34557f;
+  border-radius: 9px;
+  background: linear-gradient(160deg, rgb(17 31 53 / 76%), rgb(13 25 44 / 74%));
+  padding: 0.38rem;
 }
 
 .comments-tools-toggle {
@@ -2904,6 +2925,7 @@ textarea::placeholder {
   align-items: center;
   gap: 0.4rem;
   flex-wrap: wrap;
+  row-gap: 0.32rem;
 }
 
 .topic-chat-open-btn {
@@ -3749,6 +3771,28 @@ textarea:focus-visible {
 
   .topbar-right {
     gap: 0.48rem;
+  }
+
+  .notification-dropdown {
+    right: -10px;
+    width: min(94vw, 320px);
+  }
+
+  .comments-head {
+    align-items: flex-start;
+  }
+
+  .comments-form {
+    grid-template-columns: 1fr auto;
+    gap: 0.38rem;
+  }
+
+  .topic-chat-meta {
+    gap: 0.28rem;
+  }
+
+  .topic-chat-context {
+    margin-left: 0;
   }
 
   .btn {

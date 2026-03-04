@@ -93,6 +93,30 @@ export const CommunityPage = ({
     }
   };
 
+  const shareInvite = async (link: string) => {
+    if (!link) return;
+    const text = pick(
+      language,
+      `Únete a ${selectedCommunity?.name ?? "mi comunidad"} en Wee: ${link}`,
+      `Join ${selectedCommunity?.name ?? "my community"} on Wee: ${link}`,
+      `Únete a ${selectedCommunity?.name ?? "a miña comunidade"} en Wee: ${link}`
+    );
+    if (navigator.share) {
+      try {
+        await navigator.share({
+          title: pick(language, "Invitación a Wee", "Wee invite", "Invitación a Wee"),
+          text,
+          url: link
+        });
+        onToast?.(pick(language, "Invitación compartida.", "Invite shared.", "Invitación compartida."));
+        return;
+      } catch {
+        // fallback to copy
+      }
+    }
+    await copy(link, pick(language, "Enlace", "Link", "Ligazón"));
+  };
+
   return (
     <main>
       <TopBar
@@ -192,6 +216,9 @@ export const CommunityPage = ({
                     </button>
                     <button type="button" className="btn" onClick={() => copy(inviteUrl, pick(language, "Enlace", "Link", "Ligazón"))}>
                       <Icon name="link" /> {pick(language, "Copiar enlace", "Copy link", "Copiar ligazón")}
+                    </button>
+                    <button type="button" className="btn btn-primary" onClick={() => void shareInvite(inviteUrl)}>
+                      <Icon name="send" /> {pick(language, "Compartir invitación", "Share invite", "Compartir invitación")}
                     </button>
                   </div>
                 </>

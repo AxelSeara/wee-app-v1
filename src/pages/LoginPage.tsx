@@ -1,4 +1,4 @@
-import { type FormEvent, useMemo, useState } from "react";
+import { type FormEvent, useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Avatar } from "../components/Avatar";
 import { Icon } from "../components/Icon";
@@ -63,6 +63,8 @@ export const LoginPage = ({
   const [avatarDataUrl, setAvatarDataUrl] = useState<string | undefined>(undefined);
   const [profileLanguage, setProfileLanguage] = useState<AppLanguage>("es");
   const [privacyAccepted, setPrivacyAccepted] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
+  const [showPasswordConfirm, setShowPasswordConfirm] = useState(false);
 
   const sortedUsers = useMemo(() => [...users].sort((a, b) => b.createdAt - a.createdAt), [users]);
   const aliasMatchesExisting = useMemo(() => users.some((user) => user.alias.toLowerCase() === alias.trim().toLowerCase()), [users, alias]);
@@ -74,7 +76,14 @@ export const LoginPage = ({
     setPasswordConfirm("");
     setAvatarDataUrl(undefined);
     setPrivacyAccepted(false);
+    setShowPassword(false);
+    setShowPasswordConfirm(false);
   };
+
+  useEffect(() => {
+    if (view !== "register") return;
+    setAlias((current) => current || generateAlias());
+  }, [view]);
 
   const parseJoinInput = (raw: string): { code?: string; token?: string } => {
     const value = raw.trim();
@@ -131,12 +140,12 @@ export const LoginPage = ({
     }
   };
 
-  const confirmJoin = async () => {
+  const confirmJoin = async (nextView: "login" | "register") => {
     setError(null);
     const parsed = parseJoinInput(joinCodeOrLink);
     try {
       await onConfirmCommunity(parsed);
-      setView("login");
+      setView(nextView);
       resetAuth();
     } catch {
       setError(pick(language, "No pudimos confirmar la invitación.", "We couldn't confirm the invite.", "Non puidemos confirmar a invitación."));
@@ -257,7 +266,8 @@ export const LoginPage = ({
           {preview.description ? <p className="hint">{preview.description}</p> : null}
           {error ? <p className="error">{error}</p> : null}
           <div className="auth-entry-actions">
-            <button type="button" className="btn btn-primary" onClick={confirmJoin}>{pick(language, "Sí, entrar", "Yep, join", "Si, entrar")}</button>
+            <button type="button" className="btn btn-primary" onClick={() => void confirmJoin("login")}>{pick(language, "Ya tengo cuenta", "I already have an account", "Xa teño conta")}</button>
+            <button type="button" className="btn" onClick={() => void confirmJoin("register")}>{pick(language, "Soy nuevo", "I'm new here", "Son novo")}</button>
             <button type="button" className="btn" onClick={() => setView("join_community")}>{pick(language, "No, cambiar", "Nope, change", "Non, cambiar")}</button>
           </div>
         </section>
@@ -272,11 +282,34 @@ export const LoginPage = ({
           <p className="hint">{pick(language, "Comunidad", "Community", "Comunidade")}: <strong>{currentCommunity?.name ?? "-"}</strong></p>
           <form onSubmit={submitLogin} className="stack">
             <label className="form-field">{pick(language, "Alias", "Alias", "Alias")}<input value={alias} onChange={(event) => setAlias(event.target.value)} /></label>
-            <label className="form-field">{pick(language, "Contraseña", "Password", "Contrasinal")}<input type="password" value={password} onChange={(event) => setPassword(event.target.value)} /></label>
+            <label className="form-field">
+              {pick(language, "Contraseña", "Password", "Contrasinal")}
+              <div className="alias-row">
+                <input type={showPassword ? "text" : "password"} value={password} onChange={(event) => setPassword(event.target.value)} />
+                <button type="button" className="btn dice-btn" onClick={() => setShowPassword((prev) => !prev)} title={pick(language, "Mostrar u ocultar contraseña", "Show or hide password", "Mostrar ou ocultar contrasinal")}>
+                  <Icon name={showPassword ? "eyeOff" : "eye"} size={14} />
+                </button>
+              </div>
+            </label>
             {error ? <p className="error">{error}</p> : null}
             <button type="submit" className="btn btn-primary"><Icon name="spark" /> {pick(language, "Entrar", "Enter", "Entrar")}</button>
             <button type="button" className="btn" onClick={() => { resetAuth(); setView("register"); }}>{pick(language, "Aún no tengo cuenta", "I need an account", "Aínda non teño conta")}</button>
           </form>
+          {sortedUsers.length > 0 ? (
+            <div className="stack">
+              <p className="hint">{pick(language, "Entrada rápida: toca tu alias y solo escribe contraseña.", "Quick sign-in: tap your alias and enter password only.", "Entrada rápida: toca o teu alias e só escribe o contrasinal.")}</p>
+              <ul className="user-list">
+                {sortedUsers.slice(0, 8).map((user) => (
+                  <li key={user.id}>
+                    <button type="button" className="user-option" onClick={() => setAlias(user.alias)}>
+                      <Avatar user={user} size={30} />
+                      <span>{user.alias}</span>
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          ) : null}
         </section>
       ) : null}
 
@@ -296,8 +329,24 @@ export const LoginPage = ({
                   <button type="button" className="btn dice-btn" onClick={() => setAlias(generateAlias())} title={pick(language, "Sácame un alias random", "Give me a random alias", "Dáme un alias aleatorio")}><Icon name="dice" size={14} /></button>
                 </div>
               </label>
-              <label className="form-field">{pick(language, "Contraseña", "Password", "Contrasinal")}<input type="password" value={password} onChange={(event) => setPassword(event.target.value)} /></label>
-              <label className="form-field">{pick(language, "Repite contraseña", "Repeat password", "Repite contrasinal")}<input type="password" value={passwordConfirm} onChange={(event) => setPasswordConfirm(event.target.value)} /></label>
+              <label className="form-field">
+                {pick(language, "Contraseña", "Password", "Contrasinal")}
+                <div className="alias-row">
+                  <input type={showPassword ? "text" : "password"} value={password} onChange={(event) => setPassword(event.target.value)} />
+                  <button type="button" className="btn dice-btn" onClick={() => setShowPassword((prev) => !prev)} title={pick(language, "Mostrar u ocultar contraseña", "Show or hide password", "Mostrar ou ocultar contrasinal")}>
+                    <Icon name={showPassword ? "eyeOff" : "eye"} size={14} />
+                  </button>
+                </div>
+              </label>
+              <label className="form-field">
+                {pick(language, "Repite contraseña", "Repeat password", "Repite contrasinal")}
+                <div className="alias-row">
+                  <input type={showPasswordConfirm ? "text" : "password"} value={passwordConfirm} onChange={(event) => setPasswordConfirm(event.target.value)} />
+                  <button type="button" className="btn dice-btn" onClick={() => setShowPasswordConfirm((prev) => !prev)} title={pick(language, "Mostrar u ocultar confirmación", "Show or hide confirmation", "Mostrar ou ocultar confirmación")}>
+                    <Icon name={showPasswordConfirm ? "eyeOff" : "eye"} size={14} />
+                  </button>
+                </div>
+              </label>
               <label className="form-field">{pick(language, "Idioma", "Language", "Idioma")}
                 <select value={profileLanguage} onChange={(event) => setProfileLanguage(event.target.value as AppLanguage)}>
                   <option value="es">Español</option>
@@ -325,7 +374,15 @@ export const LoginPage = ({
             <ul className="user-list">
               {sortedUsers.map((user) => (
                 <li key={user.id}>
-                  <button type="button" className="user-option" onClick={() => setAlias(user.alias)}>
+                  <button
+                    type="button"
+                    className="user-option"
+                    onClick={() => {
+                      setAlias(user.alias);
+                      setView("login");
+                    }}
+                    title={pick(language, "Entrar con este alias", "Sign in with this alias", "Entrar con este alias")}
+                  >
                     <Avatar user={user} size={34} />
                     <span>{user.alias}</span>
                     {user.role === "admin" ? <span className="badge">{pick(language, "Admin", "Admin", "Admin")}</span> : null}

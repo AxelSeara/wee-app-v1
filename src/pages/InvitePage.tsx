@@ -1,6 +1,7 @@
 import { type FormEvent, useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { Icon } from "../components/Icon";
+import { generateAlias } from "../lib/aliasGenerator";
 import type { CommunitySelection } from "../lib/communitySession";
 import { pick, useI18n } from "../lib/i18n";
 import type { AppLanguage, User } from "../lib/types";
@@ -29,6 +30,7 @@ export const InvitePage = ({ onPreviewCommunity, onConfirmCommunity, onCreateOrL
   const [joinMode, setJoinMode] = useState(false);
   const [alias, setAlias] = useState("");
   const [password, setPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
 
   useEffect(() => {
     let active = true;
@@ -64,7 +66,7 @@ export const InvitePage = ({ onPreviewCommunity, onConfirmCommunity, onCreateOrL
     }
     try {
       await onConfirmCommunity({ token });
-      await onCreateOrLogin(alias.trim(), password.trim(), undefined, "es", true);
+      await onCreateOrLogin(alias.trim(), password.trim(), undefined, language, true);
       navigate("/home");
     } catch (err) {
       setError(err instanceof Error ? err.message : pick(language, "No pudimos terminar la unión a la comunidad.", "We couldn't finish joining this community.", "Non puidemos rematar a unión á comunidade."));
@@ -118,11 +120,21 @@ export const InvitePage = ({ onPreviewCommunity, onConfirmCommunity, onCreateOrL
               <form className="stack" onSubmit={submitJoin}>
                 <label className="form-field">
                   {pick(language, "Alias", "Alias", "Alias")}
-                  <input value={alias} onChange={(event) => setAlias(event.target.value)} placeholder={pick(language, "Tu alias en la comunidad", "Your community alias", "O teu alias na comunidade")} />
+                  <div className="alias-row">
+                    <input value={alias} onChange={(event) => setAlias(event.target.value)} placeholder={pick(language, "Tu alias en la comunidad", "Your community alias", "O teu alias na comunidade")} />
+                    <button type="button" className="btn dice-btn" onClick={() => setAlias(generateAlias())} title={pick(language, "Generar alias aleatorio", "Generate random alias", "Xerar alias aleatorio")}>
+                      <Icon name="dice" size={14} />
+                    </button>
+                  </div>
                 </label>
                 <label className="form-field">
                   {pick(language, "Contraseña", "Password", "Contrasinal")}
-                  <input type="password" value={password} onChange={(event) => setPassword(event.target.value)} placeholder={pick(language, "Mínimo 6 caracteres", "Minimum 6 characters", "Mínimo 6 caracteres")} />
+                  <div className="alias-row">
+                    <input type={showPassword ? "text" : "password"} value={password} onChange={(event) => setPassword(event.target.value)} placeholder={pick(language, "Mínimo 6 caracteres", "Minimum 6 characters", "Mínimo 6 caracteres")} />
+                    <button type="button" className="btn dice-btn" onClick={() => setShowPassword((prev) => !prev)} title={pick(language, "Mostrar u ocultar contraseña", "Show or hide password", "Mostrar ou ocultar contrasinal")}>
+                      <Icon name={showPassword ? "eyeOff" : "eye"} size={14} />
+                    </button>
+                  </div>
                 </label>
                 {error ? <p className="error">{error}</p> : null}
                 <button type="submit" className="btn btn-primary">

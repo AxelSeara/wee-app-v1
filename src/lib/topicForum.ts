@@ -23,4 +23,11 @@ export const topicForumScore = (post: Post, topic: string): number => {
 };
 
 export const rankTopicPosts = (posts: Post[], topic: string): Post[] =>
-  [...posts].sort((a, b) => topicForumScore(b, topic) - topicForumScore(a, topic));
+  [...posts].sort((a, b) => {
+    const scoreDiff = topicForumScore(b, topic) - topicForumScore(a, topic);
+    if (Math.abs(scoreDiff) > 0.001) return scoreDiff;
+    if (b.createdAt !== a.createdAt) return b.createdAt - a.createdAt;
+    if (b.qualityScore !== a.qualityScore) return b.qualityScore - a.qualityScore;
+    if (b.interestScore !== a.interestScore) return b.interestScore - a.interestScore;
+    return a.id.localeCompare(b.id);
+  });

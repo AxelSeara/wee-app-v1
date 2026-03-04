@@ -13,7 +13,8 @@ interface LoginPageProps {
     alias: string,
     password: string,
     avatarDataUrl?: string,
-    language?: AppLanguage
+    language?: AppLanguage,
+    acceptedPrivacy?: boolean
   ) => Promise<{ user: User; isNewUser: boolean }>;
 }
 
@@ -33,6 +34,7 @@ export const LoginPage = ({ users, onCreateOrLogin }: LoginPageProps) => {
   const [passwordConfirm, setPasswordConfirm] = useState("");
   const [avatarDataUrl, setAvatarDataUrl] = useState<string | undefined>(undefined);
   const [profileLanguage, setProfileLanguage] = useState<AppLanguage>("es");
+  const [privacyAccepted, setPrivacyAccepted] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [showWelcome, setShowWelcome] = useState(false);
   const navigate = useNavigate();
@@ -45,6 +47,7 @@ export const LoginPage = ({ users, onCreateOrLogin }: LoginPageProps) => {
     setPassword("");
     setPasswordConfirm("");
     setAvatarDataUrl(undefined);
+    setPrivacyAccepted(false);
   };
 
   const goToLogin = (): void => {
@@ -118,8 +121,19 @@ export const LoginPage = ({ users, onCreateOrLogin }: LoginPageProps) => {
       );
       return;
     }
+    if (!privacyAccepted) {
+      setError(
+        pick(
+          language,
+          "Debes aceptar la política de privacidad local para crear tu cuenta.",
+          "You must accept the local privacy policy to create your account.",
+          "Debes aceptar a política de privacidade local para crear a túa conta."
+        )
+      );
+      return;
+    }
     try {
-      const result = await onCreateOrLogin(cleanAlias, password, avatarDataUrl, profileLanguage);
+      const result = await onCreateOrLogin(cleanAlias, password, avatarDataUrl, profileLanguage, true);
       if (!result.isNewUser) {
         setError(pick(language, "Ese alias ya existe. Inicia sesión.", "That alias already exists. Sign in instead.", "Ese alias xa existe. Inicia sesión."));
         return;
@@ -134,6 +148,17 @@ export const LoginPage = ({ users, onCreateOrLogin }: LoginPageProps) => {
             "La contraseña debe tener al menos 4 caracteres (modo test).",
             "Password must be at least 4 characters (testing mode).",
             "O contrasinal debe ter polo menos 4 caracteres (modo test)."
+          )
+        );
+        return;
+      }
+      if (code === "PRIVACY_CONSENT_REQUIRED") {
+        setError(
+          pick(
+            language,
+            "Debes aceptar la política de privacidad local para crear tu cuenta.",
+            "You must accept the local privacy policy to create your account.",
+            "Debes aceptar a política de privacidade local para crear a túa conta."
           )
         );
         return;
@@ -302,6 +327,21 @@ export const LoginPage = ({ users, onCreateOrLogin }: LoginPageProps) => {
                   <option value="en">English</option>
                   <option value="gl">Galego</option>
                 </select>
+              </label>
+              <label className="consent-row">
+                <input
+                  type="checkbox"
+                  checked={privacyAccepted}
+                  onChange={(event) => setPrivacyAccepted(event.target.checked)}
+                />
+                <span>
+                  {pick(
+                    language,
+                    "Acepto la política de privacidad local (datos guardados solo en este dispositivo).",
+                    "I accept the local privacy policy (data is stored only on this device).",
+                    "Acepto a política de privacidade local (datos gardados só neste dispositivo)."
+                  )}
+                </span>
               </label>
 
               {error ? <p className="error">{error}</p> : null}

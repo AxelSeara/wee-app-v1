@@ -36,7 +36,12 @@ export const SharePage = ({ activeUser, onShareUrl, getDuplicatePreview, onToast
       <TopBar user={activeUser} onLogout={onLogout} />
       <section className="page-section narrow">
         <h2>{pick(language, "Comparte un enlace", "Share a link")}</h2>
-        <p className="section-intro">{pick(language, "Wee lo coloca en su tema y lo valora para separar señal de ruido.", "Wee places it in its topic and evaluates it to separate signal from noise.")}</p>
+        <p className="section-intro">{pick(language, "Pega un enlace y listo. Wee lo ordena por tema y evita duplicados.", "Paste a link and done. Wee sorts it by topic and avoids duplicates.")}</p>
+        <ol className="share-steps">
+          <li>{pick(language, "Pega la URL", "Paste the URL", "Pega a URL")}</li>
+          <li>{pick(language, "Revisa si ya existe en la comunidad", "Check if it already exists in the community", "Revisa se xa existe na comunidade")}</li>
+          <li>{pick(language, "Publícala para abrir o reforzar el hilo", "Post it to open or reinforce the thread", "Publícaa para abrir ou reforzar o fío")}</li>
+        </ol>
         <form className="stack" onSubmit={submit}>
           <label>
             URL

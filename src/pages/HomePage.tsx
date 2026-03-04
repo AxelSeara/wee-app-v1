@@ -23,6 +23,12 @@ interface HomePageProps {
 }
 
 const groupByTopic = (posts: Post[]): Array<{ topic: string; posts: Post[] }> => {
+  const byRecent = (a: Post, b: Post): number => {
+    if (b.createdAt !== a.createdAt) return b.createdAt - a.createdAt;
+    if (b.qualityScore !== a.qualityScore) return b.qualityScore - a.qualityScore;
+    if (b.interestScore !== a.interestScore) return b.interestScore - a.interestScore;
+    return a.id.localeCompare(b.id);
+  };
   const grouped = new Map<string, Post[]>();
   posts.forEach((post) => {
     post.topics.forEach((topic) => {
@@ -31,8 +37,8 @@ const groupByTopic = (posts: Post[]): Array<{ topic: string; posts: Post[] }> =>
   });
 
   return Array.from(grouped.entries())
-    .map(([topic, bucket]) => ({ topic, posts: bucket.sort((a, b) => b.createdAt - a.createdAt) }))
-    .sort((a, b) => b.posts[0].createdAt - a.posts[0].createdAt);
+    .map(([topic, bucket]) => ({ topic, posts: bucket.sort(byRecent) }))
+    .sort((a, b) => byRecent(a.posts[0], b.posts[0]));
 };
 
 export const HomePage = ({
@@ -53,6 +59,7 @@ export const HomePage = ({
   const [showOnboarding, setShowOnboarding] = useState(false);
   const [activeSection, setActiveSection] = useState("popular-section");
   const [showAllActiveUsers, setShowAllActiveUsers] = useState(false);
+  const [compactFeed, setCompactFeed] = useState(false);
   const visiblePosts = useMemo(
     () => filterPosts({ ...DEFAULT_FILTERS, query: searchQuery }),
     [filterPosts, searchQuery]
@@ -83,6 +90,12 @@ export const HomePage = ({
   };
 
   const byCommunityValue = (a: Post, b: Post): number => {
+    const byRecent = (first: Post, second: Post): number => {
+      if (second.createdAt !== first.createdAt) return second.createdAt - first.createdAt;
+      if (second.qualityScore !== first.qualityScore) return second.qualityScore - first.qualityScore;
+      if (second.interestScore !== first.interestScore) return second.interestScore - first.interestScore;
+      return first.id.localeCompare(second.id);
+    };
     const valueA = userQualityValueById.get(a.userId) ?? 40;
     const valueB = userQualityValueById.get(b.userId) ?? 40;
     const recencyA = recencyScore(a.createdAt);
@@ -111,11 +124,20 @@ export const HomePage = ({
       collaborationB +
       clickbaitB +
       weightedFeedback(b);
-    return scoreB - scoreA;
+    const diff = scoreB - scoreA;
+    if (Math.abs(diff) > 0.001) return diff;
+    return byRecent(a, b);
   };
 
   const feedPosts = [...visiblePosts].sort(byCommunityValue).slice(0, 14);
-  const latestNewsPosts = [...visiblePosts].sort((a, b) => b.createdAt - a.createdAt).slice(0, 8);
+  const latestNewsPosts = [...visiblePosts]
+    .sort((a, b) => {
+      if (b.createdAt !== a.createdAt) return b.createdAt - a.createdAt;
+      if (b.qualityScore !== a.qualityScore) return b.qualityScore - a.qualityScore;
+      if (b.interestScore !== a.interestScore) return b.interestScore - a.interestScore;
+      return a.id.localeCompare(b.id);
+    })
+    .slice(0, 8);
   const topicBlocks = groupByTopic(visiblePosts);
   const usersById = useMemo(() => new Map(users.map((user) => [user.id, user])), [users]);
 
@@ -219,6 +241,8 @@ export const HomePage = ({
     const key = `wee_onboarding_seen_${activeUser.id}`;
     const seen = localStorage.getItem(key);
     setShowOnboarding(!seen);
+    const compactKey = `wee_compact_feed_${activeUser.id}`;
+    setCompactFeed(localStorage.getItem(compactKey) === "1");
   }, [activeUser.id]);
 
   useEffect(() => {
@@ -294,6 +318,14 @@ export const HomePage = ({
 
   const scrollToSection = (id: string): void => {
     document.getElementById(id)?.scrollIntoView({ behavior: "smooth", block: "start" });
+  };
+
+  const toggleCompactFeed = (): void => {
+    setCompactFeed((prev) => {
+      const next = !prev;
+      localStorage.setItem(`wee_compact_feed_${activeUser.id}`, next ? "1" : "0");
+      return next;
+    });
   };
 
   return (
@@ -394,14 +426,27 @@ export const HomePage = ({
 
         <div className="home-main">
           <section className="page-section section-latest" id="popular-section">
-            <h2><Icon name="chili" /> {pick(language, "Popular ahora", "Popular now", "Popular agora")}</h2>
+            <div className="section-head">
+              <h2><Icon name="chili" /> {pick(language, "Popular ahora", "Popular now", "Popular agora")}</h2>
+              <button type="button" className="btn" onClick={toggleCompactFeed}>
+                <Icon name="news" size={13} /> {compactFeed
+                  ? pick(language, "Vista completa", "Expanded view", "Vista completa")
+                  : pick(language, "Vista compacta", "Compact view", "Vista compacta")}
+              </button>
+            </div>
             <p className="section-intro">
               {pick(language, "Lo más útil y comentado por la comunidad en este momento.", "Most useful and discussed by the community right now.", "O máis útil e comentado pola comunidade neste momento.")}
             </p>
-            <div className="post-grid">
+            <div className={compactFeed ? "post-grid post-grid-compact" : "post-grid"}>
               {feedPosts.length > 0 ? (
                 feedPosts.map((post) => (
-                  <PostCard key={post.id} post={post} onOpenDetail={(entry) => navigate(`/post/${entry.id}`)} />
+                  <PostCard
+                    key={post.id}
+                    post={post}
+                    author={usersById.get(post.userId)}
+                    compact={compactFeed}
+                    onOpenDetail={(entry) => navigate(`/post/${entry.id}`)}
+                  />
                 ))
               ) : (
                 <article className="empty-state">
@@ -433,10 +478,16 @@ export const HomePage = ({
             <p className="section-intro">
               {pick(language, "Publicaciones por orden temporal para no perder contexto.", "Posts in chronological order to keep context.", "Publicacións por orde temporal para non perder contexto.")}
             </p>
-            <div className="post-grid">
+            <div className={compactFeed ? "post-grid post-grid-compact" : "post-grid"}>
               {latestNewsPosts.length > 0 ? (
                 latestNewsPosts.map((post) => (
-                  <PostCard key={post.id} post={post} onOpenDetail={(entry) => navigate(`/post/${entry.id}`)} />
+                  <PostCard
+                    key={post.id}
+                    post={post}
+                    author={usersById.get(post.userId)}
+                    compact={compactFeed}
+                    onOpenDetail={(entry) => navigate(`/post/${entry.id}`)}
+                  />
                 ))
               ) : (
                 <article className="empty-state">

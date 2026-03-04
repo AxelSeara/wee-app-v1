@@ -31,6 +31,7 @@ interface PostDetailPageProps {
   onAdminDeleteComment: (postId: string, commentId: string) => Promise<{ ok: boolean; message: string }>;
   onAdminDeletePost: (postId: string) => Promise<{ ok: boolean; message: string }>;
   onAdminUpdatePostTopic: (postId: string, nextTopic: string) => Promise<{ ok: boolean; message: string }>;
+  onAddPostTopic: (postId: string, nextTopic: string) => Promise<{ ok: boolean; message: string }>;
   onToast: (message: string) => void;
 }
 
@@ -56,6 +57,7 @@ export const PostDetailPage = ({
   onAdminDeleteComment,
   onAdminDeletePost,
   onAdminUpdatePostTopic,
+  onAddPostTopic,
   onToast
 }: PostDetailPageProps) => {
   const { language } = useI18n();
@@ -66,12 +68,17 @@ export const PostDetailPage = ({
   const [current, setCurrent] = useState<Post | null>(postFromState);
   const [ratingBusy, setRatingBusy] = useState(false);
   const [justOpenedExternal, setJustOpenedExternal] = useState(false);
+  const [showSourceVoteHint, setShowSourceVoteHint] = useState(false);
+  const [manualTopic, setManualTopic] = useState("");
+  const [topicBusy, setTopicBusy] = useState(false);
   const [adminTopic, setAdminTopic] = useState("");
   const isAdmin = activeUser.role === "admin";
 
   useEffect(() => {
     setCurrent(postFromState);
     setJustOpenedExternal(false);
+    setShowSourceVoteHint(false);
+    setManualTopic("");
     setAdminTopic(postFromState?.topics?.[0] ?? "");
   }, [postFromState]);
 
@@ -173,6 +180,7 @@ export const PostDetailPage = ({
                       : prev
                   );
                   setJustOpenedExternal(true);
+                  setShowSourceVoteHint(false);
                   onToast(pick(language, "Fuente abierta. Ya puedes valorar esta noticia.", "Source opened. You can now rate this post."));
                 }}
               >
@@ -185,12 +193,13 @@ export const PostDetailPage = ({
             <button
               type="button"
               className={currentUserVote === 1 ? "btn btn-primary" : "btn"}
-              disabled={!canRate || ratingBusy || !current.url}
+              disabled={ratingBusy || !current.url}
               onClick={async () => {
                 setRatingBusy(true);
                 const result = await onRatePost(current.id, 1);
                 onToast(result.message);
                 if (result.ok && activeUserId) {
+                  setShowSourceVoteHint(false);
                   setCurrent((prev) => {
                     if (!prev) return prev;
                     const feedbacks: NonNullable<Post["feedbacks"]> = prev.feedbacks ?? [];
@@ -202,6 +211,8 @@ export const PostDetailPage = ({
                       : [...feedbacks, { userId: activeUserId, vote: 1 as const, votedAt: Date.now() }];
                     return { ...prev, feedbacks: nextFeedbacks };
                   });
+                } else if (!canRate && current.url) {
+                  setShowSourceVoteHint(true);
                 }
                 setRatingBusy(false);
               }}
@@ -211,12 +222,13 @@ export const PostDetailPage = ({
             <button
               type="button"
               className={currentUserVote === -1 ? "btn btn-primary" : "btn"}
-              disabled={!canRate || ratingBusy || !current.url}
+              disabled={ratingBusy || !current.url}
               onClick={async () => {
                 setRatingBusy(true);
                 const result = await onRatePost(current.id, -1);
                 onToast(result.message);
                 if (result.ok && activeUserId) {
+                  setShowSourceVoteHint(false);
                   setCurrent((prev) => {
                     if (!prev) return prev;
                     const feedbacks: NonNullable<Post["feedbacks"]> = prev.feedbacks ?? [];
@@ -228,6 +240,8 @@ export const PostDetailPage = ({
                       : [...feedbacks, { userId: activeUserId, vote: -1 as const, votedAt: Date.now() }];
                     return { ...prev, feedbacks: nextFeedbacks };
                   });
+                } else if (!canRate && current.url) {
+                  setShowSourceVoteHint(true);
                 }
                 setRatingBusy(false);
               }}
@@ -235,17 +249,59 @@ export const PostDetailPage = ({
               <Icon name="thumbDown" />
             </button>
           </div>
-          {!canRate && current.url ? <p className="warning">{pick(language, "Abre la fuente para poder votar esta noticia.", "Open the source to vote on this post.")}</p> : null}
+          {current.url ? <p className="hint">{pick(language, "Para valorar esta noticia, visita primero la fuente.", "To rate this post, visit the source first.")}</p> : null}
+          {showSourceVoteHint && !canRate && current.url ? <p className="warning">{pick(language, "Visita la fuente para poder valorarla primero.", "Visit the source before rating it.")}</p> : null}
           {justOpenedExternal ? <p className="hint">{pick(language, "Gracias por comprobar la fuente.", "Thanks for checking the source.")}</p> : null}
 
           <details className="score-details">
-            <summary>{pick(language, "Cómo se calcula su puntuación", "How this score is calculated")}</summary>
+            <summary>{pick(language, "Por qué esta nota", "Why this post", "Por que esta nota")}</summary>
+            <p className="score-details-intro">{pick(language, "Señales principales que Wee tuvo en cuenta.", "Main signals Wee considered.", "Sinais principais que Wee tivo en conta.")}</p>
             <ul className="rationale">
-              {current.rationale.slice(0, 6).map((line) => (
+              {current.rationale.slice(0, 4).map((line) => (
                 <li key={line}>{translateRationale(language, line)}</li>
               ))}
             </ul>
           </details>
+
+          <section className="score-details">
+            <h3>{pick(language, "Ajustar temas", "Adjust topics")}</h3>
+            <p className="score-details-intro">
+              {pick(language, "¿Falta un tema? Añádelo para mejorar este hilo.", "Missing a topic? Add it to improve this thread.")}
+            </p>
+            <div className="detail-actions">
+              <input
+                value={manualTopic}
+                onChange={(event) => setManualTopic(event.target.value)}
+                placeholder={pick(language, "Ejemplo: energia", "Example: energy")}
+              />
+              <button
+                type="button"
+                className="btn"
+                disabled={!manualTopic.trim() || topicBusy}
+                onClick={async () => {
+                  setTopicBusy(true);
+                  const result = await onAddPostTopic(current.id, manualTopic);
+                  onToast(result.message);
+                  if (result.ok) {
+                    const nextTopic = manualTopic
+                      .trim()
+                      .toLowerCase()
+                      .replace(/\s+/g, "-")
+                      .replace(/[^a-z0-9-]/g, "")
+                      .slice(0, 36);
+                    setCurrent((prev) => {
+                      if (!prev || prev.topics.includes(nextTopic)) return prev;
+                      return { ...prev, topics: [nextTopic, ...prev.topics].slice(0, 6) };
+                    });
+                    setManualTopic("");
+                  }
+                  setTopicBusy(false);
+                }}
+              >
+                <Icon name="tag" /> {pick(language, "Añadir tema", "Add topic")}
+              </button>
+            </div>
+          </section>
 
           {isAdmin ? (
             <section className="score-details">

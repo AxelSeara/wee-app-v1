@@ -78,4 +78,14 @@ describe("classifyPost", () => {
     expect(result.topics).toContain("tech");
     expect(result.subtopics.some((sub) => sub.startsWith("tech/"))).toBe(true);
   });
+
+  it("improves topic detection with phrase and context clues", () => {
+    const result = classifyPost({
+      title: "Ceasefire talks continue after missile strike near border",
+      text: "Leaders discuss security guarantees while military units remain deployed.",
+      url: "https://example.com/world/update"
+    });
+    expect(result.topics).toContain("war");
+    expect(result.topics).toContain("geopolitics");
+  });
 });

@@ -13,7 +13,7 @@ import { deriveTitleFromUrl, isUnusableTitle, qualityLabelText } from "./lib/pre
 import { enrichUrl } from "./lib/enrich";
 import { listPosts as listPostsFromStore } from "./lib/store";
 import type { ExportBundle } from "./lib/types";
-import { canonicalizeUrl, duplicateUrlKeys, generateId } from "./lib/utils";
+import { canonicalizeUrl, duplicateUrlKeys, generateId, normalizeSpace } from "./lib/utils";
 import { HomePage } from "./pages/HomePage";
 import { LoginPage } from "./pages/LoginPage";
 import { PostDetailPage } from "./pages/PostDetailPage";
@@ -73,6 +73,23 @@ const AppRoutes = () => {
     return map;
   }, [posts]);
 
+  const sourceOpenSessionKey = (userId: string, postId: string): string =>
+    `wee:source-opened:${userId}:${postId}`;
+  const markSourceOpenedSession = (userId: string, postId: string): void => {
+    try {
+      window.sessionStorage.setItem(sourceOpenSessionKey(userId, postId), "1");
+    } catch {
+      // ignore storage restrictions
+    }
+  };
+  const hasSourceOpenedSession = (userId: string, postId: string): boolean => {
+    try {
+      return window.sessionStorage.getItem(sourceOpenSessionKey(userId, postId)) === "1";
+    } catch {
+      return false;
+    }
+  };
+
   const onExport = async (): Promise<void> => {
     const data = await exportJson();
     const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
@@ -91,6 +108,14 @@ const AppRoutes = () => {
     await importJson(bundle);
     setToast(pick(language, "Importación completada. Ya tienes los datos cargados.", "Import completed. Your data is now loaded."));
     window.setTimeout(() => setToast(null), 1800);
+  };
+
+  const onDeleteMyData = async (): Promise<void> => {
+    if (!activeUser) return;
+    const userId = activeUser.id;
+    await removeUser(userId);
+    logout();
+    showToast(pick(language, "Tus datos locales se han eliminado.", "Your local data has been deleted.", "Elimináronse os teus datos locais."));
   };
 
   const findDuplicatePost = (url: string) => {
@@ -130,6 +155,11 @@ const AppRoutes = () => {
       const contributorUserIds = Array.from(new Set([...(existing.contributorUserIds ?? [existing.userId]), activeUser.id]));
       const shareCount = Object.values(counts).reduce((acc, value) => acc + value, 0);
       const sameUserDuplicate = counts[activeUser.id] > 1;
+      const feedbacks = existing.feedbacks ?? [];
+      const hasFeedbackFromSharer = feedbacks.some((entry) => entry.userId === activeUser.id);
+      const nextFeedbacks = hasFeedbackFromSharer
+        ? feedbacks
+        : [...feedbacks, { userId: activeUser.id, vote: 1 as const, votedAt: Date.now() }];
 
       await savePost({
         ...existing,
@@ -137,6 +167,7 @@ const AppRoutes = () => {
         contributorCounts: counts,
         contributorUserIds,
         shareCount,
+        feedbacks: nextFeedbacks,
         rationale: sameUserDuplicate
           ? existing.rationale.includes("Enlace repetido por el mismo usuario; se aplica penalización interna")
             ? existing.rationale
@@ -176,6 +207,7 @@ const AppRoutes = () => {
       shareCount: 1,
       contributorUserIds: [activeUser.id],
       contributorCounts: { [activeUser.id]: 1 },
+      feedbacks: [{ userId: activeUser.id, vote: 1 as const, votedAt: createdAt }],
       topics: classified.topics,
       subtopics: classified.subtopics,
       qualityLabel: classified.qualityLabel,
@@ -204,7 +236,8 @@ const AppRoutes = () => {
 
   const onOpenExternalSource = async (postId: string): Promise<void> => {
     if (!activeUser) return;
-    const post = posts.find((entry) => entry.id === postId);
+    markSourceOpenedSession(activeUser.id, postId);
+    const post = posts.find((entry) => entry.id === postId) ?? (await listPostsFromStore()).find((entry) => entry.id === postId);
     if (!post) return;
     const openedBy = new Set(post.openedByUserIds ?? []);
     openedBy.add(activeUser.id);
@@ -216,13 +249,13 @@ const AppRoutes = () => {
     let post = posts.find((entry) => entry.id === postId);
     if (!post) return { ok: false, message: pick(language, "No encontramos esta noticia.", "We could not find this post.") };
 
-    let opened = (post.openedByUserIds ?? []).includes(activeUser.id);
+    let opened = (post.openedByUserIds ?? []).includes(activeUser.id) || hasSourceOpenedSession(activeUser.id, postId);
     if (!opened) {
       // Avoid race condition: source can be opened but React state may still be stale.
       const latest = (await listPostsFromStore()).find((entry) => entry.id === postId);
       if (latest) {
         post = latest;
-        opened = (latest.openedByUserIds ?? []).includes(activeUser.id);
+        opened = (latest.openedByUserIds ?? []).includes(activeUser.id) || hasSourceOpenedSession(activeUser.id, postId);
       }
     }
 
@@ -333,6 +366,35 @@ const AppRoutes = () => {
     }
     await updatePostPrimaryTopic(postId, nextTopic);
     return { ok: true, message: pick(language, "Tema de noticia actualizado.", "Post topic updated.") };
+  };
+
+  const onAddPostTopic = async (
+    postId: string,
+    nextTopicRaw: string
+  ): Promise<{ ok: boolean; message: string }> => {
+    if (!activeUser) {
+      return { ok: false, message: pick(language, "Inicia sesión para editar temas.", "Sign in to edit topics.") };
+    }
+    const post = posts.find((entry) => entry.id === postId);
+    if (!post) {
+      return { ok: false, message: pick(language, "No encontramos esta noticia.", "We could not find this post.") };
+    }
+    const nextTopic = normalizeSpace(nextTopicRaw).replace(/\s+/g, "-").replace(/[^a-z0-9-]/g, "").slice(0, 36);
+    if (!nextTopic) {
+      return { ok: false, message: pick(language, "Tema no válido.", "Invalid topic.") };
+    }
+    if (post.topics.includes(nextTopic)) {
+      return { ok: false, message: pick(language, "Ese tema ya está añadido.", "That topic is already added.") };
+    }
+    const nextTopics = [nextTopic, ...post.topics].slice(0, 6);
+    await savePost({
+      ...post,
+      topics: nextTopics,
+      rationale: post.rationale.includes(`Tema añadido por usuarios: ${nextTopic}`)
+        ? post.rationale
+        : [...post.rationale, `Tema añadido por usuarios: ${nextTopic}`]
+    });
+    return { ok: true, message: pick(language, "Tema añadido a la noticia.", "Topic added to post.") };
   };
 
   const onAdminRenameTopic = async (
@@ -478,6 +540,7 @@ const AppRoutes = () => {
                   onAdminDeleteComment={onAdminDeleteComment}
                   onAdminDeletePost={onAdminDeletePost}
                   onAdminUpdatePostTopic={onAdminUpdatePostTopic}
+                  onAddPostTopic={onAddPostTopic}
                   onToast={showToast}
                 />
               </PageTransition>
@@ -557,6 +620,7 @@ const AppRoutes = () => {
                   onSave={updatePreferences}
                   onExport={onExport}
                   onImport={onImport}
+                  onDeleteMyData={onDeleteMyData}
                   onOpenShareModal={() => setShareModalOpen(true)}
                   onLogout={logout}
                 />

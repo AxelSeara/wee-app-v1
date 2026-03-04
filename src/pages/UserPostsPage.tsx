@@ -91,6 +91,7 @@ export const UserPostsPage = ({
               <PostCard
                 key={post.id}
                 post={post}
+                author={profileUser}
                 onOpenDetail={(entry) => navigate(`/post/${entry.id}`)}
                 canDelete={isOwnProfile || canAdminDelete}
                 onDelete={(postId) => {

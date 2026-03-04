@@ -42,10 +42,12 @@ export const PostDetailModal = ({
   const [current, setCurrent] = useState<Post | null>(post);
   const [ratingBusy, setRatingBusy] = useState(false);
   const [justOpenedExternal, setJustOpenedExternal] = useState(false);
+  const [showSourceVoteHint, setShowSourceVoteHint] = useState(false);
 
   useEffect(() => {
     setCurrent(post);
     setJustOpenedExternal(false);
+    setShowSourceVoteHint(false);
   }, [post]);
 
   const related = useMemo(() => {
@@ -140,6 +142,7 @@ export const PostDetailModal = ({
                     );
                     window.open(current.url, "_blank", "noopener,noreferrer");
                     setJustOpenedExternal(true);
+                    setShowSourceVoteHint(false);
                     onToast("Fuente abierta. Te animamos a valorarla al volver.");
                   }}
                 >
@@ -156,66 +159,72 @@ export const PostDetailModal = ({
                 <p className="hint">
                   Tu valoración ayuda al grupo a priorizar mejor. Si aportas fuentes fiables de forma consistente, tu criterio pesa más.
                 </p>
-                {!canRate ? (
-                  <p className="warning">Primero abre la fuente externa para habilitar la valoración.</p>
-                ) : (
-                  <div className="rating-actions">
-                    <button
-                      type="button"
-                      className={currentUserVote === 1 ? "btn btn-primary" : "btn"}
-                      disabled={ratingBusy}
-                      onClick={async () => {
-                        if (!current) return;
-                        setRatingBusy(true);
-                        const result = await onRatePost(current.id, 1);
-                        onToast(result.message);
-                        if (result.ok && activeUserId) {
-                          setCurrent((prev) => {
-                            if (!prev) return prev;
-                            const feedbacks: NonNullable<Post["feedbacks"]> = prev.feedbacks ?? [];
-                            const existing = feedbacks.find((item) => item.userId === activeUserId);
-                            const nextFeedbacks: NonNullable<Post["feedbacks"]> = existing
-                              ? feedbacks.map((item) =>
-                                  item.userId === activeUserId ? { ...item, vote: 1 as const, votedAt: Date.now() } : item
-                                )
-                              : [...feedbacks, { userId: activeUserId, vote: 1 as const, votedAt: Date.now() }];
-                            return { ...prev, feedbacks: nextFeedbacks };
-                          });
-                        }
-                        setRatingBusy(false);
-                      }}
-                    >
-                      Positiva
-                    </button>
-                    <button
-                      type="button"
-                      className={currentUserVote === -1 ? "btn btn-primary" : "btn"}
-                      disabled={ratingBusy}
-                      onClick={async () => {
-                        if (!current) return;
-                        setRatingBusy(true);
-                        const result = await onRatePost(current.id, -1);
-                        onToast(result.message);
-                        if (result.ok && activeUserId) {
-                          setCurrent((prev) => {
-                            if (!prev) return prev;
-                            const feedbacks: NonNullable<Post["feedbacks"]> = prev.feedbacks ?? [];
-                            const existing = feedbacks.find((item) => item.userId === activeUserId);
-                            const nextFeedbacks: NonNullable<Post["feedbacks"]> = existing
-                              ? feedbacks.map((item) =>
-                                  item.userId === activeUserId ? { ...item, vote: -1 as const, votedAt: Date.now() } : item
-                                )
-                              : [...feedbacks, { userId: activeUserId, vote: -1 as const, votedAt: Date.now() }];
-                            return { ...prev, feedbacks: nextFeedbacks };
-                          });
-                        }
-                        setRatingBusy(false);
-                      }}
-                    >
-                      Negativa
-                    </button>
-                  </div>
-                )}
+                <p className="hint">Para valorar esta noticia, visita primero la fuente.</p>
+                <div className="rating-actions">
+                  <button
+                    type="button"
+                    className={currentUserVote === 1 ? "btn btn-primary" : "btn"}
+                    disabled={ratingBusy}
+                    onClick={async () => {
+                      if (!current) return;
+                      setRatingBusy(true);
+                      const result = await onRatePost(current.id, 1);
+                      onToast(result.message);
+                      if (result.ok && activeUserId) {
+                        setShowSourceVoteHint(false);
+                        setCurrent((prev) => {
+                          if (!prev) return prev;
+                          const feedbacks: NonNullable<Post["feedbacks"]> = prev.feedbacks ?? [];
+                          const existing = feedbacks.find((item) => item.userId === activeUserId);
+                          const nextFeedbacks: NonNullable<Post["feedbacks"]> = existing
+                            ? feedbacks.map((item) =>
+                                item.userId === activeUserId ? { ...item, vote: 1 as const, votedAt: Date.now() } : item
+                              )
+                            : [...feedbacks, { userId: activeUserId, vote: 1 as const, votedAt: Date.now() }];
+                          return { ...prev, feedbacks: nextFeedbacks };
+                        });
+                      } else if (!canRate) {
+                        setShowSourceVoteHint(true);
+                      }
+                      setRatingBusy(false);
+                    }}
+                  >
+                    Positiva
+                  </button>
+                  <button
+                    type="button"
+                    className={currentUserVote === -1 ? "btn btn-primary" : "btn"}
+                    disabled={ratingBusy}
+                    onClick={async () => {
+                      if (!current) return;
+                      setRatingBusy(true);
+                      const result = await onRatePost(current.id, -1);
+                      onToast(result.message);
+                      if (result.ok && activeUserId) {
+                        setShowSourceVoteHint(false);
+                        setCurrent((prev) => {
+                          if (!prev) return prev;
+                          const feedbacks: NonNullable<Post["feedbacks"]> = prev.feedbacks ?? [];
+                          const existing = feedbacks.find((item) => item.userId === activeUserId);
+                          const nextFeedbacks: NonNullable<Post["feedbacks"]> = existing
+                            ? feedbacks.map((item) =>
+                                item.userId === activeUserId ? { ...item, vote: -1 as const, votedAt: Date.now() } : item
+                              )
+                            : [...feedbacks, { userId: activeUserId, vote: -1 as const, votedAt: Date.now() }];
+                          return { ...prev, feedbacks: nextFeedbacks };
+                        });
+                      } else if (!canRate) {
+                        setShowSourceVoteHint(true);
+                      }
+                      setRatingBusy(false);
+                    }}
+                  >
+                    Negativa
+                  </button>
+                </div>
+                {showSourceVoteHint && !canRate ? (
+                  <p className="warning">Visita la fuente para poder valorarla primero.</p>
+                ) : null}
                 {justOpenedExternal ? <p className="hint">Gracias por revisar la fuente antes de valorar.</p> : null}
               </section>
             ) : null}

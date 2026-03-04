@@ -152,6 +152,33 @@ const TOPIC_EXCLUSIONS: Record<string, string[]> = {
   tech: ["low tech", "technology transfer office"] // weak disambiguation
 };
 
+const TOPIC_PHRASE_SIGNALS: Record<string, string[]> = {
+  war: ["ceasefire talks", "peace talks", "missile strike", "drone attack", "military offensive"],
+  geopolitics: ["foreign policy", "diplomatic summit", "security council", "international sanctions", "security guarantees"],
+  politics: ["election results", "parliament vote", "campaign rally", "coalition government"],
+  tech: ["artificial intelligence", "open source model", "software update", "data breach", "chip shortage"],
+  economy: ["interest rates", "inflation data", "labor market", "economic outlook"],
+  climate: ["extreme weather", "carbon emissions", "energy transition"],
+  health: ["public health", "clinical trial", "hospital capacity"],
+  science: ["peer reviewed", "research paper", "scientific study"],
+  local: ["city council", "ourense province", "municipal budget"],
+  sports: ["match day", "transfer market", "league table"],
+  culture: ["box office", "film festival", "music festival"],
+  education: ["school calendar", "university admissions", "education reform"]
+};
+
+const TOPIC_CONTEXT_CLUES: Record<string, Array<[string, string]>> = {
+  war: [["attack", "military"], ["invasion", "troops"], ["missile", "border"]],
+  geopolitics: [["summit", "leaders"], ["sanctions", "government"], ["nato", "security"], ["leaders", "security"]],
+  politics: [["election", "vote"], ["parliament", "bill"], ["party", "campaign"]],
+  tech: [["ai", "model"], ["software", "release"], ["chip", "gpu"]],
+  economy: [["inflation", "rates"], ["market", "stocks"], ["budget", "deficit"]],
+  climate: [["emissions", "co2"], ["heatwave", "climate"], ["drought", "temperatures"]],
+  health: [["hospital", "patients"], ["vaccine", "trial"], ["outbreak", "public health"]],
+  local: [["ourense", "concello"], ["municipal", "budget"], ["neighborhood", "city council"]],
+  sports: [["league", "match"], ["goal", "coach"], ["playoffs", "team"]]
+};
+
 const SUBTOPIC_KEYWORDS: Record<string, string[]> = {
   "tech/ai": ["llm", "machine learning", "generative ai", "chatbot", "model weights", "openai", "anthropic"],
   "tech/chips": ["semiconductor", "chip", "gpu", "tsmc", "fab", "wafer"],
@@ -272,13 +299,27 @@ const detectTopicsFromInput = (input: ClassifyInput, sourceDomain?: string): str
   const url = normalizeTopicText(input.url ?? "");
 
   const scores = new Map<string, number>();
+  const phraseHitsByTopic = new Map<string, number>();
+  const contextHitsByTopic = new Map<string, number>();
   const allTopics = Array.from(new Set([...Object.keys(TOPIC_KEYWORDS), ...Object.keys(LOCATION_KEYWORDS)]));
 
   allTopics.forEach((topic) => {
     const titleScore = topicSignalStrength(title, topic) * 2.3;
     const textScore = topicSignalStrength(text, topic) * 1;
     const urlScore = topicSignalStrength(url, topic) * 0.55;
-    const total = titleScore + textScore + urlScore;
+    const prepared = normalizeTopicText(`${title} ${text}`);
+    const phraseHits = (TOPIC_PHRASE_SIGNALS[topic] ?? []).reduce(
+      (acc, phrase) => acc + (keywordMatchCount(prepared, phrase) > 0 ? 1 : 0),
+      0
+    );
+    const contextHits = (TOPIC_CONTEXT_CLUES[topic] ?? []).reduce((acc, [left, right]) => {
+      return acc + (keywordMatchCount(prepared, left) > 0 && keywordMatchCount(prepared, right) > 0 ? 1 : 0);
+    }, 0);
+    const phraseBoost = phraseHits * 1.7;
+    const contextBoost = contextHits * 1.1;
+    phraseHitsByTopic.set(topic, phraseHits);
+    contextHitsByTopic.set(topic, contextHits);
+    const total = titleScore + textScore + urlScore + phraseBoost + contextBoost;
     if (total > 0) scores.set(topic, total);
   });
 
@@ -296,14 +337,32 @@ const detectTopicsFromInput = (input: ClassifyInput, sourceDomain?: string): str
   }
 
   if (scores.size === 0) return ["misc"];
-  const ranked = Array.from(scores.entries()).sort((a, b) => b[1] - a[1]);
+  const ranked = Array.from(scores.entries()).sort((a, b) => {
+    if (b[1] !== a[1]) return b[1] - a[1];
+    const weightA = TOPIC_WEIGHTS[a[0]] ?? 0;
+    const weightB = TOPIC_WEIGHTS[b[0]] ?? 0;
+    if (weightB !== weightA) return weightB - weightA;
+    return a[0].localeCompare(b[0]);
+  });
   const topScore = ranked[0][1];
+  const dynamicThreshold = topScore >= 6 ? 0.45 : 0.5;
   const selected = ranked
-    .filter(([, score]) => score >= 2.2 && score >= topScore * 0.5)
+    .filter(([, score]) => score >= 2.1 && score >= topScore * dynamicThreshold)
     .map(([topic]) => topic)
     .slice(0, 5);
 
-  return selected.length > 0 ? selected : [ranked[0][0] ?? "misc"];
+  const contextualCopicks = ranked
+    .filter(([topic, score]) => {
+      if (selected.includes(topic)) return false;
+      const phraseHits = phraseHitsByTopic.get(topic) ?? 0;
+      const contextHits = contextHitsByTopic.get(topic) ?? 0;
+      return (phraseHits > 0 || contextHits > 0) && score >= 1.8;
+    })
+    .map(([topic]) => topic)
+    .slice(0, Math.max(0, 5 - selected.length));
+
+  const merged = [...selected, ...contextualCopicks].slice(0, 5);
+  return merged.length > 0 ? merged : [ranked[0][0] ?? "misc"];
 };
 
 const topicRationale = (normalizedText: string, topics: string[]): string[] => {

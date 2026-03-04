@@ -7,6 +7,8 @@ export interface User {
   passwordHash?: string;
   role?: "admin" | "member";
   language?: AppLanguage;
+  privacyConsentAt?: number;
+  privacyPolicyVersion?: string;
   avatarDataUrl?: string;
   avatarColor?: string;
   initials?: string;

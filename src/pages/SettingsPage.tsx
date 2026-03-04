@@ -12,6 +12,7 @@ interface SettingsPageProps {
   onSave: (prefs: UserPreferences) => Promise<void>;
   onExport: () => Promise<void>;
   onImport: (file: File) => Promise<void>;
+  onDeleteMyData: () => Promise<void>;
   onOpenShareModal?: () => void;
   onLogout: () => void;
 }
@@ -32,6 +33,7 @@ export const SettingsPage = ({
   onSave,
   onExport,
   onImport,
+  onDeleteMyData,
   onOpenShareModal,
   onLogout
 }: SettingsPageProps) => {
@@ -332,6 +334,41 @@ export const SettingsPage = ({
               />
             </label>
           </div>
+        </article>
+
+        <article className="settings-card">
+          <h3><Icon name="shield" /> {pick(language, "Privacidad y datos", "Privacy & data", "Privacidade e datos")}</h3>
+          <p className="hint">
+            {pick(
+              language,
+              "Wee guarda tus datos solo en este dispositivo (IndexedDB/localStorage). No enviamos datos a servidores externos.",
+              "Wee stores your data only on this device (IndexedDB/localStorage). No data is sent to external servers.",
+              "Wee garda os teus datos só neste dispositivo (IndexedDB/localStorage). Non enviamos datos a servidores externos."
+            )}
+          </p>
+          <ul className="rules-list">
+            <li>{pick(language, "Acceso/portabilidad: exporta tu copia JSON.", "Access/portability: export your JSON copy.", "Acceso/portabilidade: exporta a túa copia JSON.")}</li>
+            <li>{pick(language, "Rectificación: edita alias/foto y publicaciones.", "Rectification: edit alias/photo and posts.", "Rectificación: edita alias/foto e publicacións.")}</li>
+            <li>{pick(language, "Supresión: elimina tu cuenta y tus datos locales.", "Erasure: delete your account and local data.", "Supresión: elimina a túa conta e os teus datos locais.")}</li>
+          </ul>
+          <button
+            type="button"
+            className="btn"
+            onClick={async () => {
+              const okDelete = window.confirm(
+                pick(
+                  language,
+                  "Esto eliminará tu cuenta y tus datos en este dispositivo. ¿Continuar?",
+                  "This will delete your account and your data on this device. Continue?",
+                  "Isto eliminará a túa conta e os teus datos neste dispositivo. Continuar?"
+                )
+              );
+              if (!okDelete) return;
+              await onDeleteMyData();
+            }}
+          >
+            <Icon name="trash" /> {pick(language, "Eliminar mis datos", "Delete my data", "Eliminar os meus datos")}
+          </button>
         </article>
 
         {message ? <p className="hint">{message}</p> : null}

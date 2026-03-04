@@ -27,6 +27,8 @@ interface CreateOrLoginResult {
   isNewUser: boolean;
 }
 
+const PRIVACY_POLICY_VERSION = "2026-03-04";
+
 export const DEFAULT_FILTERS: SearchFilters = {
   query: "",
   qualityLabel: "all",
@@ -152,7 +154,8 @@ export const useAppData = () => {
       alias: string,
       password: string,
       avatarDataUrl?: string,
-      language: AppLanguage = "es"
+      language?: AppLanguage,
+      acceptedPrivacy = false
     ): Promise<CreateOrLoginResult> => {
       const normalizedAlias = alias.trim().slice(0, 40);
       if (!normalizedAlias) {
@@ -183,10 +186,11 @@ export const useAppData = () => {
           };
         }
 
-        if ((updatedUser.language ?? "es") !== language || updatedUser !== existing) {
-          await updateUser({ ...updatedUser, language });
+        const nextLanguage = language ?? updatedUser.language ?? "es";
+        if ((updatedUser.language ?? "es") !== nextLanguage || updatedUser !== existing) {
+          await updateUser({ ...updatedUser, language: nextLanguage });
           await reload();
-          updatedUser = { ...updatedUser, language };
+          updatedUser = { ...updatedUser, language: nextLanguage };
         }
         loginWithUserId(updatedUser.id);
         return { user: updatedUser, isNewUser: false };
@@ -194,13 +198,18 @@ export const useAppData = () => {
 
       if (!isStrongPassword(cleanPassword)) throw new Error("WEAK_PASSWORD");
       const isFirstUser = users.length === 0;
+      if (!acceptedPrivacy) {
+        throw new Error("PRIVACY_CONSENT_REQUIRED");
+      }
 
       const newUser: User = {
         id: generateId(),
         alias: normalizedAlias,
         passwordHash: await hashPassword(cleanPassword),
         role: isFirstUser ? "admin" : "member",
-        language,
+        language: language ?? "es",
+        privacyConsentAt: Date.now(),
+        privacyPolicyVersion: PRIVACY_POLICY_VERSION,
         avatarDataUrl,
         avatarColor: avatarDataUrl ? undefined : colorFromString(normalizedAlias),
         initials: getInitials(normalizedAlias),

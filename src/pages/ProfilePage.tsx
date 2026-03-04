@@ -214,9 +214,14 @@ export const ProfilePage = ({
                 {userPosts
                   .slice()
                   .sort((a, b) => b.createdAt - a.createdAt)
-                  .slice(0, 8)
-                  .map((post) => (
-                    <PostCard key={post.id} post={post} onOpenDetail={(entry) => navigate(`/post/${entry.id}`)} />
+                    .slice(0, 8)
+                    .map((post) => (
+                    <PostCard
+                      key={post.id}
+                      post={post}
+                      author={users.find((user) => user.id === post.userId)}
+                      onOpenDetail={(entry) => navigate(`/post/${entry.id}`)}
+                    />
                   ))}
               </div>
             )}

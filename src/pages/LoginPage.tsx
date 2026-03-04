@@ -26,6 +26,7 @@ interface LoginPageProps {
     language?: AppLanguage,
     acceptedPrivacy?: boolean
   ) => Promise<{ user: User; isNewUser: boolean }>;
+  onChangeLanguage: (language: AppLanguage) => void;
 }
 
 const fileToDataUrl = (file: File): Promise<string> =>
@@ -42,7 +43,8 @@ export const LoginPage = ({
   onCreateCommunity,
   onPreviewCommunity,
   onConfirmCommunity,
-  onCreateOrLogin
+  onCreateOrLogin,
+  onChangeLanguage
 }: LoginPageProps) => {
   const { language } = useI18n();
   const navigate = useNavigate();
@@ -61,7 +63,7 @@ export const LoginPage = ({
   const [password, setPassword] = useState("");
   const [passwordConfirm, setPasswordConfirm] = useState("");
   const [avatarDataUrl, setAvatarDataUrl] = useState<string | undefined>(undefined);
-  const [profileLanguage, setProfileLanguage] = useState<AppLanguage>("es");
+  const [profileLanguage, setProfileLanguage] = useState<AppLanguage>(language);
   const [privacyAccepted, setPrivacyAccepted] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [showPasswordConfirm, setShowPasswordConfirm] = useState(false);
@@ -84,6 +86,11 @@ export const LoginPage = ({
     if (view !== "register") return;
     setAlias((current) => current || generateAlias());
   }, [view]);
+
+  useEffect(() => {
+    if (view !== "register") return;
+    setProfileLanguage(language);
+  }, [language, view]);
 
   const parseJoinInput = (raw: string): { code?: string; token?: string } => {
     const value = raw.trim();
@@ -128,7 +135,7 @@ export const LoginPage = ({
     setError(null);
     const parsed = parseJoinInput(joinCodeOrLink);
     if (!parsed.code && !parsed.token) {
-      setError(pick(language, "Pega un código o enlace válido.", "Paste a valid code or invite link.", "Pega un código ou ligazón válida."));
+      setError(pick(language, "Pega un código válido.", "Paste a valid code.", "Pega un código válido."));
       return;
     }
     try {
@@ -203,6 +210,20 @@ export const LoginPage = ({
 
   return (
     <main className={view === "register" ? "auth-layout" : "auth-layout auth-layout-single"}>
+      <div className="auth-language-switch" role="group" aria-label={pick(language, "Idioma de la interfaz", "Interface language", "Idioma da interface")}>
+        {(["gl", "es", "en"] as const).map((option) => (
+          <button
+            key={option}
+            type="button"
+            className={`auth-language-btn${language === option ? " active" : ""}`}
+            onClick={() => onChangeLanguage(option)}
+            aria-pressed={language === option}
+          >
+            {option.toUpperCase()}
+          </button>
+        ))}
+      </div>
+
       {view === "landing" ? (
         <section className="auth-card auth-card-entry">
           <h1 className="auth-hero-title">
@@ -250,9 +271,9 @@ export const LoginPage = ({
           <h2>{pick(language, "Unirse a comunidad", "Join community", "Unirse a comunidade")}</h2>
             <button type="button" className="btn" onClick={() => setView("landing")}><Icon name="arrowLeft" /> {pick(language, "Volver", "Back", "Volver")}</button>
           </div>
-          <p className="hint">{pick(language, "Pega código o enlace y te enseñamos primero dónde vas a entrar.", "Paste the code or invite link and preview the community first.", "Pega código ou ligazón e ensinámosche primeiro onde vas entrar.")}</p>
+          <p className="hint">{pick(language, "Pega el código y te enseñamos primero dónde vas a entrar.", "Paste the code and preview the community first.", "Pega o código e ensinámosche primeiro onde vas entrar.")}</p>
           <form className="stack" onSubmit={submitPreview}>
-            <label className="form-field">{pick(language, "Código o enlace", "Code or link", "Código ou ligazón")}<input value={joinCodeOrLink} onChange={(event) => setJoinCodeOrLink(event.target.value)} placeholder="ABCD1234 o /invite/..." /></label>
+            <label className="form-field">{pick(language, "Código de comunidad", "Community code", "Código da comunidade")}<input value={joinCodeOrLink} onChange={(event) => setJoinCodeOrLink(event.target.value)} placeholder="ABCD1234" /></label>
             {error ? <p className="error">{error}</p> : null}
             <button type="submit" className="btn btn-primary"><Icon name="spark" /> {pick(language, "Ver comunidad", "Preview community", "Ver comunidade")}</button>
           </form>

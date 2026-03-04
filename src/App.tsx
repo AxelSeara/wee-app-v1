@@ -15,7 +15,7 @@ import { NotificationsContext, type AppNotification } from "./lib/notifications"
 import { trackComment, trackOpenSource, trackPageView, trackRate, trackShare } from "./lib/usageAnalytics";
 import { listPosts as listPostsFromStore, reportPostById } from "./lib/store";
 import { consumeRateLimit } from "./lib/rateLimit";
-import type { AuraRulesetVersion, ExportBundle } from "./lib/types";
+import type { AppLanguage, AuraRulesetVersion, ExportBundle } from "./lib/types";
 import { canonicalizeUrl, duplicateUrlKeys, generateId, normalizeSpace, sha256Hex } from "./lib/utils";
 import { HomePage } from "./pages/HomePage";
 import { LoginPage } from "./pages/LoginPage";
@@ -72,7 +72,22 @@ const AppRoutes = () => {
   const [toast, setToast] = useState<string | null>(null);
   const [shareModalOpen, setShareModalOpen] = useState(false);
   const [notificationsReadAt, setNotificationsReadAt] = useState(0);
-  const language = normalizeLanguage(activeUser?.language);
+  const [guestLanguage, setGuestLanguage] = useState<AppLanguage>(() => {
+    try {
+      return normalizeLanguage(localStorage.getItem("wee:guest-language") ?? undefined);
+    } catch {
+      return "es";
+    }
+  });
+  const language = normalizeLanguage(activeUser?.language ?? guestLanguage);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem("wee:guest-language", guestLanguage);
+    } catch {
+      // ignore storage restrictions
+    }
+  }, [guestLanguage]);
 
   useEffect(() => {
     trackPageView(location.pathname);
@@ -956,6 +971,7 @@ const AppRoutes = () => {
                 onPreviewCommunity={previewCommunityInvite}
                 onConfirmCommunity={confirmCommunityInvite}
                 onCreateOrLogin={createOrLogin}
+                onChangeLanguage={setGuestLanguage}
               />
             </PageTransition>
           }

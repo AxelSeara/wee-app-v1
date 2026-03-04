@@ -3247,12 +3247,50 @@ textarea::placeholder {
   align-items: start;
   max-width: 1080px;
   margin: 0 auto;
+  position: relative;
+  padding-top: 2.25rem;
 }
 
 .auth-layout.auth-layout-single {
   grid-template-columns: minmax(0, 680px);
   max-width: 760px;
   align-items: center;
+}
+
+.auth-language-switch {
+  position: absolute;
+  top: 0.35rem;
+  right: 0;
+  display: inline-flex;
+  gap: 0.3rem;
+  padding: 0.22rem;
+  border: 1px solid #2f4d74;
+  border-radius: 999px;
+  background: rgb(13 24 41 / 82%);
+}
+
+.auth-language-btn {
+  min-width: 2.05rem;
+  border: 1px solid transparent;
+  border-radius: 999px;
+  background: transparent;
+  color: #bcd0f1;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  padding: 0.22rem 0.42rem;
+  cursor: pointer;
+}
+
+.auth-language-btn:hover {
+  color: #e6f0ff;
+  background: rgb(44 72 110 / 45%);
+}
+
+.auth-language-btn.active {
+  color: #f3f8ff;
+  border-color: #4d7cb8;
+  background: linear-gradient(135deg, rgb(52 84 127 / 72%), rgb(34 57 89 / 74%));
 }
 
 .auth-card {
@@ -3409,6 +3447,20 @@ textarea::placeholder {
 .stack {
   display: grid;
   gap: 0.75rem;
+}
+
+.copy-inline-toast {
+  margin: 0.35rem 0 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.38rem;
+  width: fit-content;
+  border: 1px solid #3f5f8f;
+  border-radius: 999px;
+  padding: 0.28rem 0.58rem;
+  background: rgb(19 35 60 / 88%);
+  color: #d6e7ff;
+  font-size: 0.82rem;
 }
 
 .user-list {
@@ -3957,6 +4009,13 @@ textarea:focus-visible {
   .auth-layout {
     grid-template-columns: 1fr;
     align-content: start;
+    padding-top: 0.6rem;
+  }
+
+  .auth-language-switch {
+    position: static;
+    justify-self: end;
+    margin-bottom: 0.45rem;
   }
 
   .auth-form-grid {

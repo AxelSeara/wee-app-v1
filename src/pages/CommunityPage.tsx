@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { TopBar } from "../components/TopBar";
 import { Icon } from "../components/Icon";
@@ -38,6 +38,7 @@ export const CommunityPage = ({
   const [rulesInput, setRulesInput] = useState(rulesText ?? "");
   const [invite, setInvite] = useState<{ code: string; token: string; link: string } | null>(null);
   const [saving, setSaving] = useState(false);
+  const [copyNotice, setCopyNotice] = useState<string | null>(null);
 
   useEffect(() => {
     setNameInput(selectedCommunity?.name ?? "");
@@ -48,18 +49,19 @@ export const CommunityPage = ({
     setRulesInput(rulesText ?? "");
   }, [rulesText]);
 
-  const inviteUrl = useMemo(() => {
-    if (!invite?.token) return "";
-    return `${window.location.origin}${window.location.pathname}#/invite/${invite.token}`;
-  }, [invite]);
-
   const copy = async (value: string, label: string) => {
     if (!value) return;
     try {
       await navigator.clipboard.writeText(value);
-      onToast?.(pick(language, `${label} copiado.`, `${label} copied.`, `${label} copiado.`));
+      const message = pick(language, `${label} copiado.`, `${label} copied.`, `${label} copiado.`);
+      onToast?.(message);
+      setCopyNotice(message);
+      window.setTimeout(() => setCopyNotice(null), 1800);
     } catch {
-      onToast?.(pick(language, "No se pudo copiar, prueba de nuevo.", "Couldn't copy it, try again.", "Non se puido copiar, proba outra vez."));
+      const message = pick(language, "No se pudo copiar, prueba de nuevo.", "Couldn't copy it, try again.", "Non se puido copiar, proba outra vez.");
+      onToast?.(message);
+      setCopyNotice(message);
+      window.setTimeout(() => setCopyNotice(null), 1800);
     }
   };
 
@@ -91,30 +93,6 @@ export const CommunityPage = ({
           : pick(language, "No pudimos crear la invitación ahora.", "We couldn't create the invite right now.", "Non puidemos crear a invitación agora.")
       );
     }
-  };
-
-  const shareInvite = async (link: string) => {
-    if (!link) return;
-    const text = pick(
-      language,
-      `Únete a ${selectedCommunity?.name ?? "mi comunidad"} en Wee: ${link}`,
-      `Join ${selectedCommunity?.name ?? "my community"} on Wee: ${link}`,
-      `Únete a ${selectedCommunity?.name ?? "a miña comunidade"} en Wee: ${link}`
-    );
-    if (navigator.share) {
-      try {
-        await navigator.share({
-          title: pick(language, "Invitación a Wee", "Wee invite", "Invitación a Wee"),
-          text,
-          url: link
-        });
-        onToast?.(pick(language, "Invitación compartida.", "Invite shared.", "Invitación compartida."));
-        return;
-      } catch {
-        // fallback to copy
-      }
-    }
-    await copy(link, pick(language, "Enlace", "Link", "Ligazón"));
   };
 
   return (
@@ -201,7 +179,7 @@ export const CommunityPage = ({
 
           <article className="settings-card">
             <h3><Icon name="link" /> {pick(language, "Invitar gente", "Invite people", "Convidar xente")}</h3>
-            <p className="hint">{pick(language, "Comparte código o enlace y entran en un momento.", "Share code or link and they can join in seconds.", "Comparte código ou ligazón e entran nun momento.")}</p>
+            <p className="hint">{pick(language, "De momento, comparte solo el código de comunidad.", "For now, share only the community code.", "Polo momento, comparte só o código da comunidade.")}</p>
             <div className="stack">
               <button type="button" className="btn btn-primary" onClick={generateInvite}>
                 <Icon name="plus" /> {pick(language, "Crear invitación", "Create invite", "Crear invitación")}
@@ -209,21 +187,19 @@ export const CommunityPage = ({
               {invite ? (
                 <>
                   <div className="hint">{pick(language, "Código de comunidad", "Community code", "Código da comunidade")}: <strong>{invite.code}</strong></div>
-                  <div className="hint" style={{ wordBreak: "break-all" }}>{inviteUrl}</div>
                   <div className="auth-entry-actions">
                     <button type="button" className="btn" onClick={() => copy(invite.code, pick(language, "Código", "Code", "Código"))}>
                       <Icon name="link" /> {pick(language, "Copiar código", "Copy code", "Copiar código")}
                     </button>
-                    <button type="button" className="btn" onClick={() => copy(inviteUrl, pick(language, "Enlace", "Link", "Ligazón"))}>
-                      <Icon name="link" /> {pick(language, "Copiar enlace", "Copy link", "Copiar ligazón")}
-                    </button>
-                    <button type="button" className="btn btn-primary" onClick={() => void shareInvite(inviteUrl)}>
-                      <Icon name="send" /> {pick(language, "Compartir invitación", "Share invite", "Compartir invitación")}
-                    </button>
                   </div>
+                  {copyNotice ? (
+                    <p className="copy-inline-toast" role="status" aria-live="polite">
+                      <Icon name="check" size={13} /> {copyNotice}
+                    </p>
+                  ) : null}
                 </>
               ) : (
-                <p className="hint">{pick(language, "Crea una invitación y compártela donde quieras.", "Create an invite and share it anywhere.", "Crea unha invitación e compártea onde queiras.")}</p>
+                <p className="hint">{pick(language, "Crea un código y pásalo a quien quieras invitar.", "Create a code and send it to people you want to invite.", "Crea un código e pásao a quen queiras convidar.")}</p>
               )}
             </div>
           </article>

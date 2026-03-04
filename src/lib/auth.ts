@@ -1,5 +1,5 @@
-// Testing phase policy: keep it intentionally simple.
-export const PASSWORD_REGEX = /^.{4,}$/;
+// Supabase Auth baseline: minimum 6 characters.
+export const PASSWORD_REGEX = /^.{6,}$/;
 
 export const isStrongPassword = (value: string): boolean => PASSWORD_REGEX.test(value);
 
@@ -59,7 +59,7 @@ export const hashPassword = async (password: string): Promise<string> => {
     const hashHex = await pbkdf2Hash(password, saltHex);
     return `pbkdf2$${PBKDF2_ITERATIONS}$${saltHex}$${hashHex}`;
   }
-  return `fallback:${password}`;
+  throw new Error("CRYPTO_UNAVAILABLE");
 };
 
 export const verifyPassword = async (password: string, storedHash: string): Promise<boolean> => {

@@ -1,5 +1,5 @@
 import { AnimatePresence } from "framer-motion";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { HashRouter, Navigate, Route, Routes, useLocation } from "react-router-dom";
 import { AppFooter } from "./components/AppFooter";
 import { AppSkeleton } from "./components/AppSkeleton";
@@ -11,6 +11,7 @@ import { classifyPost } from "./lib/classify";
 import { I18nContext, normalizeLanguage, pick } from "./lib/i18n";
 import { deriveTitleFromUrl, isUnusableTitle, qualityLabelText } from "./lib/presentation";
 import { enrichUrl } from "./lib/enrich";
+import { trackComment, trackOpenSource, trackPageView, trackRate, trackShare } from "./lib/usageAnalytics";
 import { listPosts as listPostsFromStore } from "./lib/store";
 import type { ExportBundle } from "./lib/types";
 import { canonicalizeUrl, duplicateUrlKeys, generateId, normalizeSpace } from "./lib/utils";
@@ -58,6 +59,10 @@ const AppRoutes = () => {
   const [toast, setToast] = useState<string | null>(null);
   const [shareModalOpen, setShareModalOpen] = useState(false);
   const language = normalizeLanguage(activeUser?.language);
+
+  useEffect(() => {
+    trackPageView(location.pathname);
+  }, [location.pathname]);
 
   const knownTopics = useMemo(
     () => Array.from(new Set(posts.flatMap((post) => post.topics))).sort(),
@@ -175,6 +180,12 @@ const AppRoutes = () => {
           : existing.rationale
       });
 
+      trackShare({
+        mode: sameUserDuplicate ? "penalized" : "merged",
+        sourceDomain: existing.sourceDomain,
+        primaryTopic: existing.topics?.[0]
+      });
+
       return {
         mode: sameUserDuplicate ? "penalized" : "merged",
         message: sameUserDuplicate
@@ -218,6 +229,12 @@ const AppRoutes = () => {
       normalizedText: classified.normalizedText
     });
 
+    trackShare({
+      mode: "created",
+      sourceDomain: classified.sourceDomain,
+      primaryTopic: classified.topics[0]
+    });
+
     return {
       mode: "created",
       message: pick(
@@ -242,6 +259,7 @@ const AppRoutes = () => {
     const openedBy = new Set(post.openedByUserIds ?? []);
     openedBy.add(activeUser.id);
     await savePost({ ...post, openedByUserIds: Array.from(openedBy) });
+    trackOpenSource({ sourceDomain: post.sourceDomain, primaryTopic: post.topics?.[0] });
   };
 
   const onRatePost = async (postId: string, vote: 1 | -1): Promise<{ ok: boolean; message: string }> => {
@@ -270,6 +288,7 @@ const AppRoutes = () => {
       : [...feedbacks, { userId: activeUser.id, vote, votedAt: Date.now() }];
 
     await savePost({ ...post, feedbacks: nextFeedbacks });
+    trackRate({ vote, sourceDomain: post.sourceDomain, primaryTopic: post.topics?.[0] });
     return { ok: true, message: vote > 0 ? pick(language, "Voto guardado. Aura al alza.", "Vote saved. Aura is rising.") : pick(language, "Voto guardado. Aura a la baja.", "Vote saved. Aura is dropping.") };
   };
 
@@ -297,6 +316,7 @@ const AppRoutes = () => {
       ]
     };
     await savePost(nextPost);
+    trackComment({ sourceDomain: post.sourceDomain, primaryTopic: post.topics?.[0], length: clean.length });
     return { ok: true, message: pick(language, "Comentario enviado. Hilo actualizado.", "Comment posted. Thread updated."), post: nextPost };
   };
 

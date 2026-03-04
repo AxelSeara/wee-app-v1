@@ -5,3 +5,7 @@ dist
 coverage
 *.tsbuildinfo
 .vercel
+.env
+.env.local
+.env.*
+!.env.example

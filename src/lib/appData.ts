@@ -18,6 +18,7 @@ import {
   updatePost,
   upsertPreferences
 } from "./store";
+import { remoteModeEnabled, supabase } from "./backend/supabase";
 import type { AppLanguage, ExportBundle, Post, SearchFilters, User, UserCommunityStats, UserPreferences } from "./types";
 import { hashPassword, isStrongPassword, verifyPassword } from "./auth";
 import { clamp, colorFromString, generateId, getInitials, normalizeSpace } from "./utils";
@@ -94,6 +95,22 @@ const bayesianMean = (
   priorWeight: number
 ): number => (sampleMean * sampleSize + priorMean * priorWeight) / Math.max(1, sampleSize + priorWeight);
 
+const aliasToAuthEmail = (alias: string): string => {
+  const base = alias
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, ".")
+    .replace(/^\.+|\.+$/g, "")
+    .slice(0, 24) || "user";
+  let hash = 0;
+  for (let i = 0; i < alias.length; i += 1) {
+    hash = (hash * 31 + alias.charCodeAt(i)) >>> 0;
+  }
+  const suffix = hash.toString(36).slice(0, 6) || "x";
+  return `${base}.${suffix}@weeapp.dev`;
+};
+
 export const useAppData = () => {
   const [users, setUsers] = useState<User[]>([]);
   const [posts, setPosts] = useState<Post[]>([]);
@@ -101,8 +118,11 @@ export const useAppData = () => {
   const [preferences, setPreferences] = useState<UserPreferences | null>(null);
   const [loading, setLoading] = useState(true);
 
-  const reload = useCallback(async () => {
-    setLoading(true);
+  const reload = useCallback(async (options?: { showSkeleton?: boolean }) => {
+    const showSkeleton = options?.showSkeleton ?? false;
+    if (showSkeleton) {
+      setLoading(true);
+    }
     const [fetchedUsers, fetchedPosts] = await Promise.all([getUsers(), listPosts()]);
     setUsers(fetchedUsers);
     setPosts(fetchedPosts);
@@ -114,11 +134,13 @@ export const useAppData = () => {
       setPreferences(null);
     }
 
-    setLoading(false);
+    if (showSkeleton) {
+      setLoading(false);
+    }
   }, [activeUserId]);
 
   useEffect(() => {
-    void reload();
+    void reload({ showSkeleton: true });
   }, [reload]);
 
   const activeUser = useMemo(
@@ -145,6 +167,9 @@ export const useAppData = () => {
   }, []);
 
   const logout = useCallback(() => {
+    if (remoteModeEnabled && supabase) {
+      void supabase.auth.signOut();
+    }
     setActiveUserId(null);
     setActiveUserIdState(null);
   }, []);
@@ -166,6 +191,75 @@ export const useAppData = () => {
         throw new Error("PASSWORD_REQUIRED");
       }
       const existing = users.find((user) => user.alias.toLowerCase() === normalizedAlias.toLowerCase());
+      if (remoteModeEnabled && supabase) {
+        if (existing) {
+          const authEmail = existing.authEmail ?? aliasToAuthEmail(existing.alias);
+          const { data, error } = await supabase.auth.signInWithPassword({
+            email: authEmail,
+            password: cleanPassword
+          });
+          if (error || !data.user) throw new Error("INVALID_PASSWORD");
+          const updatedUser = { ...existing, id: data.user.id, authEmail };
+          if (updatedUser.id !== existing.id || updatedUser.authEmail !== existing.authEmail) {
+            await updateUser(updatedUser);
+            await reload();
+          }
+          loginWithUserId(updatedUser.id);
+          return { user: updatedUser, isNewUser: false };
+        }
+
+        if (!isStrongPassword(cleanPassword)) throw new Error("WEAK_PASSWORD");
+        if (!acceptedPrivacy) throw new Error("PRIVACY_CONSENT_REQUIRED");
+
+        const authEmail = aliasToAuthEmail(normalizedAlias);
+        const { data, error } = await supabase.auth.signUp({
+          email: authEmail,
+          password: cleanPassword
+        });
+        if (error) {
+          if (error.message.toLowerCase().includes("already registered")) {
+            throw new Error("ALIAS_EXISTS");
+          }
+          throw new Error(`AUTH_SIGNUP_FAILED:${error.message}`);
+        }
+        const authUserId = data.user?.id;
+        if (!authUserId) throw new Error("AUTH_SIGNUP_FAILED");
+
+        let sessionUserId = data.session?.user.id ?? null;
+        if (!sessionUserId) {
+          const signInAfterSignup = await supabase.auth.signInWithPassword({
+            email: authEmail,
+            password: cleanPassword
+          });
+          if (signInAfterSignup.error || !signInAfterSignup.data.user) {
+            throw new Error(
+              `AUTH_SIGNIN_AFTER_SIGNUP_FAILED:${signInAfterSignup.error?.message ?? "unknown error"}`
+            );
+          }
+          sessionUserId = signInAfterSignup.data.user.id;
+        }
+
+        const isFirstUser = users.length === 0;
+        const newUser: User = {
+          id: sessionUserId,
+          alias: normalizedAlias,
+          authEmail,
+          role: isFirstUser ? "admin" : "member",
+          language: language ?? "es",
+          privacyConsentAt: Date.now(),
+          privacyPolicyVersion: PRIVACY_POLICY_VERSION,
+          avatarDataUrl,
+          avatarColor: avatarDataUrl ? undefined : colorFromString(normalizedAlias),
+          initials: getInitials(normalizedAlias),
+          createdAt: Date.now()
+        };
+
+        await addUser(newUser);
+        await reload();
+        loginWithUserId(newUser.id);
+        return { user: newUser, isNewUser: true };
+      }
+
       if (existing) {
         let updatedUser = existing;
         if (existing.passwordHash) {
@@ -292,18 +386,37 @@ export const useAppData = () => {
     async (userId: string) => {
       const target = users.find((entry) => entry.id === userId);
       if (!target) return;
-      const authoredPosts = posts.filter((post) => post.userId === userId);
-      for (const post of authoredPosts) {
-        await deletePostById(post.id);
-      }
-      const postsToClean = posts.filter((post) => post.userId !== userId);
-      for (const post of postsToClean) {
+      for (const post of posts) {
         const nextComments = (post.comments ?? []).filter((comment) => comment.userId !== userId);
         const nextFeedbacks = (post.feedbacks ?? []).filter((feedback) => feedback.userId !== userId);
         const nextOpened = (post.openedByUserIds ?? []).filter((id) => id !== userId);
-        const nextContributorUserIds = (post.contributorUserIds ?? [post.userId]).filter((id) => id !== userId);
         const nextContributorCounts = { ...(post.contributorCounts ?? {}) };
         delete nextContributorCounts[userId];
+        const contributorEntries = Object.entries(nextContributorCounts).filter(([, count]) => count > 0);
+        const nextContributorUserIds = contributorEntries.map(([id]) => id);
+        const nextShareCount = contributorEntries.reduce((acc, [, count]) => acc + count, 0);
+
+        if (post.userId === userId) {
+          if (nextContributorUserIds.length === 0) {
+            await deletePostById(post.id);
+            continue;
+          }
+          const nextOwnerId = contributorEntries
+            .slice()
+            .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))[0][0];
+          await updatePost({
+            ...post,
+            userId: nextOwnerId,
+            comments: nextComments,
+            feedbacks: nextFeedbacks,
+            openedByUserIds: nextOpened,
+            contributorUserIds: nextContributorUserIds,
+            contributorCounts: nextContributorCounts,
+            shareCount: nextShareCount
+          });
+          continue;
+        }
+
         const touched =
           nextComments.length !== (post.comments ?? []).length ||
           nextFeedbacks.length !== (post.feedbacks ?? []).length ||
@@ -318,7 +431,7 @@ export const useAppData = () => {
           openedByUserIds: nextOpened,
           contributorUserIds: nextContributorUserIds,
           contributorCounts: nextContributorCounts,
-          shareCount: Object.values(nextContributorCounts).reduce((acc, value) => acc + value, 0)
+          shareCount: nextShareCount
         });
       }
       await deleteUserById(userId);

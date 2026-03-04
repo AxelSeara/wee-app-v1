@@ -1,4 +1,5 @@
 import { openDB, type DBSchema, type IDBPDatabase } from "idb";
+import { remoteModeEnabled, supabase } from "./backend/supabase";
 import type { ExportBundle, Post, User, UserPreferences } from "./types";
 import { canonicalizeUrl, duplicateUrlKeys } from "./utils";
 
@@ -30,6 +31,42 @@ const LS_KEYS = {
 } as const;
 
 const hasIndexedDB = (): boolean => typeof indexedDB !== "undefined";
+const isRemote = (): boolean => remoteModeEnabled && Boolean(supabase);
+
+const REMOTE_KEYS = {
+  users: "users",
+  posts: "posts",
+  preferences: "preferences"
+} as const;
+
+const remoteReadCollection = async <T>(key: string): Promise<T[]> => {
+  if (!supabase) return [];
+  const { data, error } = await supabase
+    .from("app_state")
+    .select("payload")
+    .eq("id", key)
+    .maybeSingle();
+  if (error) throw new Error(`Remote read failed (${key}): ${error.message}`);
+  return ((data?.payload as T[] | null) ?? []).map((entry) => entry);
+};
+
+const sanitizeRemoteUser = (user: User): User => {
+  const { passwordHash, ...safe } = user;
+  return safe;
+};
+
+const remoteWriteCollection = async <T>(key: string, records: T[]): Promise<void> => {
+  if (!supabase) return;
+  const { error } = await supabase.from("app_state").upsert(
+    {
+      id: key,
+      payload: records,
+      updated_at: new Date().toISOString()
+    },
+    { onConflict: "id" }
+  );
+  if (error) throw new Error(`Remote write failed (${key}): ${error.message}`);
+};
 
 let dbPromise: Promise<IDBPDatabase<NewsDB>> | null = null;
 
@@ -158,6 +195,14 @@ export const setActiveUserId = (userId: string | null): void => {
 export const getActiveUserId = (): string | null => localStorage.getItem(ACTIVE_USER_KEY);
 
 export const addUser = async (user: User): Promise<void> => {
+  if (isRemote()) {
+    const users = await remoteReadCollection<User>(REMOTE_KEYS.users);
+    if (!users.some((u) => u.id === user.id)) {
+      users.push(sanitizeRemoteUser(user));
+      await remoteWriteCollection<User>(REMOTE_KEYS.users, users);
+    }
+    return;
+  }
   if (hasIndexedDB()) {
     const db = await getDb();
     await db.put("users", user);
@@ -171,6 +216,10 @@ export const addUser = async (user: User): Promise<void> => {
 };
 
 export const getUsers = async (): Promise<User[]> => {
+  if (isRemote()) {
+    const users = await remoteReadCollection<User>(REMOTE_KEYS.users);
+    return users.sort((a, b) => b.createdAt - a.createdAt);
+  }
   if (hasIndexedDB()) {
     const db = await getDb();
     const users = await db.getAll("users");
@@ -180,6 +229,10 @@ export const getUsers = async (): Promise<User[]> => {
 };
 
 export const getUserById = async (id: string): Promise<User | undefined> => {
+  if (isRemote()) {
+    const users = await remoteReadCollection<User>(REMOTE_KEYS.users);
+    return users.find((u) => u.id === id);
+  }
   if (hasIndexedDB()) {
     const db = await getDb();
     return db.get("users", id);
@@ -188,6 +241,15 @@ export const getUserById = async (id: string): Promise<User | undefined> => {
 };
 
 export const updateUser = async (user: User): Promise<void> => {
+  if (isRemote()) {
+    const users = await remoteReadCollection<User>(REMOTE_KEYS.users);
+    const index = users.findIndex((entry) => entry.id === user.id);
+    if (index >= 0) {
+      users[index] = sanitizeRemoteUser(user);
+      await remoteWriteCollection<User>(REMOTE_KEYS.users, users);
+    }
+    return;
+  }
   if (hasIndexedDB()) {
     const db = await getDb();
     await db.put("users", user);
@@ -202,6 +264,15 @@ export const updateUser = async (user: User): Promise<void> => {
 };
 
 export const deleteUserById = async (userId: string): Promise<void> => {
+  if (isRemote()) {
+    const users = (await remoteReadCollection<User>(REMOTE_KEYS.users)).filter((entry) => entry.id !== userId);
+    const preferences = (await remoteReadCollection<UserPreferences>(REMOTE_KEYS.preferences)).filter(
+      (entry) => entry.userId !== userId
+    );
+    await remoteWriteCollection<User>(REMOTE_KEYS.users, users);
+    await remoteWriteCollection<UserPreferences>(REMOTE_KEYS.preferences, preferences);
+    return;
+  }
   if (hasIndexedDB()) {
     const db = await getDb();
     await db.delete("users", userId);
@@ -216,6 +287,14 @@ export const deleteUserById = async (userId: string): Promise<void> => {
 
 export const addPost = async (post: Post): Promise<void> => {
   const normalized = normalizePostForDedup(post);
+  if (isRemote()) {
+    const posts = await remoteReadCollection<Post>(REMOTE_KEYS.posts);
+    if (!posts.some((p) => p.id === normalized.id)) {
+      posts.push(normalized);
+      await remoteWriteCollection<Post>(REMOTE_KEYS.posts, posts);
+    }
+    return;
+  }
   if (hasIndexedDB()) {
     const db = await getDb();
     await db.put("posts", normalized);
@@ -230,6 +309,15 @@ export const addPost = async (post: Post): Promise<void> => {
 
 export const updatePost = async (post: Post): Promise<void> => {
   const normalized = normalizePostForDedup(post);
+  if (isRemote()) {
+    const posts = await remoteReadCollection<Post>(REMOTE_KEYS.posts);
+    const index = posts.findIndex((entry) => entry.id === normalized.id);
+    if (index >= 0) {
+      posts[index] = normalized;
+      await remoteWriteCollection<Post>(REMOTE_KEYS.posts, posts);
+    }
+    return;
+  }
   if (hasIndexedDB()) {
     const db = await getDb();
     await db.put("posts", normalized);
@@ -244,6 +332,10 @@ export const updatePost = async (post: Post): Promise<void> => {
 };
 
 export const listPosts = async (): Promise<Post[]> => {
+  if (isRemote()) {
+    const posts = await remoteReadCollection<Post>(REMOTE_KEYS.posts);
+    return posts.map((post) => normalizePostForDedup(post)).sort((a, b) => b.createdAt - a.createdAt);
+  }
   if (hasIndexedDB()) {
     const db = await getDb();
     const posts = await db.getAll("posts");
@@ -253,6 +345,11 @@ export const listPosts = async (): Promise<Post[]> => {
 };
 
 export const deletePostById = async (postId: string): Promise<void> => {
+  if (isRemote()) {
+    const posts = (await remoteReadCollection<Post>(REMOTE_KEYS.posts)).filter((post) => post.id !== postId);
+    await remoteWriteCollection<Post>(REMOTE_KEYS.posts, posts);
+    return;
+  }
   if (hasIndexedDB()) {
     const db = await getDb();
     await db.delete("posts", postId);
@@ -268,6 +365,13 @@ export const listPostsByTopic = async (topic: string): Promise<Post[]> => {
 };
 
 export const listPostsByUser = async (userId: string): Promise<Post[]> => {
+  if (isRemote()) {
+    const posts = await remoteReadCollection<Post>(REMOTE_KEYS.posts);
+    return posts
+      .filter((p) => p.userId === userId)
+      .map((post) => normalizePostForDedup(post))
+      .sort((a, b) => b.createdAt - a.createdAt);
+  }
   if (hasIndexedDB()) {
     const db = await getDb();
     const byUser = await db.getAllFromIndex("posts", "by-userId", userId);
@@ -280,6 +384,17 @@ export const listPostsByUser = async (userId: string): Promise<Post[]> => {
 };
 
 export const getPreferences = async (userId: string): Promise<UserPreferences> => {
+  if (isRemote()) {
+    const all = await remoteReadCollection<UserPreferences>(REMOTE_KEYS.preferences);
+    return (
+      all.find((entry) => entry.userId === userId) ?? {
+        userId,
+        preferredTopics: [],
+        blockedDomains: [],
+        blockedKeywords: []
+      }
+    );
+  }
   if (hasIndexedDB()) {
     const db = await getDb();
     const found = await db.get("preferences", userId);
@@ -304,6 +419,14 @@ export const getPreferences = async (userId: string): Promise<UserPreferences> =
 };
 
 export const upsertPreferences = async (prefs: UserPreferences): Promise<void> => {
+  if (isRemote()) {
+    const all = await remoteReadCollection<UserPreferences>(REMOTE_KEYS.preferences);
+    const index = all.findIndex((entry) => entry.userId === prefs.userId);
+    if (index >= 0) all[index] = prefs;
+    else all.push(prefs);
+    await remoteWriteCollection<UserPreferences>(REMOTE_KEYS.preferences, all);
+    return;
+  }
   if (hasIndexedDB()) {
     const db = await getDb();
     await db.put("preferences", prefs);
@@ -319,6 +442,10 @@ export const upsertPreferences = async (prefs: UserPreferences): Promise<void> =
 export const exportAllData = async (): Promise<ExportBundle> => {
   const [users, posts] = await Promise.all([getUsers(), listPosts()]);
   let preferences: UserPreferences[];
+  if (isRemote()) {
+    preferences = await remoteReadCollection<UserPreferences>(REMOTE_KEYS.preferences);
+    return { users, posts, preferences };
+  }
   if (hasIndexedDB()) {
     const db = await getDb();
     preferences = await db.getAll("preferences");
@@ -332,6 +459,62 @@ export const importAllData = async (bundle: ExportBundle): Promise<void> => {
   const users = bundle.users ?? [];
   const posts = (bundle.posts ?? []).map((post) => normalizePostForDedup(post));
   const preferences = bundle.preferences ?? [];
+
+  if (isRemote()) {
+    const currentUsers = await remoteReadCollection<User>(REMOTE_KEYS.users);
+    const currentPosts = (await remoteReadCollection<Post>(REMOTE_KEYS.posts)).map((post) => normalizePostForDedup(post));
+    const currentPreferences = await remoteReadCollection<UserPreferences>(REMOTE_KEYS.preferences);
+
+    const mergedUsers = [...currentUsers];
+    users.forEach((u) => {
+      if (!mergedUsers.some((current) => current.id === u.id)) mergedUsers.push(u);
+    });
+
+    const mergedPostsById = new Map<string, Post>(currentPosts.map((post) => [post.id, post]));
+    const duplicateIndex = new Map<string, string>();
+    mergedPostsById.forEach((post) => {
+      duplicateUrlKeys(post.canonicalUrl ?? post.url).forEach((key) => {
+        if (!duplicateIndex.has(key)) duplicateIndex.set(key, post.id);
+      });
+    });
+    posts.forEach((incoming) => {
+      const sameId = mergedPostsById.get(incoming.id);
+      if (sameId) {
+        const merged = mergeDuplicatePosts(sameId, incoming);
+        mergedPostsById.set(merged.id, merged);
+        duplicateUrlKeys(merged.canonicalUrl ?? merged.url).forEach((key) => duplicateIndex.set(key, merged.id));
+        return;
+      }
+
+      const duplicateId = duplicateUrlKeys(incoming.canonicalUrl ?? incoming.url)
+        .map((key) => duplicateIndex.get(key))
+        .find(Boolean);
+      if (duplicateId) {
+        const base = mergedPostsById.get(duplicateId);
+        if (!base) return;
+        const merged = mergeDuplicatePosts(base, incoming);
+        mergedPostsById.set(merged.id, merged);
+        duplicateUrlKeys(merged.canonicalUrl ?? merged.url).forEach((key) => duplicateIndex.set(key, merged.id));
+        return;
+      }
+
+      mergedPostsById.set(incoming.id, incoming);
+      duplicateUrlKeys(incoming.canonicalUrl ?? incoming.url).forEach((key) => duplicateIndex.set(key, incoming.id));
+    });
+    const mergedPosts = Array.from(mergedPostsById.values());
+
+    const mergedPreferences = [...currentPreferences];
+    preferences.forEach((pref) => {
+      if (!mergedPreferences.some((current) => current.userId === pref.userId)) {
+        mergedPreferences.push(pref);
+      }
+    });
+
+    await remoteWriteCollection<User>(REMOTE_KEYS.users, mergedUsers);
+    await remoteWriteCollection<Post>(REMOTE_KEYS.posts, mergedPosts);
+    await remoteWriteCollection<UserPreferences>(REMOTE_KEYS.preferences, mergedPreferences);
+    return;
+  }
 
   if (hasIndexedDB()) {
     const db = await getDb();

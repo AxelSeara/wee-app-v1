@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { Icon } from "../components/Icon";
 import { normalizeLanguage, pick, useI18n } from "../lib/i18n";
 import { TopBar } from "../components/TopBar";
+import { checkSupabaseConnection, hasSupabaseConfig } from "../lib/backend/supabase";
 import type { AppLanguage, User, UserPreferences } from "../lib/types";
 
 interface SettingsPageProps {
@@ -47,6 +48,8 @@ export const SettingsPage = ({
   const [selectedLanguage, setSelectedLanguage] = useState<AppLanguage>(normalizeLanguage(activeUser.language));
   const [noiseMode, setNoiseMode] = useState<"open" | "balanced" | "strict">("balanced");
   const [message, setMessage] = useState<string | null>(null);
+  const [backendStatus, setBackendStatus] = useState<string | null>(null);
+  const [checkingBackend, setCheckingBackend] = useState(false);
 
   useEffect(() => {
     setSelectedLanguage(normalizeLanguage(activeUser.language));
@@ -310,6 +313,29 @@ export const SettingsPage = ({
           <button type="button" className="btn btn-primary" onClick={() => void save()}>
             <Icon name="check" /> {pick(language, "Guardar preferencias", "Save preferences")}
           </button>
+        </article>
+
+        <article className="settings-card">
+          <h3><Icon name="link" /> Backend (Supabase)</h3>
+          <p className="hint">
+            {hasSupabaseConfig
+              ? pick(language, "Configuración detectada. Puedes verificar conexión.", "Configuration detected. You can verify connection.")
+              : pick(language, "No hay configuración de Supabase en este entorno.", "No Supabase configuration was found in this environment.")}
+          </p>
+          <button
+            type="button"
+            className="btn"
+            disabled={!hasSupabaseConfig || checkingBackend}
+            onClick={async () => {
+              setCheckingBackend(true);
+              const result = await checkSupabaseConnection();
+              setBackendStatus(result.message);
+              setCheckingBackend(false);
+            }}
+          >
+            <Icon name="check" /> {pick(language, "Comprobar conexión", "Check connection")}
+          </button>
+          {backendStatus ? <p className="hint">{backendStatus}</p> : null}
         </article>
 
         <article className="settings-card">

@@ -4,6 +4,9 @@ import { pick, useI18n } from "../lib/i18n";
 import { EASE_STANDARD, MOTION_DURATION } from "../lib/motion";
 import { Icon } from "./Icon";
 
+const ALPHA_VERSION = "v0.1.1-alpha";
+const ALPHA_UPDATED_AT = "2026-03-04";
+
 export const AppFooter = () => {
   const { language } = useI18n();
   const [open, setOpen] = useState(false);
@@ -12,7 +15,17 @@ export const AppFooter = () => {
     <>
       <footer className="app-footer">
         <section className="footer-bar">
-          <p>{pick(language, "Wee · comparte aquí primero y decide mejor en comunidad", "Wee · share here first and decide better as a community")}</p>
+          <div className="footer-copy">
+            <p>{pick(language, "Wee · comparte aquí primero y decide mejor en comunidad", "Wee · share here first and decide better as a community")}</p>
+            <p className="footer-meta">
+              {pick(
+                language,
+                `Estado: Alpha · Versión ${ALPHA_VERSION} · Última actualización ${ALPHA_UPDATED_AT}`,
+                `Status: Alpha · Version ${ALPHA_VERSION} · Last update ${ALPHA_UPDATED_AT}`,
+                `Estado: Alpha · Versión ${ALPHA_VERSION} · Última actualización ${ALPHA_UPDATED_AT}`
+              )}
+            </p>
+          </div>
           <button type="button" className="btn" onClick={() => setOpen(true)}>
             <Icon name="book" size={14} /> {pick(language, "Sobre Wee", "About Wee")}
           </button>

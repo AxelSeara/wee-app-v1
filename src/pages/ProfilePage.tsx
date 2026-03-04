@@ -60,7 +60,7 @@ export const ProfilePage = ({
     [posts, profileUser.id]
   );
   const communityStats = userCommunityStatsById.get(profileUser.id);
-  const canSeeScores = isOwnProfile || activeUser.role === "admin";
+  const canSeeScores = activeUser.role === "admin";
   const canManageUser = activeUser.role === "admin" && !isOwnProfile;
   const isTargetAdmin = (profileUser.role ?? "member") === "admin";
   const recentComments = useMemo(

@@ -2976,6 +2976,16 @@ textarea::placeholder {
   text-shadow: 0 1px 0 rgb(6 14 29 / 45%);
 }
 
+.footer-copy {
+  display: grid;
+  gap: 0.18rem;
+}
+
+.footer-meta {
+  color: #98afcf;
+  font-size: 0.76rem;
+}
+
 .about-modal {
   width: min(920px, 100%);
   padding: 1.25rem 1.25rem 1.1rem;

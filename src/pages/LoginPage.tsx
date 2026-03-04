@@ -86,6 +86,17 @@ export const LoginPage = ({ users, onCreateOrLogin }: LoginPageProps) => {
         setError(pick(language, "Contraseña incorrecta.", "Incorrect password.", "Contrasinal incorrecto."));
         return;
       }
+      if (code === "CRYPTO_UNAVAILABLE") {
+        setError(
+          pick(
+            language,
+            "Tu navegador no soporta cifrado seguro para contraseñas. Actualízalo para continuar.",
+            "Your browser does not support secure password encryption. Please update it to continue.",
+            "O teu navegador non soporta cifrado seguro para contrasinais. Actualízao para continuar."
+          )
+        );
+        return;
+      }
       setError(pick(language, "No pudimos entrar con ese alias.", "We could not sign in with that alias.", "Non puidemos entrar con ese alias."));
     }
   };
@@ -114,9 +125,9 @@ export const LoginPage = ({ users, onCreateOrLogin }: LoginPageProps) => {
       setError(
         pick(
           language,
-          "La contraseña debe tener al menos 4 caracteres (modo test).",
-          "Password must be at least 4 characters (testing mode).",
-          "O contrasinal debe ter polo menos 4 caracteres (modo test)."
+          "La contraseña debe tener al menos 6 caracteres.",
+          "Password must be at least 6 characters.",
+          "O contrasinal debe ter polo menos 6 caracteres."
         )
       );
       return;
@@ -138,16 +149,16 @@ export const LoginPage = ({ users, onCreateOrLogin }: LoginPageProps) => {
         setError(pick(language, "Ese alias ya existe. Inicia sesión.", "That alias already exists. Sign in instead.", "Ese alias xa existe. Inicia sesión."));
         return;
       }
-      setShowWelcome(true);
+      navigate("/home");
     } catch (err) {
       const code = err instanceof Error ? err.message : "";
       if (code === "WEAK_PASSWORD") {
         setError(
           pick(
             language,
-            "La contraseña debe tener al menos 4 caracteres (modo test).",
-            "Password must be at least 4 characters (testing mode).",
-            "O contrasinal debe ter polo menos 4 caracteres (modo test)."
+            "La contraseña debe tener al menos 6 caracteres.",
+            "Password must be at least 6 characters.",
+            "O contrasinal debe ter polo menos 6 caracteres."
           )
         );
         return;
@@ -159,6 +170,67 @@ export const LoginPage = ({ users, onCreateOrLogin }: LoginPageProps) => {
             "Debes aceptar la política de privacidad local para crear tu cuenta.",
             "You must accept the local privacy policy to create your account.",
             "Debes aceptar a política de privacidade local para crear a túa conta."
+          )
+        );
+        return;
+      }
+      if (code === "ALIAS_EXISTS") {
+        setError(pick(language, "Ese alias ya existe. Inicia sesión.", "That alias already exists. Sign in instead.", "Ese alias xa existe. Inicia sesión."));
+        return;
+      }
+      if (code === "AUTH_SIGNUP_FAILED") {
+        setError(
+          pick(
+            language,
+            "No pudimos crear la cuenta en el backend. Revisa la conexión o la configuración de Supabase.",
+            "We could not create the account in the backend. Check connection or Supabase setup.",
+            "Non puidemos crear a conta no backend. Revisa a conexión ou a configuración de Supabase."
+          )
+        );
+        return;
+      }
+      if (code.startsWith("AUTH_SIGNUP_FAILED:")) {
+        const detail = code.slice("AUTH_SIGNUP_FAILED:".length).trim();
+        setError(
+          pick(
+            language,
+            `No pudimos crear la cuenta en Supabase: ${detail}`,
+            `Could not create account in Supabase: ${detail}`,
+            `Non puidemos crear a conta en Supabase: ${detail}`
+          )
+        );
+        return;
+      }
+      if (code === "AUTH_SIGNIN_AFTER_SIGNUP_FAILED") {
+        setError(
+          pick(
+            language,
+            "Cuenta creada, pero no pudimos iniciar sesión automática. Revisa la confirmación de email en Supabase o entra manualmente.",
+            "Account created, but automatic sign-in failed. Check email confirmation in Supabase or sign in manually.",
+            "Conta creada, pero fallou o inicio automático. Revisa a confirmación de email en Supabase ou entra manualmente."
+          )
+        );
+        return;
+      }
+      if (code.startsWith("AUTH_SIGNIN_AFTER_SIGNUP_FAILED:")) {
+        const detail = code.slice("AUTH_SIGNIN_AFTER_SIGNUP_FAILED:".length).trim();
+        setError(
+          pick(
+            language,
+            `Cuenta creada, pero falló el login automático: ${detail}`,
+            `Account created, but auto sign-in failed: ${detail}`,
+            `Conta creada, pero fallou o login automático: ${detail}`
+          )
+        );
+        return;
+      }
+      if (code === "CRYPTO_UNAVAILABLE") {
+        setError(
+          pick(
+            language,
+            "Tu navegador no soporta cifrado seguro para contraseñas. Actualízalo para continuar.",
+            "Your browser does not support secure password encryption. Please update it to continue.",
+            "O teu navegador non soporta cifrado seguro para contrasinais. Actualízao para continuar."
           )
         );
         return;
@@ -297,9 +369,9 @@ export const LoginPage = ({ users, onCreateOrLogin }: LoginPageProps) => {
                   <p className="hint">
                     {pick(
                       language,
-                      "Durante pruebas: mínimo 4 caracteres.",
-                      "Testing mode: minimum 4 characters.",
-                      "Durante probas: mínimo 4 caracteres."
+                      "Mínimo 6 caracteres.",
+                      "Minimum 6 characters.",
+                      "Mínimo 6 caracteres."
                     )}
                   </p>
                 </div>

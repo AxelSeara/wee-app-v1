@@ -323,9 +323,13 @@ export const HomePage = ({
               >
                 <Icon name="book" /> {pick(language, "Temas", "Topics", "Temas")}
               </button>
-              <Link to={`/profile/${activeUser.id}/posts`} className="side-nav-btn">
-                <Icon name="user" /> {pick(language, "Perfil", "Profile", "Perfil")}
-              </Link>
+              <button
+                type="button"
+                className={activeSection === "community-section" ? "side-nav-btn active" : "side-nav-btn"}
+                onClick={() => scrollToSection("community-section")}
+              >
+                <Icon name="users" /> {pick(language, "Comunidad", "Community", "Comunidade")}
+              </button>
             </nav>
             <label className="home-sidebar-search" aria-label={pick(language, "Tema actual", "Current topic", "Tema actual")}>
               <Icon name="book" size={13} />

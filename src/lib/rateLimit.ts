@@ -14,6 +14,9 @@ export interface RateLimitDecision {
   source: "remote" | "local";
 }
 
+let remoteAuthCheckCacheAt = 0;
+let remoteAuthAvailable = false;
+
 const toNumber = (value: string | undefined, fallback: number): number => {
   const parsed = Number(value);
   return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback;
@@ -103,6 +106,23 @@ export const consumeRateLimit = async (
 ): Promise<RateLimitDecision> => {
   const rule = RATE_LIMIT_RULES[action];
   if (supabase) {
+    // Community auth no longer uses Supabase Auth JWT sessions.
+    // Remote RPC limit relies on auth.uid(), so we only call it when a JWT session exists.
+    const cacheTtlMs = 30_000;
+    if (now - remoteAuthCheckCacheAt > cacheTtlMs) {
+      remoteAuthCheckCacheAt = now;
+      try {
+        const { data, error } = await supabase.auth.getSession();
+        remoteAuthAvailable = !error && Boolean(data.session?.access_token);
+      } catch {
+        remoteAuthAvailable = false;
+      }
+    }
+
+    if (!remoteAuthAvailable) {
+      return consumeLocalRateLimit(action, userId, now);
+    }
+
     const { data, error } = await supabase.rpc("consume_rate_limit", {
       p_action: action,
       p_limit: rule.limit,

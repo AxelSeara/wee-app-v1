@@ -50,8 +50,9 @@ export const ShareLinkModal = ({ open, onClose, onShareUrl, getDuplicatePreview,
       onToast(
         pick(
           language,
-          "No pudimos publicar ahora. Inténtalo de nuevo.",
-          "Could not publish right now. Please try again."
+          "Ups, no se pudo publicar ahora. Prueba otra vez.",
+          "Oops, couldn't post right now. Try again.",
+          "Ups, non se puido publicar agora. Proba outra vez."
         )
       );
     } finally {
@@ -85,11 +86,11 @@ export const ShareLinkModal = ({ open, onClose, onShareUrl, getDuplicatePreview,
           >
             <header className="modal-head">
               <div>
-                <h2 id="share-link-title">{pick(language, "Comparte un enlace", "Share a link")}</h2>
-                <p>{pick(language, "Pásalo por Wee para que quede en su tema, con contexto y sin duplicados.", "Share it via Wee so it stays in its topic, with context and no duplicates.")}</p>
+                <h2 id="share-link-title">{pick(language, "Comparte un link", "Share a link", "Comparte unha ligazón")}</h2>
+                <p>{pick(language, "Pásalo por Wee y se queda en su tema, con contexto y sin duplicados.", "Share it through Wee so it stays in the right topic with context and no duplicates.", "Pásao por Wee e queda no seu tema, con contexto e sen duplicados.")}</p>
               </div>
               <button type="button" className="btn" onClick={onClose}>
-                {pick(language, "Cerrar", "Close")}
+                {pick(language, "Cerrar", "Close", "Pechar")}
               </button>
             </header>
 
@@ -115,12 +116,12 @@ export const ShareLinkModal = ({ open, onClose, onShareUrl, getDuplicatePreview,
                         `This link is already in your history. We'll merge it into the same thread to keep things tidy. Contributors: ${duplicateState.contributors} · shares: ${duplicateState.totalShares}.`,
                         `Esta ligazón xa está no teu historial. Sumarémola ao mesmo fío para mantelo ordenado. Colaboradores: ${duplicateState.contributors} · envíos: ${duplicateState.totalShares}.`
                       )
-                    : pick(language, `Este enlace ya existe: lo uniremos al hilo actual (${duplicateState.contributors} colaboradores, ${duplicateState.totalShares} envíos).`, `This link already exists: we'll merge it into the current thread (${duplicateState.contributors} contributors, ${duplicateState.totalShares} shares).`)}
+                    : pick(language, `Ese link ya existe: va al hilo actual (${duplicateState.contributors} colaboradores, ${duplicateState.totalShares} envíos).`, `This link already exists: we'll merge it into the current thread (${duplicateState.contributors} contributors, ${duplicateState.totalShares} shares).`, `Esa ligazón xa existe: vai ao fío actual (${duplicateState.contributors} colaboradores, ${duplicateState.totalShares} envíos).`)}
                 </p>
               ) : null}
 
               {!duplicateState.exists && url.trim() ? (
-                <p className="hint">{pick(language, "Tip: si se comparte aquí primero, el grupo lo debate en su hilo y no se pierde contexto.", "Tip: if it is shared here first, the group debates it in-thread and context is not lost.")}</p>
+                <p className="hint">{pick(language, "Tip rápido: si lo compartes aquí primero, el debate queda ordenado en su hilo.", "Quick tip: share it here first and the discussion stays tidy in-thread.", "Consello rápido: se o compartes aquí primeiro, o debate queda ordenado no seu fío.")}</p>
               ) : null}
 
               <button type="submit" className="btn btn-primary" disabled={submitting}>
@@ -131,7 +132,7 @@ export const ShareLinkModal = ({ open, onClose, onShareUrl, getDuplicatePreview,
                     <span className="loading-dots" aria-hidden="true" />
                   </>
                 ) : (
-                  pick(language, "Publicar", "Post")
+                  pick(language, "Publicar", "Post", "Publicar")
                 )}
               </button>
             </form>

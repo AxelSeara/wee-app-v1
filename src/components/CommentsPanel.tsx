@@ -87,7 +87,7 @@ export const CommentsPanel = ({
   return (
     <section className={compact ? "comments-panel comments-panel-compact" : "comments-panel"}>
       <div className="comments-head">
-        <h4>{pick(language, "Comentarios", "Comments")}</h4>
+        <h4>{pick(language, "Comentarios", "Comments", "Comentarios")}</h4>
         <div className="comments-head-actions">
           <span className="badge">{comments.length}</span>
           {canModerateComments && onDeleteComment ? (
@@ -110,8 +110,8 @@ export const CommentsPanel = ({
           >
             <Icon name="trash" size={13} />{" "}
             {deleteMode
-              ? pick(language, "Modo eliminar: activo", "Delete mode: on", "Modo eliminar: activo")
-              : pick(language, "Eliminar comentarios", "Delete comments", "Eliminar comentarios")}
+              ? pick(language, "Modo borrar: activo", "Delete mode: on", "Modo borrar: activo")
+              : pick(language, "Borrar comentarios", "Delete comments", "Borrar comentarios")}
           </button>
         </div>
       ) : null}
@@ -121,7 +121,7 @@ export const CommentsPanel = ({
           <input
             value={draft}
             onChange={(event) => setDraft(event.target.value)}
-            placeholder={pick(language, "Añade contexto, corrige un dato o comparte una fuente...", "Add context, correct a detail or share a source...")}
+            placeholder={pick(language, "Añade contexto, corrige un dato o pasa una fuente...", "Add context, fix a detail or share a source...", "Engade contexto, corrixe un dato ou pasa unha fonte...")}
             maxLength={320}
             disabled={!activeUserId || busy}
           />
@@ -144,8 +144,8 @@ export const CommentsPanel = ({
       <div className="comments-list">
         {sortedComments.length === 0 ? (
           <article className="empty-state">
-            <h3>{pick(language, "Todavía no hay comentarios", "No comments yet", "Aínda non hai comentarios")}</h3>
-            <p>{pick(language, "Sé la primera persona en aportar contexto a esta noticia.", "Be the first person to add context to this post.", "Sé a primeira persoa en aportar contexto a esta nova.")}</p>
+            <h3>{pick(language, "Aún no hay comentarios", "No comments yet", "Aínda non hai comentarios")}</h3>
+            <p>{pick(language, "Sé la primera persona en dejar contexto aquí.", "Be the first one to add context here.", "Sé a primeira persoa en deixar contexto aquí.")}</p>
           </article>
         ) : (
           sortedComments.slice(0, compact ? 3 : 12).map((comment) => {
@@ -176,7 +176,7 @@ export const CommentsPanel = ({
                 ) : null}
                 <header>
                   {author ? <Avatar user={author} size={22} /> : null}
-                  {author ? <Link to={`/profile/${author.id}/posts`} className="comment-author-link">{author.alias}</Link> : <strong>{pick(language, "usuario", "user")}</strong>}
+                  {author ? <Link to={`/profile/${author.id}/posts`} className="comment-author-link">{author.alias}</Link> : <strong>{pick(language, "usuario", "user", "usuario")}</strong>}
                   <span className="hint">{relativeTime(comment.createdAt, language)}</span>
                 </header>
                 <p>{comment.text}</p>

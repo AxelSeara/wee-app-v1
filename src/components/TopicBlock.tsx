@@ -51,15 +51,15 @@ export const TopicBlock = ({ topic, posts }: TopicBlockProps) => {
       <div className="topic-head">
         <h4 className="topic-title">{formatTopicLabel(topic)}</h4>
         <div className="topic-head-badges">
-          <span className="topic-hot-tag"><Icon name="chili" size={13} /> {pick(language, "En movimiento", "Active now")}: {hotCount}</span>
+          <span className="topic-hot-tag"><Icon name="chili" size={13} /> {pick(language, "Ahora mismo", "Happening now", "Agora mesmo")}: {hotCount}</span>
           <span className="badge"><Icon name="spark" size={12} /> {pick(language, "Aura media", "Avg Aura", "Aura media")} {avgAura}</span>
         </div>
       </div>
       <p className="topic-summary">{intro}</p>
-      <p className="topic-meta">{pick(language, "Publicaciones en este tema", "Posts in this topic")}: {posts.length}</p>
+      <p className="topic-meta">{pick(language, "Publicaciones en este tema", "Posts in this topic", "Publicacións neste tema")}: {posts.length}</p>
 
       {latest ? (
-        <p className="topic-last-update">{pick(language, "Última actualización", "Last update")}: {formatNewsDate(extractNewsDate(latest))}</p>
+        <p className="topic-last-update">{pick(language, "Última actualización", "Last update", "Última actualización")}: {formatNewsDate(extractNewsDate(latest))}</p>
       ) : null}
 
       <div className="topic-updates">
@@ -82,8 +82,8 @@ export const TopicBlock = ({ topic, posts }: TopicBlockProps) => {
       <div className="topic-actions">
         {chiliCount > 0 ? (
           <span className="topic-recency-badge">
-            <span>{pick(language, "Muy reciente", "Very recent")}</span>
-            <span className="topic-recency-chilis" aria-label={pick(language, "Nivel de recencia", "Recency level")}>
+            <span>{pick(language, "Muy reciente", "Very recent", "Moi recente")}</span>
+            <span className="topic-recency-chilis" aria-label={pick(language, "Nivel de recencia", "Recency level", "Nivel de recencia")}>
               {Array.from({ length: chiliCount }).map((_, index) => (
                 <Icon key={`${topic}-${index}`} name="chili" size={13} />
               ))}
@@ -99,7 +99,7 @@ export const TopicBlock = ({ topic, posts }: TopicBlockProps) => {
               setExpanded((curr) => !curr);
             }}
           >
-            {expanded ? pick(language, "Mostrar menos", "Show less") : pick(language, "Ver últimas del hilo", "See latest in thread")}
+            {expanded ? pick(language, "Ver menos", "Show less", "Ver menos") : pick(language, "Ver últimas del hilo", "See latest in thread", "Ver últimas do fío")}
           </button>
         ) : null}
       </div>

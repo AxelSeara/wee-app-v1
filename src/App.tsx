@@ -284,15 +284,15 @@ const AppRoutes = () => {
     url: string,
     options?: { forceTopic?: string }
   ): Promise<{ mode: "created" | "merged" | "penalized"; message: string; debugBreakdown?: unknown; topicDebug?: unknown }> => {
-    if (!activeUser) return { mode: "created", message: pick(language, "Inicia sesión para compartir enlaces.", "Sign in to share links.") };
+    if (!activeUser) return { mode: "created", message: pick(language, "Entra para compartir links.", "Sign in to share links.") };
     const postLimit = await consumeRateLimit("create_post", activeUser.id);
     if (!postLimit.allowed) {
       return {
         mode: "created",
         message: pick(
           language,
-          `Has alcanzado el límite de publicación. Reintenta en ${postLimit.retryAfterSec}s.`,
-          `Posting rate limit reached. Try again in ${postLimit.retryAfterSec}s.`
+          `Te has pasado del ritmo de publicación. Prueba en ${postLimit.retryAfterSec}s.`,
+          `Posting too fast. Try again in ${postLimit.retryAfterSec}s.`
         )
       };
     }
@@ -342,8 +342,8 @@ const AppRoutes = () => {
       return {
         mode: sameUserDuplicate ? "penalized" : "merged",
         message: sameUserDuplicate
-          ? pick(language, "Ya habías compartido este enlace. Lo mantenemos en el mismo hilo para no duplicar y mantener el contexto.", "You already shared this link. We keep it in the same thread to avoid duplicates and keep context.")
-          : pick(language, `Este enlace ya existía: lo sumamos al mismo hilo (${contributorUserIds.length} colaboradores).`, `This link already existed: merged into the same thread (${contributorUserIds.length} contributors).`)
+          ? pick(language, "Ese link ya lo habías compartido. Lo dejamos en el mismo hilo para mantener orden y contexto.", "You already shared this link. We keep it in the same thread to avoid duplicates and keep context.")
+          : pick(language, `Ese link ya existía: lo sumamos al mismo hilo (${contributorUserIds.length} colaboradores).`, `This link already existed: merged into the same thread (${contributorUserIds.length} contributors).`)
       };
     }
 
@@ -384,7 +384,7 @@ const AppRoutes = () => {
         mode: sameUserDuplicate ? "penalized" : "merged",
         message: pick(
           language,
-          `Este contenido ya existía en otro enlace. Lo unimos al mismo hilo (${contributorUserIds.length} colaboradores).`,
+          `Ese contenido ya estaba en otro enlace. Lo unimos al mismo hilo (${contributorUserIds.length} colaboradores).`,
           `This content already existed under another link. Merged into the same thread (${contributorUserIds.length} contributors).`
         )
       };
@@ -535,15 +535,15 @@ const AppRoutes = () => {
   };
 
   const onRatePost = async (postId: string, vote: 1 | -1): Promise<{ ok: boolean; message: string }> => {
-    if (!activeUser) return { ok: false, message: pick(language, "Inicia sesión para votar.", "Sign in to vote.") };
+    if (!activeUser) return { ok: false, message: pick(language, "Entra para votar.", "Sign in to vote.") };
     const voteLimit = await consumeRateLimit("vote_post", activeUser.id);
     if (!voteLimit.allowed) {
       return {
         ok: false,
         message: pick(
           language,
-          `Límite de votos alcanzado. Reintenta en ${voteLimit.retryAfterSec}s.`,
-          `Vote rate limit reached. Try again in ${voteLimit.retryAfterSec}s.`
+          `Vas muy rápido votando. Prueba en ${voteLimit.retryAfterSec}s.`,
+          `Voting too fast. Try again in ${voteLimit.retryAfterSec}s.`
         )
       };
     }
@@ -572,22 +572,22 @@ const AppRoutes = () => {
 
     await savePost({ ...post, feedbacks: nextFeedbacks });
     trackRate({ vote, sourceDomain: post.sourceDomain, primaryTopic: post.topics?.[0] });
-    return { ok: true, message: vote > 0 ? pick(language, "Voto guardado. Aura al alza.", "Vote saved. Aura is rising.") : pick(language, "Voto guardado. Aura a la baja.", "Vote saved. Aura is dropping.") };
+    return { ok: true, message: vote > 0 ? pick(language, "Voto guardado. Aura subiendo.", "Vote saved. Aura going up.") : pick(language, "Voto guardado. Aura bajando.", "Vote saved. Aura going down.") };
   };
 
   const onAddComment = async (
     postId: string,
     text: string
   ): Promise<{ ok: boolean; message: string; post?: (typeof posts)[number] }> => {
-    if (!activeUser) return { ok: false, message: pick(language, "Inicia sesión para comentar.", "Sign in to comment.") };
+    if (!activeUser) return { ok: false, message: pick(language, "Entra para comentar.", "Sign in to comment.") };
     const commentLimit = await consumeRateLimit("create_comment", activeUser.id);
     if (!commentLimit.allowed) {
       return {
         ok: false,
         message: pick(
           language,
-          `Límite de comentarios alcanzado. Reintenta en ${commentLimit.retryAfterSec}s.`,
-          `Comment rate limit reached. Try again in ${commentLimit.retryAfterSec}s.`
+          `Vas muy rápido comentando. Prueba en ${commentLimit.retryAfterSec}s.`,
+          `Commenting too fast. Try again in ${commentLimit.retryAfterSec}s.`
         )
       };
     }
@@ -611,14 +611,14 @@ const AppRoutes = () => {
     };
     await savePost(nextPost);
     trackComment({ sourceDomain: post.sourceDomain, primaryTopic: post.topics?.[0], length: clean.length });
-    return { ok: true, message: pick(language, "Comentario enviado. Hilo actualizado.", "Comment posted. Thread updated."), post: nextPost };
+    return { ok: true, message: pick(language, "Comentario enviado. Hilo al día.", "Comment posted. Thread updated."), post: nextPost };
   };
 
   const onVoteCommentAura = async (
     postId: string,
     commentId: string
   ): Promise<{ ok: boolean; message: string; post?: (typeof posts)[number] }> => {
-    if (!activeUser) return { ok: false, message: pick(language, "Inicia sesión para valorar comentarios.", "Sign in to rate comments.") };
+    if (!activeUser) return { ok: false, message: pick(language, "Entra para valorar comentarios.", "Sign in to rate comments.") };
     const post = posts.find((entry) => entry.id === postId);
     if (!post) return { ok: false, message: pick(language, "No encontramos esta noticia.", "We could not find this post.") };
 
@@ -644,7 +644,7 @@ const AppRoutes = () => {
       ok: true,
       message: hasVoted
         ? pick(language, "Has retirado tu aura.", "Aura removed.")
-        : pick(language, "Aura enviada. Este comentario gana visibilidad.", "Aura sent. This comment gets more visibility."),
+        : pick(language, "Aura enviada. Este comentario sube un poco.", "Aura sent. This comment gets a visibility boost."),
       post: nextPost
     };
   };
@@ -654,7 +654,7 @@ const AppRoutes = () => {
     commentId: string
   ): Promise<{ ok: boolean; message: string }> => {
     if (!activeUser || activeUser.role !== "admin") {
-      return { ok: false, message: pick(language, "Acción solo para admin.", "Admin-only action.") };
+      return { ok: false, message: pick(language, "Esta acción es solo para admin.", "This action is admin-only.") };
     }
     const post = posts.find((entry) => entry.id === postId);
     const target = post?.comments?.find((comment) => comment.id === commentId);
@@ -677,7 +677,7 @@ const AppRoutes = () => {
 
   const onAdminDeletePost = async (postId: string): Promise<{ ok: boolean; message: string }> => {
     if (!activeUser || activeUser.role !== "admin") {
-      return { ok: false, message: pick(language, "Acción solo para admin.", "Admin-only action.") };
+      return { ok: false, message: pick(language, "Esta acción es solo para admin.", "This action is admin-only.") };
     }
     const post = posts.find((entry) => entry.id === postId);
     if (!post) return { ok: false, message: pick(language, "No encontramos esta noticia.", "We could not find this post.") };
@@ -696,10 +696,10 @@ const AppRoutes = () => {
   };
 
   const onReportPost = async (postId: string, reason: string): Promise<{ ok: boolean; message: string }> => {
-    if (!activeUser) return { ok: false, message: pick(language, "Inicia sesión para reportar.", "Sign in to report.") };
+    if (!activeUser) return { ok: false, message: pick(language, "Entra para reportar.", "Sign in to report.") };
     const cleanReason = reason.trim().slice(0, 280);
     if (!cleanReason) {
-      return { ok: false, message: pick(language, "Indica un motivo breve.", "Please provide a short reason.") };
+      return { ok: false, message: pick(language, "Cuéntanos un motivo breve.", "Please add a short reason.") };
     }
     try {
       await reportPostById(postId, activeUser.id, cleanReason);
@@ -719,7 +719,7 @@ const AppRoutes = () => {
     reason: string
   ): Promise<{ ok: boolean; message: string }> => {
     if (!activeUser || activeUser.role !== "admin") {
-      return { ok: false, message: pick(language, "Acción solo para admin.", "Admin-only action.") };
+      return { ok: false, message: pick(language, "Esta acción es solo para admin.", "This action is admin-only.") };
     }
     const post = posts.find((entry) => entry.id === postId);
     if (!post) return { ok: false, message: pick(language, "No encontramos esta noticia.", "We could not find this post.") };
@@ -748,7 +748,7 @@ const AppRoutes = () => {
     nextTopic: string
   ): Promise<{ ok: boolean; message: string }> => {
     if (!activeUser || activeUser.role !== "admin") {
-      return { ok: false, message: pick(language, "Acción solo para admin.", "Admin-only action.") };
+      return { ok: false, message: pick(language, "Esta acción es solo para admin.", "This action is admin-only.") };
     }
     if (!nextTopic.trim()) {
       return { ok: false, message: pick(language, "Tema no válido.", "Invalid topic.") };
@@ -774,7 +774,7 @@ const AppRoutes = () => {
     nextTopicRaw: string
   ): Promise<{ ok: boolean; message: string }> => {
     if (!activeUser) {
-      return { ok: false, message: pick(language, "Inicia sesión para editar temas.", "Sign in to edit topics.") };
+      return { ok: false, message: pick(language, "Entra para editar temas.", "Sign in to edit topics.") };
     }
     const post = posts.find((entry) => entry.id === postId);
     if (!post) {
@@ -813,7 +813,7 @@ const AppRoutes = () => {
     toTopic: string
   ): Promise<{ ok: boolean; message: string }> => {
     if (!activeUser || activeUser.role !== "admin") {
-      return { ok: false, message: pick(language, "Acción solo para admin.", "Admin-only action.") };
+      return { ok: false, message: pick(language, "Esta acción es solo para admin.", "This action is admin-only.") };
     }
     if (!fromTopic.trim() || !toTopic.trim() || fromTopic.trim() === toTopic.trim()) {
       return { ok: false, message: pick(language, "Tema no válido.", "Invalid topic.") };
@@ -830,7 +830,7 @@ const AppRoutes = () => {
 
   const onAdminDeleteUser = async (userId: string): Promise<{ ok: boolean; message: string }> => {
     if (!activeUser || activeUser.role !== "admin") {
-      return { ok: false, message: pick(language, "Acción solo para admin.", "Admin-only action.") };
+      return { ok: false, message: pick(language, "Esta acción es solo para admin.", "This action is admin-only.") };
     }
     if (userId === activeUser.id) {
       return { ok: false, message: pick(language, "No puedes eliminar tu propio usuario admin.", "You cannot delete your own admin user.") };
@@ -850,7 +850,7 @@ const AppRoutes = () => {
     role: "admin" | "member"
   ): Promise<{ ok: boolean; message: string }> => {
     if (!activeUser || activeUser.role !== "admin") {
-      return { ok: false, message: pick(language, "Acción solo para admin.", "Admin-only action.") };
+      return { ok: false, message: pick(language, "Esta acción es solo para admin.", "This action is admin-only.") };
     }
     return {
       ok: false,
@@ -879,7 +879,7 @@ const AppRoutes = () => {
           }}
         >
           <AppSkeleton />
-          <p className="loading-caption">{pick(language, "Cargando tu comunidad...", "Loading your community...")}</p>
+          <p className="loading-caption">{pick(language, "Cargando tu comunidad...", "Loading your community...", "Cargando a túa comunidade...")}</p>
         </NotificationsContext.Provider>
       </I18nContext.Provider>
     );
@@ -890,25 +890,29 @@ const AppRoutes = () => {
       backendError === "BACKEND_CONFIG_MISSING"
         ? pick(
             language,
-            "Este despliegue exige backend remoto y no tiene configuración de Supabase. Revisa variables VITE_SUPABASE_* en Vercel.",
-            "This deployment requires remote backend but Supabase is not configured. Check VITE_SUPABASE_* variables in Vercel."
+            "Este despliegue necesita backend remoto y le faltan variables de Supabase. Revisa VITE_SUPABASE_* en Vercel.",
+            "This deployment needs a remote backend and is missing Supabase env vars. Check VITE_SUPABASE_* in Vercel.",
+            "Este despregue necesita backend remoto e faltan variables de Supabase. Revisa VITE_SUPABASE_* en Vercel."
           )
         : backendError === "BACKEND_AUTH_FAILED"
           ? pick(
               language,
-              "No tenemos permisos para acceder al backend. Revisa claves públicas y sesión de Supabase.",
-              "Backend access is not authorized. Check Supabase public keys and session."
+              "No tenemos permiso para hablar con el backend. Revisa claves públicas y sesión de Supabase.",
+              "Backend access is not authorized. Check Supabase public keys and session.",
+              "Non temos permiso para falar co backend. Revisa claves públicas e sesión de Supabase."
             )
           : backendError === "BACKEND_UNREACHABLE"
             ? pick(
                 language,
-                "No pudimos conectar con el backend. Revisa red, proyecto Supabase y Edge Functions.",
-                "Could not connect to backend. Check network, Supabase project and Edge Functions."
+                "No pudimos conectar con el backend. Revisa red, proyecto de Supabase y Edge Functions.",
+                "Could not connect to backend. Check network, Supabase project and Edge Functions.",
+                "Non puidemos conectar co backend. Revisa rede, proxecto de Supabase e Edge Functions."
               )
             : pick(
                 language,
-                "El backend respondió con un error no esperado. Revisa logs de Supabase para más detalle.",
-                "Backend returned an unexpected error. Check Supabase logs for details."
+                "El backend respondió con un error raro. Mira los logs de Supabase para más detalle.",
+                "Backend returned an unexpected error. Check Supabase logs for details.",
+                "O backend respondeu cun erro raro. Mira os logs de Supabase para máis detalle."
               );
     return (
       <I18nContext.Provider value={{ language }}>
@@ -921,7 +925,7 @@ const AppRoutes = () => {
           }}
         >
           <main className="page-section narrow">
-            <h2>{pick(language, "Error de conexión de backend", "Backend connection error")}</h2>
+            <h2>{pick(language, "Error de conexión con el backend", "Backend connection error", "Erro de conexión co backend")}</h2>
             <p className="warning">{backendErrorMessage}</p>
           </main>
         </NotificationsContext.Provider>

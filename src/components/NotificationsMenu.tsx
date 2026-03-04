@@ -45,13 +45,13 @@ export const NotificationsMenu = () => {
           <div className="notification-head">
             <strong>{pick(language, "Notificaciones", "Notifications", "Notificacións")}</strong>
             <button type="button" className="link-btn" onClick={markAllAsRead}>
-              {pick(language, "Marcar leídas", "Mark as read", "Marcar lidas")}
+              {pick(language, "Marcar todo como leído", "Mark all as read", "Marcar todo como lido")}
             </button>
           </div>
 
           <div className="notification-list">
             {notifications.length === 0 ? (
-              <p className="hint">{pick(language, "Sin novedades todavía.", "No updates yet.", "Sen novidades aínda.")}</p>
+              <p className="hint">{pick(language, "Todo tranquilo por ahora.", "All quiet for now.", "Todo tranquilo por agora.")}</p>
             ) : (
               notifications.slice(0, 14).map((notification) => {
                 const isUnread = notification.createdAt > lastReadAt;

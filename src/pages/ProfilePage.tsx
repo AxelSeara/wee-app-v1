@@ -90,15 +90,15 @@ export const ProfilePage = ({
             <Avatar user={profileUser} size={74} />
             <div>
               <h2>{profileUser.alias}</h2>
-              <p>{pick(language, `${userPosts.length} noticias compartidas`, `${userPosts.length} shared posts`)}</p>
+              <p>{pick(language, `${userPosts.length} noticias compartidas`, `${userPosts.length} shared posts`, `${userPosts.length} novas compartidas`)}</p>
             </div>
           </div>
           {canSeeScores && communityStats ? (
             <div className="profile-rank-card">
-              <h3>{translateRankTitle(language, communityStats.rankTitle)} · {pick(language, "nivel", "level")} {communityStats.level}</h3>
+              <h3>{translateRankTitle(language, communityStats.rankTitle)} · {pick(language, "nivel", "level", "nivel")} {communityStats.level}</h3>
               <p>
-                aura {communityStats.aura} · {pick(language, "nivel", "level")} {communityStats.level} ·
-                {` `}{communityStats.highQualityCount} {pick(language, "aportes útiles", "useful contributions")}
+                aura {communityStats.aura} · {pick(language, "nivel", "level", "nivel")} {communityStats.level} ·
+                {` `}{communityStats.highQualityCount} {pick(language, "aportes útiles", "useful contributions", "achegas útiles")}
               </p>
               <div className="profile-level-bar">
                 <span style={{ width: `${Math.round(communityStats.levelProgress * 100)}%` }} />
@@ -116,7 +116,7 @@ export const ProfilePage = ({
           {isOwnProfile ? (
             <div className="profile-upload">
               <label className="btn">
-                <Icon name="camera" /> {pick(language, "Cambiar foto", "Change photo")}
+                <Icon name="camera" /> {pick(language, "Cambiar foto", "Change photo", "Cambiar foto")}
                 <input
                   type="file"
                   accept="image/*"
@@ -126,7 +126,7 @@ export const ProfilePage = ({
                     if (!file) return;
                     void fileToDataUrl(file).then((dataUrl) => {
                       void onUpdateAvatar(activeUser.id, dataUrl);
-                      onToast(pick(language, "Foto de perfil actualizada.", "Profile photo updated."));
+                      onToast(pick(language, "Foto de perfil actualizada.", "Profile photo updated.", "Foto de perfil actualizada."));
                     });
                   }}
                 />
@@ -136,10 +136,10 @@ export const ProfilePage = ({
                 className="btn"
                 onClick={() => {
                   void onUpdateAvatar(activeUser.id, undefined);
-                  onToast(pick(language, "Foto eliminada. Ahora se muestra tu avatar con iniciales.", "Photo removed. Your initials avatar is now shown."));
+                  onToast(pick(language, "Foto eliminada. Ahora se muestra tu avatar con iniciales.", "Photo removed. Your initials avatar is now shown.", "Foto eliminada. Agora móstrase o teu avatar con iniciais."));
                 }}
               >
-                <Icon name="trash" /> {pick(language, "Quitar foto", "Remove photo")}
+                <Icon name="trash" /> {pick(language, "Quitar foto", "Remove photo", "Quitar foto")}
               </button>
             </div>
           ) : null}
@@ -155,7 +155,7 @@ export const ProfilePage = ({
                   return;
                 }
                 void onUpdateAlias(activeUser.id, next);
-                onToast(pick(language, "Alias actualizado.", "Alias updated."));
+                onToast(pick(language, "Alias actualizado.", "Alias updated.", "Alias actualizado."));
               }}
             >
               <label>
@@ -164,13 +164,13 @@ export const ProfilePage = ({
                   <input
                     value={aliasInput}
                     onChange={(event) => setAliasInput(event.target.value)}
-                    placeholder={pick(language, "Tu alias visible", "Your visible alias")}
+                    placeholder={pick(language, "Tu alias visible", "Your visible alias", "O teu alias visible")}
                   />
-                  <button type="button" className="btn dice-btn" onClick={generatedAlias} title="Generar alias aleatorio">
+                  <button type="button" className="btn dice-btn" onClick={generatedAlias} title={pick(language, "Generar alias aleatorio", "Generate random alias", "Xerar alias aleatorio")}>
                     <Icon name="dice" size={14} />
                   </button>
                   <button type="submit" className="btn btn-primary">
-                    {pick(language, "Guardar", "Save")}
+                    {pick(language, "Guardar", "Save", "Gardar")}
                   </button>
                 </div>
               </label>
@@ -181,9 +181,9 @@ export const ProfilePage = ({
 
           {!isOwnProfile ? (
             <article className="settings-card">
-            <h3><Icon name="comment" /> {pick(language, "Comentarios recientes", "Recent comments")}</h3>
+            <h3><Icon name="comment" /> {pick(language, "Comentarios recientes", "Recent comments", "Comentarios recentes")}</h3>
             {recentComments.length === 0 ? (
-              <p className="hint">{pick(language, "Todavía no hay comentarios recientes.", "No recent comments yet.")}</p>
+              <p className="hint">{pick(language, "Todavía no hay comentarios recientes.", "No recent comments yet.", "Aínda non hai comentarios recentes.")}</p>
             ) : (
               <div className="settings-known-topics">
                 {recentComments.map(({ comment, postId }) => (
@@ -236,7 +236,7 @@ export const ProfilePage = ({
                   onLogout();
                 }}
               >
-                <Icon name="logout" /> {pick(language, "Cerrar sesión", "Log out")}
+                <Icon name="logout" /> {pick(language, "Cerrar sesión", "Log out", "Pechar sesión")}
               </button>
             ) : null}
             {canManageUser ? (
@@ -251,8 +251,8 @@ export const ProfilePage = ({
               >
                 <Icon name="trophy" />
                 {isTargetAdmin
-                  ? pick(language, "Quitar admin", "Remove admin")
-                  : pick(language, "Nombrar admin", "Promote to admin")}
+                  ? pick(language, "Quitar admin", "Remove admin", "Quitar admin")
+                  : pick(language, "Nombrar admin", "Promote to admin", "Nomear admin")}
               </button>
             ) : null}
             {canManageUser ? (
@@ -260,17 +260,17 @@ export const ProfilePage = ({
                 type="button"
                 className="btn"
                 onClick={async () => {
-                  const okDelete = window.confirm(pick(language, "¿Eliminar este usuario de la comunidad?", "Delete this user from the community?"));
+                  const okDelete = window.confirm(pick(language, "¿Eliminar este usuario de la comunidad?", "Remove this user from the community?", "Eliminar este usuario da comunidade?"));
                   if (!okDelete) return;
                   const result = await onDeleteUser(profileUser.id);
                   onToast(result.message);
                 }}
               >
-                <Icon name="trash" /> {pick(language, "Eliminar usuario", "Delete user")}
+                <Icon name="trash" /> {pick(language, "Eliminar usuario", "Delete user", "Eliminar usuario")}
               </button>
             ) : null}
             <Link to="/home" className="btn btn-nav">
-              <Icon name="arrowLeft" /> {pick(language, "Volver al inicio", "Back to home")}
+              <Icon name="arrowLeft" /> {pick(language, "Volver al inicio", "Back to home", "Volver ao inicio")}
             </Link>
           </div>
         </div>

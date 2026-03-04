@@ -70,15 +70,16 @@ export const SettingsPage = ({
         blockedDomains: uniq(blockedDomains),
         blockedKeywords: uniq(blockedKeywords)
       });
-      setMessage(pick(language, "Preferencias guardadas.", "Preferences saved."));
+      setMessage(pick(language, "Listo, preferencias guardadas.", "Done, preferences saved.", "Listo, preferencias gardadas."));
     } catch (error) {
       const detail = error instanceof Error ? error.message : "unknown_error";
       if (detail === "MISSING_USER_PREFERENCES_TABLE") {
         setMessage(
           pick(
             language,
-            "Falta la tabla user_preferences en Supabase. Ejecuta el SQL v2 para guardar ajustes.",
-            "Missing user_preferences table in Supabase. Run SQL v2 to save settings."
+            "Falta la tabla user_preferences en Supabase. Ejecuta el SQL v2 para poder guardar ajustes.",
+            "The user_preferences table is missing in Supabase. Run SQL v2 to save settings.",
+            "Falta a táboa user_preferences en Supabase. Executa o SQL v2 para poder gardar axustes."
           )
         );
         return;
@@ -87,7 +88,8 @@ export const SettingsPage = ({
         pick(
           language,
           `No pudimos guardar ajustes: ${detail}`,
-          `Could not save settings: ${detail}`
+          `Couldn't save settings: ${detail}`,
+          `Non puidemos gardar axustes: ${detail}`
         )
       );
     }
@@ -96,14 +98,15 @@ export const SettingsPage = ({
   const saveLanguage = async () => {
     try {
       await onUpdateLanguage(activeUser.id, selectedLanguage);
-      setMessage(pick(language, "Idioma actualizado.", "Language updated."));
+      setMessage(pick(language, "Idioma actualizado.", "Language updated.", "Idioma actualizado."));
     } catch (error) {
       const detail = error instanceof Error ? error.message : "unknown_error";
       setMessage(
         pick(
           language,
           `No pudimos actualizar el idioma: ${detail}`,
-          `Could not update language: ${detail}`
+          `Couldn't update language: ${detail}`,
+          `Non puidemos actualizar o idioma: ${detail}`
         )
       );
     }
@@ -184,15 +187,15 @@ export const SettingsPage = ({
     <main>
       <TopBar user={activeUser} onOpenShare={onOpenShareModal} onLogout={onLogout} />
       <section className="page-section">
-        <h2><Icon name="settings" /> {pick(language, "Preferencias", "Preferences")}</h2>
+        <h2><Icon name="settings" /> {pick(language, "Ajustes", "Settings", "Axustes")}</h2>
         <p className="section-intro">
-          {pick(language, "Hazlo simple: elige qué te interesa y cuánto ruido quieres quitar.", "Keep it simple: choose what interests you and how much noise to remove.")}
+          {pick(language, "Déjalo a tu gusto: qué quieres ver y cuánto ruido filtrar.", "Tune it your way: what you want to see and how much noise to filter.", "Déixao ao teu gusto: que queres ver e canto ruído filtrar.")}
         </p>
 
         <div className="settings-grid">
           <article className="settings-card">
-            <h3><Icon name="target" /> {pick(language, "Qué quieres ver primero", "What you want to see first")}</h3>
-            <p className="hint">{pick(language, "Marca temas y te los subimos al inicio.", "Pick topics and we'll move them to the top.")}</p>
+            <h3><Icon name="target" /> {pick(language, "Qué ver primero", "What to see first", "Que ver primeiro")}</h3>
+            <p className="hint">{pick(language, "Marca temas y te los subimos arriba.", "Pick topics and we'll move them to the top.", "Marca temas e subímolos arriba.")}</p>
             {suggestedTopics.length > 0 ? (
               <div className="settings-known-topics">
                 {suggestedTopics.map((topic) => {
@@ -210,24 +213,24 @@ export const SettingsPage = ({
                 })}
               </div>
             ) : (
-              <p className="hint">{pick(language, "Aún no hay temas detectados. Comparte algunas noticias y aparecerán aquí.", "No topics detected yet. Share some posts and they will appear here.")}</p>
+              <p className="hint">{pick(language, "Aún no hay temas detectados. Comparte unas noticias y aparecerán aquí.", "No topics yet. Share a few posts and they'll show up here.", "Aínda non hai temas detectados. Comparte unhas novas e aparecerán aquí.")}</p>
             )}
 
             <div className="settings-inline-add">
               <input
                 value={topicInput}
                 onChange={(event) => setTopicInput(event.target.value)}
-                placeholder={pick(language, "Añadir temas (ej: salud, ciencia)", "Add topics (ex: health, science)")}
+                placeholder={pick(language, "Añadir temas (ej: salud, ciencia)", "Add topics (e.g. health, science)", "Engadir temas (ex: saúde, ciencia)")}
               />
               <button type="button" className="btn" onClick={addTopicsFromInput}>
-                {pick(language, "Añadir", "Add")}
+                {pick(language, "Añadir", "Add", "Engadir")}
               </button>
             </div>
           </article>
 
           <article className="settings-card">
-            <h3><Icon name="user" /> {pick(language, "Idioma de la app", "App language")}</h3>
-            <p className="hint">{pick(language, "Elige el idioma de la interfaz para tu perfil.", "Choose the interface language for your profile.")}</p>
+            <h3><Icon name="user" /> {pick(language, "Idioma de la app", "App language", "Idioma da app")}</h3>
+            <p className="hint">{pick(language, "Elige el idioma en el que quieres usar Wee.", "Choose the language you want to use Wee in.", "Escolle o idioma no que queres usar Wee.")}</p>
             <div className="settings-inline-add">
               <select value={selectedLanguage} onChange={(event) => setSelectedLanguage(event.target.value as AppLanguage)}>
                 <option value="es">Español</option>
@@ -235,50 +238,50 @@ export const SettingsPage = ({
                 <option value="gl">Galego</option>
               </select>
               <button type="button" className="btn" onClick={() => void saveLanguage()}>
-                {pick(language, "Aplicar", "Apply")}
+                {pick(language, "Aplicar", "Apply", "Aplicar")}
               </button>
             </div>
           </article>
 
           <article className="settings-card">
-            <h3><Icon name="bolt" /> {pick(language, "Ruido del feed", "Feed noise")}</h3>
-            <p className="hint">{pick(language, "Elige un modo rápido. Luego puedes retocar debajo.", "Choose a quick mode. You can fine-tune below.")}</p>
+            <h3><Icon name="bolt" /> {pick(language, "Ruido del feed", "Feed noise", "Ruído do feed")}</h3>
+            <p className="hint">{pick(language, "Elige un modo rápido y luego lo ajustas fino debajo.", "Pick a quick mode and fine-tune it below.", "Escolle un modo rápido e logo axústalo fino debaixo.")}</p>
             <div className="settings-modes">
               <button
                 type="button"
                 className={noiseMode === "open" ? "tab active" : "tab"}
                 onClick={() => applyMode("open")}
               >
-                {pick(language, "Abierto", "Open")}
+                {pick(language, "Abierto", "Open", "Aberto")}
               </button>
               <button
                 type="button"
                 className={noiseMode === "balanced" ? "tab active" : "tab"}
                 onClick={() => applyMode("balanced")}
               >
-                {pick(language, "Equilibrado", "Balanced")}
+                {pick(language, "Equilibrado", "Balanced", "Equilibrado")}
               </button>
               <button
                 type="button"
                 className={noiseMode === "strict" ? "tab active" : "tab"}
                 onClick={() => applyMode("strict")}
               >
-                {pick(language, "Estricto", "Strict")}
+                {pick(language, "Estricto", "Strict", "Estrito")}
               </button>
             </div>
             <p className="hint">
               {noiseMode === "open"
-                ? pick(language, "Ves casi todo.", "You see almost everything.")
+                ? pick(language, "Ves casi todo.", "You see almost everything.", "Ves case todo.")
                 : noiseMode === "balanced"
-                  ? pick(language, "Reduce ruido sin pasarse.", "Reduces noise without overdoing it.")
-                  : pick(language, "Filtra fuerte: solo lo más limpio.", "Strong filter: only the cleanest content.")}
+                  ? pick(language, "Quita ruido sin pasarse.", "Removes noise without overdoing it.", "Quita ruído sen pasarse.")
+                  : pick(language, "Filtro fuerte: solo lo más limpio.", "Strong filter: only the cleanest stuff.", "Filtro forte: só o máis limpo.")}
             </p>
           </article>
         </div>
 
         <div className="settings-grid">
           <article className="settings-card">
-            <h3><Icon name="link" /> {pick(language, "Fuentes que no quieres ver", "Sources you do not want to see")}</h3>
+            <h3><Icon name="link" /> {pick(language, "Fuentes que no quieres ver", "Sources you don't want to see", "Fontes que non queres ver")}</h3>
             <div className="settings-known-topics">
               {quickDomains.map((domain) => {
                 const active = blockedDomains.includes(domain);
@@ -298,16 +301,16 @@ export const SettingsPage = ({
               <input
                 value={domainInput}
                 onChange={(event) => setDomainInput(event.target.value)}
-                placeholder={pick(language, "Añadir dominios (ej: ejemplo.com)", "Add domains (ex: example.com)")}
+                placeholder={pick(language, "Añadir dominios (ej: ejemplo.com)", "Add domains (e.g. example.com)", "Engadir dominios (ex: exemplo.com)")}
               />
               <button type="button" className="btn" onClick={addDomainsFromInput}>
-                {pick(language, "Añadir", "Add")}
+                {pick(language, "Añadir", "Add", "Engadir")}
               </button>
             </div>
           </article>
 
           <article className="settings-card">
-            <h3><Icon name="comment" /> {pick(language, "Palabras para filtrar", "Keywords to filter")}</h3>
+            <h3><Icon name="comment" /> {pick(language, "Palabras para filtrar", "Keywords to filter", "Palabras para filtrar")}</h3>
             <div className="settings-known-topics">
               {quickKeywords.map((keyword) => {
                 const active = blockedKeywords.includes(keyword);
@@ -327,31 +330,31 @@ export const SettingsPage = ({
               <input
                 value={keywordInput}
                 onChange={(event) => setKeywordInput(event.target.value)}
-                placeholder={pick(language, "Añadir palabras (ej: bulo, rumor)", "Add keywords (ex: rumor, hoax)")}
+                placeholder={pick(language, "Añadir palabras (ej: bulo, rumor)", "Add keywords (e.g. rumor, hoax)", "Engadir palabras (ex: bulo, rumor)")}
               />
               <button type="button" className="btn" onClick={addKeywordsFromInput}>
-                {pick(language, "Añadir", "Add")}
+                {pick(language, "Añadir", "Add", "Engadir")}
               </button>
             </div>
           </article>
         </div>
 
         <article className="settings-card">
-          <h3><Icon name="target" /> {pick(language, "Resumen", "Summary")}</h3>
+          <h3><Icon name="target" /> {pick(language, "Resumen", "Summary", "Resumo")}</h3>
           <p className="hint">
-            {pick(language, "Temas priorizados", "Prioritized topics")}: {preferredTopics.length} · {pick(language, "Fuentes ocultas", "Hidden sources")}: {blockedDomains.length} · {pick(language, "Palabras filtradas", "Filtered keywords")}: {blockedKeywords.length}
+            {pick(language, "Temas priorizados", "Prioritized topics", "Temas priorizados")}: {preferredTopics.length} · {pick(language, "Fuentes ocultas", "Hidden sources", "Fontes ocultas")}: {blockedDomains.length} · {pick(language, "Palabras filtradas", "Filtered keywords", "Palabras filtradas")}: {blockedKeywords.length}
           </p>
           <button type="button" className="btn btn-primary" onClick={() => void save()}>
-            <Icon name="check" /> {pick(language, "Guardar preferencias", "Save preferences")}
+            <Icon name="check" /> {pick(language, "Guardar ajustes", "Save settings", "Gardar axustes")}
           </button>
         </article>
 
         <article className="settings-card">
-          <h3><Icon name="link" /> Backend (Supabase)</h3>
+          <h3><Icon name="link" /> {pick(language, "Estado del backend (Supabase)", "Backend status (Supabase)", "Estado do backend (Supabase)")}</h3>
           <p className="hint">
             {hasSupabaseConfig
-              ? pick(language, "Configuración detectada. Puedes verificar conexión.", "Configuration detected. You can verify connection.")
-              : pick(language, "No hay configuración de Supabase en este entorno.", "No Supabase configuration was found in this environment.")}
+              ? pick(language, "Configuración detectada. Si quieres, puedes comprobar conexión.", "Configuration detected. You can check the connection.", "Configuración detectada. Se queres, podes comprobar conexión.")
+              : pick(language, "Aquí no hay configuración de Supabase todavía.", "No Supabase configuration was found here yet.", "Aquí non hai configuración de Supabase aínda.")}
           </p>
           <button
             type="button"
@@ -364,21 +367,21 @@ export const SettingsPage = ({
               setCheckingBackend(false);
             }}
           >
-            <Icon name="check" /> {pick(language, "Comprobar conexión", "Check connection")}
+            <Icon name="check" /> {pick(language, "Comprobar conexión", "Check connection", "Comprobar conexión")}
           </button>
           {backendStatus ? <p className="hint">{backendStatus}</p> : null}
         </article>
 
         <article className="settings-card">
-          <h3><Icon name="book" /> {pick(language, "Respaldo de tus datos", "Data backup")}</h3>
-          <p className="hint">{pick(language, "Exporta o importa una copia de seguridad cuando quieras.", "Export or import a backup anytime.")}</p>
+          <h3><Icon name="book" /> {pick(language, "Copia de tus datos", "Your data backup", "Copia dos teus datos")}</h3>
+          <p className="hint">{pick(language, "Exporta o importa una copia cuando quieras.", "Export or import a copy whenever you want.", "Exporta ou importa unha copia cando queiras.")}</p>
           <div className="settings-known-topics">
             <button type="button" className="btn" onClick={() => void onExport()}>
-              <Icon name="download" /> {pick(language, "Exportar copia", "Export backup")}
+              <Icon name="download" /> {pick(language, "Exportar copia", "Export backup", "Exportar copia")}
             </button>
 
             <label className="btn">
-              <Icon name="upload" /> {pick(language, "Importar copia", "Import backup")}
+              <Icon name="upload" /> {pick(language, "Importar copia", "Import backup", "Importar copia")}
               <input
                 type="file"
                 accept="application/json"

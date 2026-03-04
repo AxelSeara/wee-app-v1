@@ -1,0 +1,302 @@
+# Added/Updated i18n lines from current diff
++    if (!activeUser) return { mode: "created", message: pick(language, "Entra para compartir links.", "Sign in to share links.") };
++          ? pick(language, "Ese link ya lo habías compartido. Lo dejamos en el mismo hilo para mantener orden y contexto.", "You already shared this link. We keep it in the same thread to avoid duplicates and keep context.")
++          : pick(language, `Ese link ya existía: lo sumamos al mismo hilo (${contributorUserIds.length} colaboradores).`, `This link already existed: merged into the same thread (${contributorUserIds.length} contributors).`)
++    if (!activeUser) return { ok: false, message: pick(language, "Entra para votar.", "Sign in to vote.") };
++    return { ok: true, message: vote > 0 ? pick(language, "Voto guardado. Aura subiendo.", "Vote saved. Aura going up.") : pick(language, "Voto guardado. Aura bajando.", "Vote saved. Aura going down.") };
++    if (!activeUser) return { ok: false, message: pick(language, "Entra para comentar.", "Sign in to comment.") };
++    return { ok: true, message: pick(language, "Comentario enviado. Hilo al día.", "Comment posted. Thread updated."), post: nextPost };
++    if (!activeUser) return { ok: false, message: pick(language, "Entra para valorar comentarios.", "Sign in to rate comments.") };
++        : pick(language, "Aura enviada. Este comentario sube un poco.", "Aura sent. This comment gets a visibility boost."),
++      return { ok: false, message: pick(language, "Esta acción es solo para admin.", "This action is admin-only.") };
++      return { ok: false, message: pick(language, "Esta acción es solo para admin.", "This action is admin-only.") };
++    if (!activeUser) return { ok: false, message: pick(language, "Entra para reportar.", "Sign in to report.") };
++      return { ok: false, message: pick(language, "Cuéntanos un motivo breve.", "Please add a short reason.") };
++      return { ok: false, message: pick(language, "Esta acción es solo para admin.", "This action is admin-only.") };
++      return { ok: false, message: pick(language, "Esta acción es solo para admin.", "This action is admin-only.") };
++      return { ok: false, message: pick(language, "Entra para editar temas.", "Sign in to edit topics.") };
++      return { ok: false, message: pick(language, "Esta acción es solo para admin.", "This action is admin-only.") };
++      return { ok: false, message: pick(language, "Esta acción es solo para admin.", "This action is admin-only.") };
++      return { ok: false, message: pick(language, "Esta acción es solo para admin.", "This action is admin-only.") };
++          <p className="loading-caption">{pick(language, "Cargando tu comunidad...", "Loading your community...", "Cargando a túa comunidade...")}</p>
++            <h2>{pick(language, "Error de conexión con el backend", "Backend connection error", "Erro de conexión co backend")}</h2>
++            <p>{pick(language, "Wee · pásalo por aquí primero y decidís mejor en grupo", "Wee · share it here first and decide better as a group", "Wee · pásao por aquí primeiro e decidides mellor en grupo")}</p>
++            <Icon name="book" size={14} /> {pick(language, "Sobre Wee", "About Wee", "Sobre Wee")}
++                  <h2 id="about-wee-title">{pick(language, "Sobre Wee", "About Wee", "Sobre Wee")}</h2>
++                  <p>{pick(language, "Wee está pensada para grupos pequeños: intereses en común, hilos por tema y señal clara de Aura.", "Wee is made for small groups: shared interests, topic threads and clear Aura signals.", "Wee está pensada para grupos pequenos: intereses en común, fíos por tema e sinal clara de Aura.")}</p>
++                  {pick(language, "Cerrar", "Close", "Pechar")}
++                  <h3><Icon name="users" /> {pick(language, "Qué es Wee", "What Wee is", "Que é Wee")}</h3>
++                    {pick(language, "Wee es un sitio para grupos pequeños con intereses parecidos. Aquí los links no se pierden: quedan agrupados por tema y listos para seguir el hilo.", "Wee is a space for small groups with shared interests. Links don't get lost: they stay grouped by topic and ready to follow in-thread.", "Wee é un sitio para grupos pequenos con intereses parecidos. Aquí as ligazóns non se perden: quedan agrupadas por tema e listas para seguir o fío.")}
++                  <h3><Icon name="target" /> {pick(language, "Cómo funciona", "How it works", "Como funciona")}</h3>
++                    {pick(language, "Compartes un link, Wee lo coloca por tema y subtema, evita duplicados y suma comentarios con Aura. Resultado: hilos claros y contexto siempre a mano.", "You share a link, Wee places it by topic and subtopic, avoids duplicates and adds Aura comments. Result: clear threads and context always in reach.", "Compartes unha ligazón, Wee colócaa por tema e subtema, evita duplicados e suma comentarios con Aura. Resultado: fíos claros e contexto sempre a man.")}
++                  <h3><Icon name="heart" /> {pick(language, "Cómo va Aura", "How Aura works", "Como vai Aura")}</h3>
++                    {pick(language, "Aura usa reglas claras: señales de fuente, contexto, actualidad y valoración del grupo. Así sube lo útil y baja el ruido.", "Aura uses clear rules: source signals, context, recency and group ratings. Useful content goes up, noise goes down.", "Aura usa regras claras: sinais de fonte, contexto, actualidade e valoración do grupo. Así sobe o útil e baixa o ruído.")}
++        <h4>{pick(language, "Comentarios", "Comments", "Comentarios")}</h4>
++              ? pick(language, "Modo borrar: activo", "Delete mode: on", "Modo borrar: activo")
++              : pick(language, "Borrar comentarios", "Delete comments", "Borrar comentarios")}
++            placeholder={pick(language, "Añade contexto, corrige un dato o pasa una fuente...", "Add context, fix a detail or share a source...", "Engade contexto, corrixe un dato ou pasa unha fonte...")}
++            <h3>{pick(language, "Aún no hay comentarios", "No comments yet", "Aínda non hai comentarios")}</h3>
++            <p>{pick(language, "Sé la primera persona en dejar contexto aquí.", "Be the first one to add context here.", "Sé a primeira persoa en deixar contexto aquí.")}</p>
++                  {author ? <Link to={`/profile/${author.id}/posts`} className="comment-author-link">{author.alias}</Link> : <strong>{pick(language, "usuario", "user", "usuario")}</strong>}
++        placeholder={pick(language, "Buscar por texto, tema o dominio", "Search by text, topic or domain", "Buscar por texto, tema ou dominio")}
++        <option value="all">{pick(language, "Todo Aura", "All Aura", "Toda Aura")}</option>
++        <option value="high">{pick(language, "Alta", "High", "Alta")}</option>
++        <option value="medium">{pick(language, "Media", "Medium", "Media")}</option>
++        <option value="low">{pick(language, "Baja", "Low", "Baixa")}</option>
++        <option value="all">{pick(language, "Todos los temas", "All topics", "Todos os temas")}</option>
++        <option value="all">{pick(language, "Todos los dominios", "All domains", "Todos os dominios")}</option>
++              {pick(language, "Marcar todo como leído", "Mark all as read", "Marcar todo como lido")}
++              <p className="hint">{pick(language, "Todo tranquilo por ahora.", "All quiet for now.", "Todo tranquilo por agora.")}</p>
++    ? pick(language, "Contenido oculto por moderación.", "Content hidden by moderation.", "Contido oculto por moderación.")
++              <strong>{pick(language, "Por qué tiene este Aura", "Why this Aura score", "Por que ten esta Aura")}</strong>
++                <p>{pick(language, "Sale de señales del grupo y del contexto del hilo.", "Based on group signals and thread context.", "Sae de sinais do grupo e do contexto do fío.")}</p>
++                {pick(language, "Cerrar", "Close", "Pechar")}
++              <span className="badge">{pick(language, "Aura", "Aura", "Aura")} {formatAuraScore(current.interestScore)}</span>
++                <span className="badge">+{current.contributorUserIds?.length ?? 1} {pick(language, "colaboradores", "contributors", "colaboradores")}</span>
++            {current.text ? <p className="post-text">{current.text}</p> : <p className="post-text">{pick(language, "Sin extracto adicional.", "No extra excerpt.", "Sen extracto adicional.")}</p>}
++                    onToast(pick(language, "Fuente abierta. Cuando vuelvas, valórala si te encaja.", "Source opened. Rate it when you're back.", "Fonte aberta. Cando volvas, valóraa se che encaixa."));
++                  {pick(language, "Abrir fuente", "Open source", "Abrir fonte")}
++                <span className="hint">{pick(language, "No hay URL externa para esta noticia.", "This post has no external URL.", "Esta nova non ten URL externa.")}</span>
++                <h3>{pick(language, "¿Te sirvió esta noticia?", "Was this post useful?", "Serviuche esta nova?")}</h3>
++                  {pick(language, "Tu valoración ayuda al grupo a ordenar mejor lo útil.", "Your rating helps the group prioritize useful content.", "A túa valoración axuda ao grupo a ordenar mellor o útil.")}
++                <p className="hint">{pick(language, "Para valorarla, visita primero la fuente.", "To rate it, visit the source first.", "Para valorala, visita primeiro a fonte.")}</p>
++                    {pick(language, "Positiva", "Positive", "Positiva")}
++                    {pick(language, "Negativa", "Negative", "Negativa")}
++                  <p className="warning">{pick(language, "Visita la fuente antes de valorarla.", "Visit the source before rating it.", "Visita a fonte antes de valorala.")}</p>
++                {justOpenedExternal ? <p className="hint">{pick(language, "Gracias por revisar la fuente antes de votar.", "Thanks for checking the source before voting.", "Grazas por revisar a fonte antes de votar.")}</p> : null}
++              <h3>{pick(language, "Noticias relacionadas", "Related posts", "Novas relacionadas")}</h3>
++                    <span>{item.topics.slice(0, 2).join(" · ")} · {pick(language, "Aura", "Aura", "Aura")} {formatAuraScore(item.interestScore)}/100</span>
++                <h2 id="share-link-title">{pick(language, "Comparte un link", "Share a link", "Comparte unha ligazón")}</h2>
++                <p>{pick(language, "Pásalo por Wee y se queda en su tema, con contexto y sin duplicados.", "Share it through Wee so it stays in the right topic with context and no duplicates.", "Pásao por Wee e queda no seu tema, con contexto e sen duplicados.")}</p>
++                {pick(language, "Cerrar", "Close", "Pechar")}
++                    : pick(language, `Ese link ya existe: va al hilo actual (${duplicateState.contributors} colaboradores, ${duplicateState.totalShares} envíos).`, `This link already exists: we'll merge it into the current thread (${duplicateState.contributors} contributors, ${duplicateState.totalShares} shares).`, `Esa ligazón xa existe: vai ao fío actual (${duplicateState.contributors} colaboradores, ${duplicateState.totalShares} envíos).`)}
++                <p className="hint">{pick(language, "Tip rápido: si lo compartes aquí primero, el debate queda ordenado en su hilo.", "Quick tip: share it here first and the discussion stays tidy in-thread.", "Consello rápido: se o compartes aquí primeiro, o debate queda ordenado no seu fío.")}</p>
++                  pick(language, "Publicar", "Post", "Publicar")
++          <span className="brand-tag">{communityLabel ? `${communityLabel}` : pick(language, "tu comunidad", "your community", "a túa comunidade")}</span>
++        <label className="topbar-search" aria-label={pick(language, "Buscar por tema o palabra", "Search by topic or keyword", "Buscar por tema ou palabra")}>
++            placeholder={pick(language, "Buscar tema, palabra o fuente...", "Search topic, keyword or source...", "Buscar tema, palabra ou fonte...")}
++            <Icon name="plus" size={14} /> {pick(language, "Compartir link", "Share link", "Compartir ligazón")}
++            <Icon name="plus" size={14} /> {pick(language, "Compartir link", "Share link", "Compartir ligazón")}
++            <div className="user-menu-dropdown" role="menu" aria-label={pick(language, "Menú de perfil", "Profile menu", "Menú de perfil")}>
++                  <span>{pick(language, "Tu cuenta", "Your account", "A túa conta")}</span>
++                <Icon name="user" size={13} /> {pick(language, "Perfil", "Profile", "Perfil")}
++                <Icon name="news" size={13} /> {pick(language, "Mis publicaciones", "My posts", "As miñas publicacións")}
++                <Icon name="settings" size={13} /> {pick(language, "Ajustes", "Settings", "Axustes")}
++                  <Icon name="logout" size={13} /> {pick(language, "Salir de la comunidad", "Leave community", "Saír da comunidade")}
++          <span className="topic-hot-tag"><Icon name="chili" size={13} /> {pick(language, "Ahora mismo", "Happening now", "Agora mesmo")}: {hotCount}</span>
++      <p className="topic-meta">{pick(language, "Publicaciones en este tema", "Posts in this topic", "Publicacións neste tema")}: {posts.length}</p>
++        <p className="topic-last-update">{pick(language, "Última actualización", "Last update", "Última actualización")}: {formatNewsDate(extractNewsDate(latest))}</p>
++            <span>{pick(language, "Muy reciente", "Very recent", "Moi recente")}</span>
++            <span className="topic-recency-chilis" aria-label={pick(language, "Nivel de recencia", "Recency level", "Nivel de recencia")}>
++            {expanded ? pick(language, "Ver menos", "Show less", "Ver menos") : pick(language, "Ver últimas del hilo", "See latest in thread", "Ver últimas do fío")}
++      onToast?.(pick(language, "No se pudo copiar, prueba de nuevo.", "Couldn't copy it, try again.", "Non se puido copiar, proba outra vez."));
++      onToast?.(error instanceof Error ? error.message : pick(language, "No se guardó, inténtalo otra vez.", "Couldn't save, please try again.", "Non se gardou, inténtao outra vez."));
++      onToast?.(pick(language, "Invitación lista para compartir.", "Invite ready to share.", "Invitación lista para compartir."));
++          : pick(language, "No pudimos crear la invitación ahora.", "We couldn't create the invite right now.", "Non puidemos crear a invitación agora.")
++          <h3>{pick(language, "Ajustes de comunidad", "Community settings", "Axustes da comunidade")}</h3>
++              <p className="hint">{pick(language, "Solo admins pueden editar esto.", "Only admins can edit this.", "Só admins poden editar isto.")}</p>
++            <p className="hint">{pick(language, "Quién está dentro y quién lleva tareas de admin.", "Who is in and who has admin permissions.", "Quen está dentro e quen ten permisos admin.")}</p>
++            {members.length === 0 ? <p className="hint">{pick(language, "Todavía no hay miembros.", "No members yet.", "Aínda non hai membros.")}</p> : null}
++            <h3><Icon name="link" /> {pick(language, "Invitar gente", "Invite people", "Convidar xente")}</h3>
++            <p className="hint">{pick(language, "Comparte código o enlace y entran en un momento.", "Share code or link and they can join in seconds.", "Comparte código ou ligazón e entran nun momento.")}</p>
++                <Icon name="plus" /> {pick(language, "Crear invitación", "Create invite", "Crear invitación")}
++                <p className="hint">{pick(language, "Crea una invitación y compártela donde quieras.", "Create an invite and share it anywhere.", "Crea unha invitación e compártea onde queiras.")}</p>
++            <h2><Icon name="spark" /> {pick(language, "Empieza en 3 pasos", "Start in 3 steps", "Empeza en 3 pasos")}</h2>
++            <button type="button" className="btn" onClick={closeOnboarding}>{pick(language, "Vamos", "Let's go", "Imos")}</button>
++            <li>{pick(language, "Pega un link y Wee lo mete en su hilo por tema.", "Paste a link and Wee drops it into the right topic thread.", "Pega unha ligazón e Wee métese no fío correcto por tema.")}</li>
++            <li>{pick(language, "Abre la fuente y valora para que suba lo útil.", "Open the source and rate it so useful stuff rises.", "Abre a fonte e valora para que suba o útil.")}</li>
++            <li>{pick(language, "Deja contexto en comentarios y ayuda al resto.", "Add context in comments and help the group.", "Deixa contexto nos comentarios e axuda ao resto.")}</li>
++            <nav className="home-side-nav" aria-label={pick(language, "Navegación de Wee", "Wee navigation", "Navegación de Wee")}>
++                <h4><Icon name="users" size={14} /> {pick(language, "Gente activa", "Active people", "Xente activa")}</h4>
++                <p className="hint">{pick(language, "Todavía no hubo movimiento reciente.", "No recent movement yet.", "Aínda non houbo movemento recente.")}</p>
++                    ? pick(language, "Ver solo activos", "Show active only", "Ver só activos")
++                  ? pick(language, "Lo que está sonando", "What's popping now", "O que está soando")
++                  ? pick(language, "Ver grande", "Expanded view", "Ver grande")
++                  : pick(language, "Ver compacto", "Compact view", "Ver compacto")}
++              {pick(language, "Lo más útil y comentado por tu comunidad ahora mismo.", "Most useful and discussed by your community right now.", "O máis útil e comentado pola túa comunidade agora mesmo.")}
++                  <h3>{pick(language, "Aún no hay nada por aquí", "Nothing here yet", "Aínda non hai nada por aquí")}</h3>
++                  <p>{pick(language, "Comparte la primera noticia y arrancamos el primer hilo.", "Share the first post and kick off the first thread.", "Comparte a primeira nova e arrincamos o primeiro fío.")}</p>
++                  <button type="button" className="btn btn-primary" onClick={onOpenShareModal}>{pick(language, "Compartir ahora", "Share now", "Compartir agora")}</button>
++              <h2><Icon name="book" /> {pick(language, "Temas en marcha", "Topics in motion", "Temas en marcha")}</h2>
++            <p className="section-intro">{pick(language, "Cada tema es un hilo vivo: misma conversación, menos duplicados y más contexto.", "Each topic is a live thread: same conversation, fewer duplicates, more context.", "Cada tema é un fío vivo: mesma conversa, menos duplicados e máis contexto.")}</p>
++              <p className="hint">{pick(language, "Aquí destaca quien aporta con constancia y ayuda de verdad al grupo.", "This highlights people who contribute consistently and help the group for real.", "Aquí destaca quen aporta con constancia e axuda de verdade ao grupo.")}</p>
++                <h3><Icon name="target" /> {pick(language, "Pulso de la comunidad", "Community pulse", "Pulso da comunidade")}</h3>
++                  {pick(language, "Cómo va la comunidad", "How the community is doing", "Como vai a comunidade")}:{" "}
++                  <h4>{pick(language, "Colaboración", "Collab", "Colaboración")}</h4>
++                  <h4>{pick(language, "Con comentarios", "With comments", "Con comentarios")}</h4>
++                  <h4>{pick(language, "Con votos", "With ratings", "Con votos")}</h4>
++                <Icon name="plus" /> {pick(language, "Aportar ahora", "Contribute now", "Aportar agora")}
++                <Icon name="book" /> {pick(language, "Ir a temas", "Go to topics", "Ir a temas")}
++                      {entry.count} {pick(language, "aportes", "contributions", "achegas")} ·
++        setError(pick(language, "Ups, esta invitación no vale o ya caducó.", "Oops, this invite is invalid or expired.", "Ups, esta invitación non vale ou xa caducou."));
++      setError(pick(language, "Te faltan alias o contraseña.", "Alias and password are required.", "Fáltanche alias ou contrasinal."));
++      setError(err instanceof Error ? err.message : pick(language, "No pudimos terminar la unión a la comunidad.", "We couldn't finish joining this community.", "Non puidemos rematar a unión á comunidade."));
++          <p className="hint">{pick(language, "Mirando invitación...", "Checking invite...", "Mirando invitación...")}</p>
++            <h2>{pick(language, "Te invitaron a Wee", "You're invited to Wee", "Convidáronte a Wee")}</h2>
++                      ? pick(language, `${community.inviter.alias} te quiere en su comunidad`, `${community.inviter.alias} wants you in their community`, `${community.inviter.alias} quere que entres na súa comunidade`)
++                      : pick(language, "Tienes una invitación pendiente", "You have an invite waiting", "Tes unha invitación pendente")}
++                  <Icon name="arrowLeft" /> {pick(language, "Volver", "Back", "Volver")}
++                  <input value={alias} onChange={(event) => setAlias(event.target.value)} placeholder={pick(language, "Tu alias en la comunidad", "Your community alias", "O teu alias na comunidade")} />
++      setError(pick(language, "Ponle nombre a la comunidad.", "Give your community a name.", "Ponlle nome á comunidade."));
++      setError(err instanceof Error ? err.message : pick(language, "Ups, no pudimos crear la comunidad.", "Oops, we couldn't create the community.", "Ups, non puidemos crear a comunidade."));
++      setError(pick(language, "Pega un código o enlace válido.", "Paste a valid code or invite link.", "Pega un código ou ligazón válida."));
++      setError(pick(language, "No encontramos esa comunidad o el enlace ya caducó.", "We can't find that community, or the invite expired.", "Non atopamos esa comunidade ou a ligazón xa caducou."));
++      setError(pick(language, "No pudimos confirmar la invitación.", "We couldn't confirm the invite.", "Non puidemos confirmar a invitación."));
++      setError(pick(language, "Te faltan alias o contraseña.", "Alias and password are both required.", "Fáltanche alias ou contrasinal."));
++      setError(err instanceof Error ? err.message : pick(language, "Ups, no pudimos entrar.", "Oops, we couldn't sign you in.", "Ups, non puidemos entrar."));
++      setError(pick(language, "Necesitas un alias para entrar al grupo.", "You need an alias to join the group.", "Necesitas un alias para entrar no grupo."));
++      setError(pick(language, "Ese alias ya lo está usando alguien en esta comunidad.", "Someone in this community is already using that alias.", "Ese alias xa o está usando alguén nesta comunidade."));
++      setError(pick(language, "Las contraseñas no coinciden, revisa eso.", "Passwords don't match. Give it another try.", "Os contrasinais non coinciden, revísao."));
++      setError(pick(language, "La contraseña tiene que tener mínimo 6 caracteres.", "Password must be at least 6 characters long.", "O contrasinal ten que ter mínimo 6 caracteres."));
++      setError(pick(language, "Para seguir, acepta la política de privacidad.", "Please accept the privacy policy to continue.", "Para seguir, acepta a política de privacidade."));
++      setError(err instanceof Error ? err.message : pick(language, "No pudimos crear la cuenta ahora mismo.", "We couldn't create the account right now.", "Non puidemos crear a conta agora mesmo."));
++            <span className="auth-hero-claim">{pick(language, "Tu grupo, tus hilos, cero lío", "Your group, your threads, less noise", "O teu grupo, os teus fíos, menos ruído")}</span>
++          <p>{pick(language, "Monta una comunidad o entra con código. Compartís links, los ordenáis por tema y todo queda en contexto.", "Create a community or join with a code. Share links, sort them by topic, keep all the context.", "Monta unha comunidade ou entra con código. Compartides ligazóns, ordénanse por tema e todo queda con contexto.")}</p>
++              <Icon name="spark" /> {pick(language, "Crear comunidad", "Create community", "Crear comunidade")}
++            <h2>{pick(language, "Crear comunidad", "Create community", "Crear comunidade")}</h2>
++            <button type="button" className="btn" onClick={() => setView("landing")}><Icon name="arrowLeft" /> {pick(language, "Volver", "Back", "Volver")}</button>
++          <p className="hint">{pick(language, "Ve a lo simple: nombre claro, descripción corta y normas en pocas líneas.", "Keep it simple: clear name, short description and short rules.", "Vai ao simple: nome claro, descrición curta e normas en poucas liñas.")}</p>
++                <option value="admins_only">{pick(language, "Solo admins invitan", "Only admins can invite", "Só admins convidan")}</option>
++                <option value="members_allowed">{pick(language, "Todos pueden invitar", "Everyone can invite", "Todos poden convidar")}</option>
++            <button type="submit" className="btn btn-primary"><Icon name="spark" /> {pick(language, "Vamos", "Let's go", "Imos")}</button>
++          <h2>{pick(language, "Unirse a comunidad", "Join community", "Unirse a comunidade")}</h2>
++            <button type="button" className="btn" onClick={() => setView("landing")}><Icon name="arrowLeft" /> {pick(language, "Volver", "Back", "Volver")}</button>
++          <p className="hint">{pick(language, "Pega código o enlace y te enseñamos primero dónde vas a entrar.", "Paste the code or invite link and preview the community first.", "Pega código ou ligazón e ensinámosche primeiro onde vas entrar.")}</p>
++            <label className="form-field">{pick(language, "Código o enlace", "Code or link", "Código ou ligazón")}<input value={joinCodeOrLink} onChange={(event) => setJoinCodeOrLink(event.target.value)} placeholder="ABCD1234 o /invite/..." /></label>
++          <h2>{pick(language, "¿Es esta tu comunidad?", "Is this your community?", "É esta a túa comunidade?")}</h2>
++            <button type="button" className="btn btn-primary" onClick={confirmJoin}>{pick(language, "Sí, entrar", "Yep, join", "Si, entrar")}</button>
++            <button type="button" className="btn" onClick={() => setView("join_community")}>{pick(language, "No, cambiar", "Nope, change", "Non, cambiar")}</button>
++            <button type="button" className="btn" onClick={() => setView("landing")}><Icon name="arrowLeft" /> {pick(language, "Volver", "Back", "Volver")}</button>
++            <button type="button" className="btn" onClick={() => { resetAuth(); setView("register"); }}>{pick(language, "Aún no tengo cuenta", "I need an account", "Aínda non teño conta")}</button>
++              <h2>{pick(language, "Crear cuenta", "Create account", "Crear conta")}</h2>
++              <button type="button" className="btn" onClick={() => setView("landing")}><Icon name="arrowLeft" /> {pick(language, "Volver", "Back", "Volver")}</button>
++                  <button type="button" className="btn dice-btn" onClick={() => setAlias(generateAlias())} title={pick(language, "Sácame un alias random", "Give me a random alias", "Dáme un alias aleatorio")}><Icon name="dice" size={14} /></button>
++            <h2><Icon name="users" /> {pick(language, "Gente de esta comunidad", "People in this community", "Xente desta comunidade")}</h2>
++          <h2>{pick(language, "No encontramos esta noticia", "We can't find this post", "Non atopamos esta nova")}</h2>
++          <p className="hint">{pick(language, "Puede que se haya eliminado o fusionado con un duplicado.", "It may have been removed or merged as duplicate.", "Pode que se eliminase ou fusionase cun duplicado.")}</p>
++          <Link to="/home" className="btn"><Icon name="arrowLeft" /> {pick(language, "Volver al inicio", "Back home", "Volver ao inicio")}</Link>
++                <Icon name="arrowLeft" /> {pick(language, "Volver", "Back", "Volver")}
++                  <Icon name="settings" /> {pick(language, "Ajustes", "Settings", "Axustes")}
++                    <h3>{pick(language, "Ajustes rápidos", "Quick settings", "Axustes rápidos")}</h3>
++                      {pick(language, "Cerrar", "Close", "Pechar")}
++                        placeholder={pick(language, "Ejemplo: energia", "Example: energy", "Exemplo: enerxia")}
++                        title={pick(language, "Añadir tema", "Add topic", "Engadir tema")}
++                        aria-label={pick(language, "Añadir tema", "Add topic", "Engadir tema")}
++                        <summary>{pick(language, "Moderación admin", "Admin moderation", "Moderación admin")}</summary>
++                              placeholder={pick(language, "Nuevo tema", "New topic", "Novo tema")}
++                              title={pick(language, "Cambiar tema", "Change topic", "Cambiar tema")}
++                              aria-label={pick(language, "Cambiar tema", "Change topic", "Cambiar tema")}
++                            placeholder={pick(language, "Motivo de moderación (opcional)", "Moderation reason (optional)", "Motivo de moderación (opcional)")}
++                              {pick(language, "Colapsar", "Collapse", "Colapsar")}
++                              {pick(language, "Retirar", "Remove", "Retirar")}
++                              {pick(language, "Restaurar", "Restore", "Restaurar")}
++                                const okDelete = window.confirm(pick(language, "¿Eliminar esta noticia?", "Delete this post?", "Eliminar esta nova?"));
++                              {pick(language, "Eliminar noticia", "Delete post", "Eliminar nova")}
++                      <h3>{pick(language, "Explicación de tema v2", "Topic explanation v2", "Explicación de tema v2")}</h3>
++                        {pick(language, "Top candidatos", "Top candidates", "Top candidatos")}:{" "}
++                <strong>{pick(language, "Por qué tiene esta nota", "Why this score", "Por que ten esta nota")}</strong>
++                  <p>{pick(language, "Sale de señales de la comunidad y del contexto del hilo.", "Based on community signals and thread context.", "Sae de sinais da comunidade e do contexto do fío.")}</p>
++            {author ? <Link to={`/profile/${author.id}/posts`} className="badge">{pick(language, "Publicado por", "Posted by", "Publicado por")} {author.alias}</Link> : null}
++          {current.text ? <p className="post-text">{current.text}</p> : <p className="post-text">{pick(language, "No hay resumen disponible.", "No summary available.", "Non hai resumo dispoñible.")}</p>}
++                placeholder={pick(language, "Motivo del reporte", "Reason for report", "Motivo do reporte")}
++                <Icon name="shield" /> {pick(language, "Reportar", "Report", "Reportar")}
++                        ? pick(language, "Fuente abierta. Ya puedes valorar esta noticia.", "Source opened. You can now rate this post.", "Fonte aberta. Xa podes valorar esta nova.")
++                        : pick(language, "Si no se abrió la pestaña, revisa el bloqueador. Ya puedes valorar esta noticia.", "If no tab opened, check your popup blocker. You can now rate this post.", "Se non se abriu a pestana, revisa o bloqueador. Xa podes valorar esta nova.")
++              <Icon name="news" /> {pick(language, "Fuente", "Source", "Fonte")}
++              <span className="hint">{pick(language, "Esta noticia no tiene URL externa.", "This post has no external URL.", "Esta nova non ten URL externa.")}</span>
++          {(!canRate && current.url) || (showSourceVoteHint && !canRate && current.url) ? <p className="warning">{pick(language, "Visita la fuente antes de votar esta noticia.", "Visit the source before rating this post.", "Visita a fonte antes de votar esta nova.")}</p> : null}
++            <h3><Icon name="tag" /> {pick(language, "Contexto del tema", "Topic context", "Contexto do tema")}</h3>
++                <Icon name="timeline" /> {pick(language, "Ir al tema", "Go to topic", "Ir ao tema")}
++            <h3><Icon name="timeline" /> {pick(language, "Más en este hilo", "More in this thread", "Máis neste fío")}</h3>
++              <p>{pick(language, `${userPosts.length} noticias compartidas`, `${userPosts.length} shared posts`, `${userPosts.length} novas compartidas`)}</p>
++              <h3>{translateRankTitle(language, communityStats.rankTitle)} · {pick(language, "nivel", "level", "nivel")} {communityStats.level}</h3>
++                aura {communityStats.aura} · {pick(language, "nivel", "level", "nivel")} {communityStats.level} ·
++                {` `}{communityStats.highQualityCount} {pick(language, "aportes útiles", "useful contributions", "achegas útiles")}
++                <Icon name="camera" /> {pick(language, "Cambiar foto", "Change photo", "Cambiar foto")}
++                      onToast(pick(language, "Foto de perfil actualizada.", "Profile photo updated.", "Foto de perfil actualizada."));
++                  onToast(pick(language, "Foto eliminada. Ahora se muestra tu avatar con iniciales.", "Photo removed. Your initials avatar is now shown.", "Foto eliminada. Agora móstrase o teu avatar con iniciais."));
++                <Icon name="trash" /> {pick(language, "Quitar foto", "Remove photo", "Quitar foto")}
++                onToast(pick(language, "Alias actualizado.", "Alias updated.", "Alias actualizado."));
++                    placeholder={pick(language, "Tu alias visible", "Your visible alias", "O teu alias visible")}
++                  <button type="button" className="btn dice-btn" onClick={generatedAlias} title={pick(language, "Generar alias aleatorio", "Generate random alias", "Xerar alias aleatorio")}>
++                    {pick(language, "Guardar", "Save", "Gardar")}
++            <h3><Icon name="comment" /> {pick(language, "Comentarios recientes", "Recent comments", "Comentarios recentes")}</h3>
++              <p className="hint">{pick(language, "Todavía no hay comentarios recientes.", "No recent comments yet.", "Aínda non hai comentarios recentes.")}</p>
++                <Icon name="logout" /> {pick(language, "Cerrar sesión", "Log out", "Pechar sesión")}
++                  ? pick(language, "Quitar admin", "Remove admin", "Quitar admin")
++                  : pick(language, "Nombrar admin", "Promote to admin", "Nomear admin")}
++                  const okDelete = window.confirm(pick(language, "¿Eliminar este usuario de la comunidad?", "Remove this user from the community?", "Eliminar este usuario da comunidade?"));
++                <Icon name="trash" /> {pick(language, "Eliminar usuario", "Delete user", "Eliminar usuario")}
++              <Icon name="arrowLeft" /> {pick(language, "Volver al inicio", "Back to home", "Volver ao inicio")}
++      setMessage(pick(language, "Listo, preferencias guardadas.", "Done, preferences saved.", "Listo, preferencias gardadas."));
++      setMessage(pick(language, "Idioma actualizado.", "Language updated.", "Idioma actualizado."));
++        <h2><Icon name="settings" /> {pick(language, "Ajustes", "Settings", "Axustes")}</h2>
++          {pick(language, "Déjalo a tu gusto: qué quieres ver y cuánto ruido filtrar.", "Tune it your way: what you want to see and how much noise to filter.", "Déixao ao teu gusto: que queres ver e canto ruído filtrar.")}
++            <h3><Icon name="target" /> {pick(language, "Qué ver primero", "What to see first", "Que ver primeiro")}</h3>
++            <p className="hint">{pick(language, "Marca temas y te los subimos arriba.", "Pick topics and we'll move them to the top.", "Marca temas e subímolos arriba.")}</p>
++              <p className="hint">{pick(language, "Aún no hay temas detectados. Comparte unas noticias y aparecerán aquí.", "No topics yet. Share a few posts and they'll show up here.", "Aínda non hai temas detectados. Comparte unhas novas e aparecerán aquí.")}</p>
++                placeholder={pick(language, "Añadir temas (ej: salud, ciencia)", "Add topics (e.g. health, science)", "Engadir temas (ex: saúde, ciencia)")}
++                {pick(language, "Añadir", "Add", "Engadir")}
++            <h3><Icon name="user" /> {pick(language, "Idioma de la app", "App language", "Idioma da app")}</h3>
++            <p className="hint">{pick(language, "Elige el idioma en el que quieres usar Wee.", "Choose the language you want to use Wee in.", "Escolle o idioma no que queres usar Wee.")}</p>
++                {pick(language, "Aplicar", "Apply", "Aplicar")}
++            <h3><Icon name="bolt" /> {pick(language, "Ruido del feed", "Feed noise", "Ruído do feed")}</h3>
++            <p className="hint">{pick(language, "Elige un modo rápido y luego lo ajustas fino debajo.", "Pick a quick mode and fine-tune it below.", "Escolle un modo rápido e logo axústalo fino debaixo.")}</p>
++                {pick(language, "Abierto", "Open", "Aberto")}
++                {pick(language, "Equilibrado", "Balanced", "Equilibrado")}
++                {pick(language, "Estricto", "Strict", "Estrito")}
++                ? pick(language, "Ves casi todo.", "You see almost everything.", "Ves case todo.")
++                  ? pick(language, "Quita ruido sin pasarse.", "Removes noise without overdoing it.", "Quita ruído sen pasarse.")
++                  : pick(language, "Filtro fuerte: solo lo más limpio.", "Strong filter: only the cleanest stuff.", "Filtro forte: só o máis limpo.")}
++            <h3><Icon name="link" /> {pick(language, "Fuentes que no quieres ver", "Sources you don't want to see", "Fontes que non queres ver")}</h3>
++                placeholder={pick(language, "Añadir dominios (ej: ejemplo.com)", "Add domains (e.g. example.com)", "Engadir dominios (ex: exemplo.com)")}
++                {pick(language, "Añadir", "Add", "Engadir")}
++            <h3><Icon name="comment" /> {pick(language, "Palabras para filtrar", "Keywords to filter", "Palabras para filtrar")}</h3>
++                placeholder={pick(language, "Añadir palabras (ej: bulo, rumor)", "Add keywords (e.g. rumor, hoax)", "Engadir palabras (ex: bulo, rumor)")}
++                {pick(language, "Añadir", "Add", "Engadir")}
++          <h3><Icon name="target" /> {pick(language, "Resumen", "Summary", "Resumo")}</h3>
++            {pick(language, "Temas priorizados", "Prioritized topics", "Temas priorizados")}: {preferredTopics.length} · {pick(language, "Fuentes ocultas", "Hidden sources", "Fontes ocultas")}: {blockedDomains.length} · {pick(language, "Palabras filtradas", "Filtered keywords", "Palabras filtradas")}: {blockedKeywords.length}
++            <Icon name="check" /> {pick(language, "Guardar ajustes", "Save settings", "Gardar axustes")}
++          <h3><Icon name="link" /> {pick(language, "Estado del backend (Supabase)", "Backend status (Supabase)", "Estado do backend (Supabase)")}</h3>
++              ? pick(language, "Configuración detectada. Si quieres, puedes comprobar conexión.", "Configuration detected. You can check the connection.", "Configuración detectada. Se queres, podes comprobar conexión.")
++              : pick(language, "Aquí no hay configuración de Supabase todavía.", "No Supabase configuration was found here yet.", "Aquí non hai configuración de Supabase aínda.")}
++            <Icon name="check" /> {pick(language, "Comprobar conexión", "Check connection", "Comprobar conexión")}
++          <h3><Icon name="book" /> {pick(language, "Copia de tus datos", "Your data backup", "Copia dos teus datos")}</h3>
++          <p className="hint">{pick(language, "Exporta o importa una copia cuando quieras.", "Export or import a copy whenever you want.", "Exporta ou importa unha copia cando queiras.")}</p>
++              <Icon name="download" /> {pick(language, "Exportar copia", "Export backup", "Exportar copia")}
++              <Icon name="upload" /> {pick(language, "Importar copia", "Import backup", "Importar copia")}
++      onToast(pick(language, "Pega un link para compartir.", "Paste a link to share.", "Pega unha ligazón para compartir."));
++        <h2>{pick(language, "Comparte un link", "Share a link", "Comparte unha ligazón")}</h2>
++        <p className="section-intro">{pick(language, "Pega el link y ya está. Wee lo ordena por tema y evita duplicados.", "Paste the link and done. Wee sorts it by topic and avoids duplicates.", "Pega a ligazón e listo. Wee ordénao por tema e evita duplicados.")}</p>
++          <li>{pick(language, "Mira si ya está en la comunidad", "Check if it's already in the community", "Mira se xa está na comunidade")}</li>
++          <li>{pick(language, "Publícalo para abrir o reforzar el hilo", "Post it to open or reinforce the thread", "Publícao para abrir ou reforzar o fío")}</li>
++                : pick(language, `Ese link ya está en Wee: ${duplicateState.contributors} personas (${duplicateState.totalShares} envíos). Lo sumamos al mismo hilo.`, `This link is already in Wee: ${duplicateState.contributors} people (${duplicateState.totalShares} shares). We'll merge it into the same thread.`, `Esa ligazón xa está en Wee: ${duplicateState.contributors} persoas (${duplicateState.totalShares} envíos). Sumámola ao mesmo fío.`)}
++              pick(language, "Publicar en Wee", "Post on Wee", "Publicar en Wee")
++          <h2><Icon name="tag" /> {pick(language, "Hilo", "Thread", "Fío")}: {formatTopicLabel(topic)}</h2>
++                <Icon name="arrowLeft" /> {pick(language, "Volver", "Back", "Volver")}
++          {pick(language, "Timeline del tema + chat: todo en contexto y sin perderte.", "Topic timeline + chat: all in context, no getting lost.", "Timeline do tema + chat: todo en contexto e sen perderte.")}
++            placeholder={pick(language, "Añadir noticia a este tema (pega URL)", "Add post to this topic (paste URL)", "Engadir nova a este tema (pega URL)")}
++              pick(language, "Añadir al tema", "Add to topic", "Engadir ao tema")
++                  placeholder={pick(language, "Renombrar tema", "Rename topic", "Renomear tema")}
++                  {pick(language, "Renombrar tema", "Rename topic", "Renomear tema")}
++                    ? pick(language, "Modo borrar: activo", "Delete mode: on", "Modo borrar: activo")
++                    : pick(language, "Borrar comentarios", "Delete comments", "Borrar comentarios")}
++              <p className="hint">{pick(language, "Solo admin puede renombrar temas.", "Only admins can rename topics.", "Só admin pode renomear temas.")}</p>
++            <h3>{pick(language, "Aún no hay publicaciones en este hilo", "No posts in this thread yet", "Aínda non hai publicacións neste fío")}</h3>
++            <p>{pick(language, "Comparte la primera noticia y lo arrancamos.", "Share the first post and kick it off.", "Comparte a primeira nova e arrincámolo.")}</p>
++                    <div className="timeline-card timeline-comment-cue" title={pick(language, "Pasa por aquí para comentar este punto", "Hover here to comment on this point", "Pasa por aquí para comentar este punto")}>
++                    <h3>{pick(language, "Elige una noticia", "Pick a post", "Escolle unha nova")}</h3>
++                    <p>{pick(language, "Pasa o haz clic en una tarjeta del timeline para abrir su conversación.", "Hover or click a timeline card to open its conversation.", "Pasa ou fai clic nunha tarxeta do timeline para abrir a súa conversa.")}</p>
++                    <h3>{pick(language, "Aún sin comentarios", "No comments yet", "Aínda sen comentarios")}</h3>
++                    <p>{pick(language, "Selecciona una noticia del timeline y abre conversación.", "Select a timeline post and start the conversation.", "Selecciona unha nova do timeline e abre conversa.")}</p>
++                        {pick(language, "Conversación de esta noticia", "Conversation for this post", "Conversa desta nova")}
++                          ? pick(language, "Aún sin comentarios", "No comments yet", "Aínda sen comentarios")
++                            <h3>{pick(language, "Este punto del hilo está vacío", "This thread point is empty", "Este punto do fío está baleiro")}</h3>
++                        <p>{pick(language, "Deja el primer comentario y abrimos conversación.", "Drop the first comment and start the conversation.", "Deixa o primeiro comentario e abrimos conversa.")}</p>
++              <p>{pick(language, `${userPosts.length} noticias compartidas`, `${userPosts.length} shared posts`, `${userPosts.length} novas compartidas`)}</p>
++          <button type="button" className={tab === "shared" ? "tab active" : "tab"} onClick={() => setTab("shared")}><Icon name="news" /> {pick(language, "Publicadas", "Shared", "Publicadas")}</button>
++          <button type="button" className={tab === "interest" ? "tab active" : "tab"} onClick={() => setTab("interest")}><Icon name="heart" /> {pick(language, "Top Aura", "Top Aura", "Top Aura")}</button>
++                  const shouldDelete = window.confirm(pick(language, "¿Quitar esta noticia de tu perfil?", "Remove this post from your profile?", "Quitar esta nova do teu perfil?"));
++                  onToast(pick(language, "Noticia eliminada.", "Post removed.", "Nova eliminada."));
++              <h3>{pick(language, "No hay noticias en esta vista", "No posts in this view", "Non hai novas nesta vista")}</h3>
++              <p>{isOwnProfile ? pick(language, "Comparte un link y empiezas tu historial.", "Share a link and start your history.", "Comparte unha ligazón e comezas o teu historial.") : pick(language, "Este usuario todavía no publicó aquí.", "This user hasn't posted here yet.", "Este usuario aínda non publicou aquí.")}</p>

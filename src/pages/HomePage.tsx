@@ -294,13 +294,13 @@ export const HomePage = ({
       {showOnboarding ? (
         <section className="page-section onboarding-card">
           <div className="section-head">
-            <h2><Icon name="spark" /> {pick(language, "Primeros 3 pasos", "First 3 steps")}</h2>
-            <button type="button" className="btn" onClick={closeOnboarding}>{pick(language, "Listo", "Got it")}</button>
+            <h2><Icon name="spark" /> {pick(language, "Empieza en 3 pasos", "Start in 3 steps", "Empeza en 3 pasos")}</h2>
+            <button type="button" className="btn" onClick={closeOnboarding}>{pick(language, "Vamos", "Let's go", "Imos")}</button>
           </div>
           <ol className="onboarding-list">
-            <li>{pick(language, "Comparte un enlace y Wee lo coloca en su hilo por tema.", "Share a link and Wee places it into its topic thread.")}</li>
-            <li>{pick(language, "Revisa la fuente y vota para priorizar lo más útil.", "Check the source and vote to prioritize useful content.")}</li>
-            <li>{pick(language, "Añade contexto en comentarios para ayudar al grupo.", "Add context in comments to help the group.")}</li>
+            <li>{pick(language, "Pega un link y Wee lo mete en su hilo por tema.", "Paste a link and Wee drops it into the right topic thread.", "Pega unha ligazón e Wee métese no fío correcto por tema.")}</li>
+            <li>{pick(language, "Abre la fuente y valora para que suba lo útil.", "Open the source and rate it so useful stuff rises.", "Abre a fonte e valora para que suba o útil.")}</li>
+            <li>{pick(language, "Deja contexto en comentarios y ayuda al resto.", "Add context in comments and help the group.", "Deixa contexto nos comentarios e axuda ao resto.")}</li>
           </ol>
         </section>
       ) : null}
@@ -308,7 +308,7 @@ export const HomePage = ({
       <div className="home-layout" id="home-top">
         <aside className="home-sidebar">
           <div className="home-sidebar-stack">
-            <nav className="home-side-nav" aria-label={pick(language, "Navegación del foro", "Forum navigation", "Navegación do foro")}>
+            <nav className="home-side-nav" aria-label={pick(language, "Navegación de Wee", "Wee navigation", "Navegación de Wee")}>
               <button
                 type="button"
                 className={activeSection === "feed-section" ? "side-nav-btn active" : "side-nav-btn"}
@@ -346,11 +346,11 @@ export const HomePage = ({
 
             <section className="home-users-block">
               <div className="home-users-head">
-                <h4><Icon name="users" size={14} /> {pick(language, "Usuarios activos", "Active users", "Usuarios en activo")}</h4>
+                <h4><Icon name="users" size={14} /> {pick(language, "Gente activa", "Active people", "Xente activa")}</h4>
                 <span className="badge">{activeUsers.length}</span>
               </div>
               {usersSidebarList.length === 0 ? (
-                <p className="hint">{pick(language, "Aún sin actividad reciente.", "No recent activity yet.", "Aínda sen actividade recente.")}</p>
+                <p className="hint">{pick(language, "Todavía no hubo movimiento reciente.", "No recent movement yet.", "Aínda non houbo movemento recente.")}</p>
               ) : (
                 <ul className="home-users-list">
                   {usersSidebarList.map((entry) => (
@@ -371,7 +371,7 @@ export const HomePage = ({
                 >
                   <Icon name="eye" size={14} />
                   {showAllActiveUsers
-                    ? pick(language, "Mostrar solo activos", "Show active only", "Amosar só activos")
+                    ? pick(language, "Ver solo activos", "Show active only", "Ver só activos")
                     : pick(language, "Mostrar todos", "Show all", "Amosar todos")}
                 </button>
               ) : null}
@@ -394,17 +394,17 @@ export const HomePage = ({
               <h2>
                 <Icon name="chili" />{" "}
                 {selectedGroup === "all"
-                  ? pick(language, "Popular del grupo", "Popular in group", "Popular do grupo")
+                  ? pick(language, "Lo que está sonando", "What's popping now", "O que está soando")
                   : `${pick(language, "Popular en", "Popular in", "Popular en")} ${selectedGroup}`}
               </h2>
               <button type="button" className="btn" onClick={toggleCompactFeed}>
                 <Icon name="news" size={13} /> {compactFeed
-                  ? pick(language, "Vista completa", "Expanded view", "Vista completa")
-                  : pick(language, "Vista compacta", "Compact view", "Vista compacta")}
+                  ? pick(language, "Ver grande", "Expanded view", "Ver grande")
+                  : pick(language, "Ver compacto", "Compact view", "Ver compacto")}
               </button>
             </div>
             <p className="section-intro">
-              {pick(language, "Lo más útil y comentado por la comunidad en este momento.", "Most useful and discussed by the community right now.", "O máis útil e comentado pola comunidade neste momento.")}
+              {pick(language, "Lo más útil y comentado por tu comunidad ahora mismo.", "Most useful and discussed by your community right now.", "O máis útil e comentado pola túa comunidade agora mesmo.")}
             </p>
             <div className={compactFeed ? "post-grid post-grid-compact" : "post-grid"}>
               {feedPosts.length > 0 ? (
@@ -419,9 +419,9 @@ export const HomePage = ({
                 ))
               ) : (
                 <article className="empty-state">
-                  <h3>{pick(language, "Aún no hay publicaciones", "No posts yet")}</h3>
-                  <p>{pick(language, "Comparte la primera noticia y abre el primer hilo de tu comunidad.", "Share the first post and open your community's first thread.")}</p>
-                  <button type="button" className="btn btn-primary" onClick={onOpenShareModal}>{pick(language, "Compartir ahora", "Share now")}</button>
+                  <h3>{pick(language, "Aún no hay nada por aquí", "Nothing here yet", "Aínda non hai nada por aquí")}</h3>
+                  <p>{pick(language, "Comparte la primera noticia y arrancamos el primer hilo.", "Share the first post and kick off the first thread.", "Comparte a primeira nova e arrincamos o primeiro fío.")}</p>
+                  <button type="button" className="btn btn-primary" onClick={onOpenShareModal}>{pick(language, "Compartir ahora", "Share now", "Compartir agora")}</button>
                 </article>
               )}
             </div>
@@ -429,9 +429,9 @@ export const HomePage = ({
 
           <section className="page-section section-topics" id="topics-section">
             <div className="section-head">
-              <h2><Icon name="book" /> {pick(language, "Temas activos", "Active topics")}</h2>
+              <h2><Icon name="book" /> {pick(language, "Temas en marcha", "Topics in motion", "Temas en marcha")}</h2>
             </div>
-            <p className="section-intro">{pick(language, "Cada tema funciona como un hilo: misma conversación, mismo contexto y menos duplicados.", "Each topic works as a thread: same conversation, same context and fewer duplicates.")}</p>
+            <p className="section-intro">{pick(language, "Cada tema es un hilo vivo: misma conversación, menos duplicados y más contexto.", "Each topic is a live thread: same conversation, fewer duplicates, more context.", "Cada tema é un fío vivo: mesma conversa, menos duplicados e máis contexto.")}</p>
             <div className="topic-grid">
               {topicBlocks.map((block) => (
                 <TopicBlock key={block.topic} topic={block.topic} posts={block.posts} />
@@ -442,14 +442,14 @@ export const HomePage = ({
           <section className="page-section section-collab" id="community-section">
             <div className="section-head">
               <h2><Icon name="users" /> {pick(language, "Comunidad", "Community", "Comunidade")}</h2>
-              <p className="hint">{pick(language, "Se ordena por constancia y por cuántas publicaciones acaban siendo útiles para la comunidad.", "Ranked by consistency and by how many posts become useful for the community.")}</p>
+              <p className="hint">{pick(language, "Aquí destaca quien aporta con constancia y ayuda de verdad al grupo.", "This highlights people who contribute consistently and help the group for real.", "Aquí destaca quen aporta con constancia e axuda de verdade ao grupo.")}</p>
             </div>
 
             <div className="community-health">
               <article className="health-main">
-                <h3><Icon name="target" /> {pick(language, "Pulso de comunidad", "Community pulse")}</h3>
+                <h3><Icon name="target" /> {pick(language, "Pulso de la comunidad", "Community pulse", "Pulso da comunidade")}</h3>
                 <p>
-                  {pick(language, "Salud actual del foro", "Current forum health", "Saúde actual do foro")}:{" "}
+                  {pick(language, "Cómo va la comunidad", "How the community is doing", "Como vai a comunidade")}:{" "}
                   <strong>{communityPulse.healthScore}/100</strong> · {communityPulse.activeAuthors}{" "}
                   {pick(language, "personas activas", "active people", "persoas activas")}
                 </p>
@@ -464,15 +464,15 @@ export const HomePage = ({
                   <p>{communityPulse.auraAverage}</p>
                 </article>
                 <article className="health-kpi">
-                  <h4>{pick(language, "Colaboración", "Collaboration")}</h4>
+                  <h4>{pick(language, "Colaboración", "Collab", "Colaboración")}</h4>
                   <p>{communityPulse.collaborationRatio}%</p>
                 </article>
                 <article className="health-kpi">
-                  <h4>{pick(language, "Con comentarios", "With comments")}</h4>
+                  <h4>{pick(language, "Con comentarios", "With comments", "Con comentarios")}</h4>
                   <p>{communityPulse.commentedRatio}%</p>
                 </article>
                 <article className="health-kpi">
-                  <h4>{pick(language, "Con votos", "With ratings")}</h4>
+                  <h4>{pick(language, "Con votos", "With ratings", "Con votos")}</h4>
                   <p>{communityPulse.ratedRatio}%</p>
                 </article>
               </div>
@@ -480,10 +480,10 @@ export const HomePage = ({
 
             <div className="community-actions">
               <button type="button" className="btn btn-primary" onClick={onOpenShareModal}>
-                <Icon name="plus" /> {pick(language, "Aportar ahora", "Contribute now")}
+                <Icon name="plus" /> {pick(language, "Aportar ahora", "Contribute now", "Aportar agora")}
               </button>
               <button type="button" className="btn" onClick={() => scrollToSection("topics-section")}>
-                <Icon name="book" /> {pick(language, "Revisar temas", "Review topics")}
+                <Icon name="book" /> {pick(language, "Ir a temas", "Go to topics", "Ir a temas")}
               </button>
             </div>
 
@@ -495,7 +495,7 @@ export const HomePage = ({
                   <Link key={entry.userId} to={`/profile/${entry.userId}/posts`} className="collab-card">
                     <h3>{user.alias}</h3>
                     <p>
-                      {entry.count} {pick(language, "aportes", "contributions")} ·
+                      {entry.count} {pick(language, "aportes", "contributions", "achegas")} ·
                       aura {userCommunityStatsById.get(entry.userId)?.aura ?? 0} ·
                       {pick(language, "nivel", "level")} {userCommunityStatsById.get(entry.userId)?.level ?? 1}
                     </p>

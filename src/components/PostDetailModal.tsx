@@ -3,6 +3,7 @@ import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { CommentsPanel } from "./CommentsPanel";
 import { EASE_STANDARD, MOTION_DURATION } from "../lib/motion";
+import { pick, useI18n } from "../lib/i18n";
 import { displayTitle, extractNewsDate, formatAuraScore, formatNewsDate, sourceLabel, topicIntro } from "../lib/presentation";
 import type { Post, User } from "../lib/types";
 
@@ -39,6 +40,7 @@ export const PostDetailModal = ({
   onVoteCommentAura,
   onToast
 }: PostDetailModalProps) => {
+  const { language } = useI18n();
   const [current, setCurrent] = useState<Post | null>(post);
   const [ratingBusy, setRatingBusy] = useState(false);
   const [justOpenedExternal, setJustOpenedExternal] = useState(false);
@@ -93,14 +95,14 @@ export const PostDetailModal = ({
                 <p>{sourceLabel(current)} · {formatNewsDate(extractNewsDate(current))}</p>
               </div>
               <button type="button" className="btn" onClick={onClose}>
-                Cerrar
+                {pick(language, "Cerrar", "Close", "Pechar")}
               </button>
             </header>
 
             <div className="modal-meta">
-              <span className="badge">Aura {formatAuraScore(current.interestScore)}</span>
+              <span className="badge">{pick(language, "Aura", "Aura", "Aura")} {formatAuraScore(current.interestScore)}</span>
               {(current.contributorUserIds?.length ?? 1) > 1 ? (
-                <span className="badge">+{current.contributorUserIds?.length ?? 1} colaboradores</span>
+                <span className="badge">+{current.contributorUserIds?.length ?? 1} {pick(language, "colaboradores", "contributors", "colaboradores")}</span>
               ) : null}
               {current.topics.map((topic) => (
                 <Link key={topic} to={`/topic/${topic}`} className="chip" onClick={onClose}>
@@ -115,7 +117,7 @@ export const PostDetailModal = ({
             </div>
 
             <p className="topic-intro">{topicIntro(current.topics)}</p>
-            {current.text ? <p className="post-text">{current.text}</p> : <p className="post-text">Sin extracto adicional.</p>}
+            {current.text ? <p className="post-text">{current.text}</p> : <p className="post-text">{pick(language, "Sin extracto adicional.", "No extra excerpt.", "Sen extracto adicional.")}</p>}
 
             <ul className="rationale">
               {current.rationale.slice(0, 4).map((line) => (
@@ -142,23 +144,23 @@ export const PostDetailModal = ({
                     window.open(current.url, "_blank", "noopener,noreferrer");
                     setJustOpenedExternal(true);
                     setShowSourceVoteHint(false);
-                    onToast("Fuente abierta. Te animamos a valorarla al volver.");
+                    onToast(pick(language, "Fuente abierta. Cuando vuelvas, valórala si te encaja.", "Source opened. Rate it when you're back.", "Fonte aberta. Cando volvas, valóraa se che encaixa."));
                   }}
                 >
-                  Abrir fuente externa
+                  {pick(language, "Abrir fuente", "Open source", "Abrir fonte")}
                 </button>
               ) : (
-                <span className="hint">No hay URL externa para esta noticia.</span>
+                <span className="hint">{pick(language, "No hay URL externa para esta noticia.", "This post has no external URL.", "Esta nova non ten URL externa.")}</span>
               )}
             </div>
 
             {current.url ? (
               <section className="rating-box">
-                <h3>¿Te resultó útil esta noticia?</h3>
+                <h3>{pick(language, "¿Te sirvió esta noticia?", "Was this post useful?", "Serviuche esta nova?")}</h3>
                 <p className="hint">
-                  Tu valoración ayuda al grupo a priorizar mejor. Si aportas fuentes fiables de forma consistente, tu criterio pesa más.
+                  {pick(language, "Tu valoración ayuda al grupo a ordenar mejor lo útil.", "Your rating helps the group prioritize useful content.", "A túa valoración axuda ao grupo a ordenar mellor o útil.")}
                 </p>
-                <p className="hint">Para valorar esta noticia, visita primero la fuente.</p>
+                <p className="hint">{pick(language, "Para valorarla, visita primero la fuente.", "To rate it, visit the source first.", "Para valorala, visita primeiro a fonte.")}</p>
                 <div className="rating-actions">
                   <button
                     type="button"
@@ -188,7 +190,7 @@ export const PostDetailModal = ({
                       setRatingBusy(false);
                     }}
                   >
-                    Positiva
+                    {pick(language, "Positiva", "Positive", "Positiva")}
                   </button>
                   <button
                     type="button"
@@ -218,13 +220,13 @@ export const PostDetailModal = ({
                       setRatingBusy(false);
                     }}
                   >
-                    Negativa
+                    {pick(language, "Negativa", "Negative", "Negativa")}
                   </button>
                 </div>
                 {showSourceVoteHint && !canRate ? (
-                  <p className="warning">Visita la fuente para poder valorarla primero.</p>
+                  <p className="warning">{pick(language, "Visita la fuente antes de valorarla.", "Visit the source before rating it.", "Visita a fonte antes de valorala.")}</p>
                 ) : null}
-                {justOpenedExternal ? <p className="hint">Gracias por revisar la fuente antes de valorar.</p> : null}
+                {justOpenedExternal ? <p className="hint">{pick(language, "Gracias por revisar la fuente antes de votar.", "Thanks for checking the source before voting.", "Grazas por revisar a fonte antes de votar.")}</p> : null}
               </section>
             ) : null}
 
@@ -239,12 +241,12 @@ export const PostDetailModal = ({
             />
 
             <section className="related-block">
-              <h3>Noticias relacionadas</h3>
+              <h3>{pick(language, "Noticias relacionadas", "Related posts", "Novas relacionadas")}</h3>
               <div className="related-list">
                 {related.map((item) => (
                   <button key={item.id} type="button" className="related-item" onClick={() => setCurrent(item)}>
                     <strong>{displayTitle(item)}</strong>
-                    <span>{item.topics.slice(0, 2).join(" · ")} · Aura {formatAuraScore(item.interestScore)}/100</span>
+                    <span>{item.topics.slice(0, 2).join(" · ")} · {pick(language, "Aura", "Aura", "Aura")} {formatAuraScore(item.interestScore)}/100</span>
                   </button>
                 ))}
               </div>

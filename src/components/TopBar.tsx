@@ -61,17 +61,17 @@ const TopBarInner = ({ user, communityName, onLeaveCommunity, searchValue, onSea
         </span>
         <span className="brand-copy">
           <span className="brand-text">Wee</span>
-          <span className="brand-tag">{communityLabel ? `${communityLabel}` : pick(language, "microcomunidad", "microcommunity")}</span>
+          <span className="brand-tag">{communityLabel ? `${communityLabel}` : pick(language, "tu comunidad", "your community", "a túa comunidade")}</span>
         </span>
       </Link>
 
       {onSearchChange ? (
-        <label className="topbar-search" aria-label={pick(language, "Buscar por tema o palabra", "Search by topic or keyword")}>
+        <label className="topbar-search" aria-label={pick(language, "Buscar por tema o palabra", "Search by topic or keyword", "Buscar por tema ou palabra")}>
           <Icon name="search" size={14} />
           <input
             value={searchValue ?? ""}
             onChange={(event) => onSearchChange(event.target.value)}
-            placeholder={pick(language, "Buscar tema, palabra o fuente...", "Search topic, keyword or source...")}
+            placeholder={pick(language, "Buscar tema, palabra o fuente...", "Search topic, keyword or source...", "Buscar tema, palabra ou fonte...")}
           />
         </label>
       ) : null}
@@ -79,11 +79,11 @@ const TopBarInner = ({ user, communityName, onLeaveCommunity, searchValue, onSea
       <div className="topbar-right">
         {onOpenShare ? (
           <button type="button" className="btn btn-primary" onClick={onOpenShare}>
-            <Icon name="plus" size={14} /> {pick(language, "Compartir enlace", "Share link")}
+            <Icon name="plus" size={14} /> {pick(language, "Compartir link", "Share link", "Compartir ligazón")}
           </button>
         ) : (
           <Link to="/share" className="btn btn-primary">
-            <Icon name="plus" size={14} /> {pick(language, "Compartir enlace", "Share link")}
+            <Icon name="plus" size={14} /> {pick(language, "Compartir link", "Share link", "Compartir ligazón")}
           </Link>
         )}
 
@@ -103,16 +103,16 @@ const TopBarInner = ({ user, communityName, onLeaveCommunity, searchValue, onSea
           </button>
 
           {profileOpen ? (
-            <div className="user-menu-dropdown" role="menu" aria-label={pick(language, "Menú de perfil", "Profile menu")}>
+            <div className="user-menu-dropdown" role="menu" aria-label={pick(language, "Menú de perfil", "Profile menu", "Menú de perfil")}>
               <div className="user-menu-header">
                 <Avatar user={user} size={28} />
                 <div>
                   <strong>{user.alias}</strong>
-                  <span>{pick(language, "Cuenta", "Account", "Conta")}</span>
+                  <span>{pick(language, "Tu cuenta", "Your account", "A túa conta")}</span>
                 </div>
               </div>
               <Link to={`/profile/${user.id}`} role="menuitem" className="user-menu-item" onClick={() => setProfileOpen(false)}>
-                <Icon name="user" size={13} /> {pick(language, "Perfil", "Profile")}
+                <Icon name="user" size={13} /> {pick(language, "Perfil", "Profile", "Perfil")}
               </Link>
               <Link to="/community" role="menuitem" className="user-menu-item" onClick={() => setProfileOpen(false)}>
                 <Icon name="users" size={13} /> {pick(language, "Comunidad", "Community", "Comunidade")}
@@ -123,13 +123,13 @@ const TopBarInner = ({ user, communityName, onLeaveCommunity, searchValue, onSea
                 className="user-menu-item"
                 onClick={() => setProfileOpen(false)}
               >
-                <Icon name="news" size={13} /> {pick(language, "Mis publicaciones", "My posts")}
+                <Icon name="news" size={13} /> {pick(language, "Mis publicaciones", "My posts", "As miñas publicacións")}
               </Link>
               <Link to="/login" role="menuitem" className="user-menu-item" onClick={() => setProfileOpen(false)}>
                 <Icon name="users" size={13} /> {pick(language, "Cambiar comunidad", "Switch community", "Cambiar comunidade")}
               </Link>
               <Link to="/settings" role="menuitem" className="user-menu-item" onClick={() => setProfileOpen(false)}>
-                <Icon name="settings" size={13} /> {pick(language, "Ajustes", "Settings")}
+                <Icon name="settings" size={13} /> {pick(language, "Ajustes", "Settings", "Axustes")}
               </Link>
               {onLeaveCommunity ? (
                 <button
@@ -141,7 +141,7 @@ const TopBarInner = ({ user, communityName, onLeaveCommunity, searchValue, onSea
                     onLeaveCommunity();
                   }}
                 >
-                  <Icon name="logout" size={13} /> {pick(language, "Salir de comunidad", "Leave community", "Saír da comunidade")}
+                  <Icon name="logout" size={13} /> {pick(language, "Salir de la comunidad", "Leave community", "Saír da comunidade")}
                 </button>
               ) : null}
               {onLogout ? (

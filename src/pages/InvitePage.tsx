@@ -4,6 +4,7 @@ import { Icon } from "../components/Icon";
 import type { CommunitySelection } from "../lib/communitySession";
 import { pick, useI18n } from "../lib/i18n";
 import type { AppLanguage, User } from "../lib/types";
+import { getInitials } from "../lib/utils";
 
 interface InvitePageProps {
   onPreviewCommunity: (input: { code?: string; token?: string }) => Promise<CommunitySelection & { inviter?: { alias: string; avatar_url?: string } }>;
@@ -40,7 +41,7 @@ export const InvitePage = ({ onPreviewCommunity, onConfirmCommunity, onCreateOrL
         setError(null);
       } catch {
         if (!active) return;
-        setError(pick(language, "Esta invitación no es válida o ha caducado.", "This invite is invalid or expired.", "Esta invitación non é válida ou caducou."));
+        setError(pick(language, "Ups, esta invitación no vale o ya caducó.", "Oops, this invite is invalid or expired.", "Ups, esta invitación non vale ou xa caducou."));
       } finally {
         if (active) setLoading(false);
       }
@@ -58,7 +59,7 @@ export const InvitePage = ({ onPreviewCommunity, onConfirmCommunity, onCreateOrL
   const submitJoin = async (event: FormEvent) => {
     event.preventDefault();
     if (!alias.trim() || !password.trim()) {
-      setError(pick(language, "Alias y contraseña son obligatorios.", "Alias and password are required.", "Alias e contrasinal son obrigatorios."));
+      setError(pick(language, "Te faltan alias o contraseña.", "Alias and password are required.", "Fáltanche alias ou contrasinal."));
       return;
     }
     try {
@@ -66,7 +67,7 @@ export const InvitePage = ({ onPreviewCommunity, onConfirmCommunity, onCreateOrL
       await onCreateOrLogin(alias.trim(), password.trim(), undefined, "es", true);
       navigate("/home");
     } catch (err) {
-      setError(err instanceof Error ? err.message : pick(language, "No se pudo completar la unión a la comunidad.", "Could not complete joining this community.", "Non se puido completar a unión á comunidade."));
+      setError(err instanceof Error ? err.message : pick(language, "No pudimos terminar la unión a la comunidad.", "We couldn't finish joining this community.", "Non puidemos rematar a unión á comunidade."));
     }
   };
 
@@ -74,7 +75,7 @@ export const InvitePage = ({ onPreviewCommunity, onConfirmCommunity, onCreateOrL
     <main className="auth-layout auth-layout-single">
       <section className="auth-card auth-card-main">
         {loading ? (
-          <p className="hint">{pick(language, "Cargando invitación...", "Loading invite...", "Cargando invitación...")}</p>
+          <p className="hint">{pick(language, "Mirando invitación...", "Checking invite...", "Mirando invitación...")}</p>
         ) : error ? (
           <>
             <h2>{pick(language, "Invitación no disponible", "Invite unavailable", "Invitación non dispoñible")}</h2>
@@ -82,26 +83,42 @@ export const InvitePage = ({ onPreviewCommunity, onConfirmCommunity, onCreateOrL
           </>
         ) : community ? (
           <>
-            <h2>{pick(language, "Te han invitado a Wee", "You were invited to Wee", "Convidáronte a Wee")}</h2>
-            <p>
-              {community.inviter?.alias
-                ? pick(language, `${community.inviter.alias} te invita a la comunidad`, `${community.inviter.alias} invited you to the community`, `${community.inviter.alias} convídache á comunidade`)
-                : pick(language, "Te han invitado a la comunidad", "You were invited to the community", "Convidáronte á comunidade")}
-              : <strong> {community.name}</strong>
-            </p>
-            {community.description ? <p className="hint">{community.description}</p> : null}
+            <h2>{pick(language, "Te invitaron a Wee", "You're invited to Wee", "Convidáronte a Wee")}</h2>
+            <article className="invite-preview-card">
+              <div className="invite-preview-head">
+                <div className="invite-avatar">
+                  {community.inviter?.avatar_url ? (
+                    <img src={community.inviter.avatar_url} alt={community.inviter.alias} />
+                  ) : (
+                    <span>{getInitials(community.inviter?.alias ?? "W")}</span>
+                  )}
+                </div>
+                <div>
+                  <p className="invite-kicker">
+                    {community.inviter?.alias
+                      ? pick(language, `${community.inviter.alias} te quiere en su comunidad`, `${community.inviter.alias} wants you in their community`, `${community.inviter.alias} quere que entres na súa comunidade`)
+                      : pick(language, "Tienes una invitación pendiente", "You have an invite waiting", "Tes unha invitación pendente")}
+                  </p>
+                  <h3>{community.name}</h3>
+                </div>
+              </div>
+              {community.description ? <p className="hint">{community.description}</p> : null}
+            </article>
 
             {!joinMode ? (
               <div className="auth-entry-actions">
                 <button type="button" className="btn btn-primary" onClick={() => setJoinMode(true)}>
                   <Icon name="spark" /> {pick(language, "Unirme y crear cuenta", "Join and create account", "Unirme e crear conta")}
                 </button>
+                <button type="button" className="btn" onClick={() => navigate("/login")}>
+                  <Icon name="arrowLeft" /> {pick(language, "Volver", "Back", "Volver")}
+                </button>
               </div>
             ) : (
               <form className="stack" onSubmit={submitJoin}>
                 <label className="form-field">
                   {pick(language, "Alias", "Alias", "Alias")}
-                  <input value={alias} onChange={(event) => setAlias(event.target.value)} placeholder={pick(language, "Tu alias", "Your alias", "O teu alias")} />
+                  <input value={alias} onChange={(event) => setAlias(event.target.value)} placeholder={pick(language, "Tu alias en la comunidad", "Your community alias", "O teu alias na comunidade")} />
                 </label>
                 <label className="form-field">
                   {pick(language, "Contraseña", "Password", "Contrasinal")}

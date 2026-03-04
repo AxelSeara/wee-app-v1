@@ -27,7 +27,7 @@ export const PostCard = ({ post, canDelete = false, onDelete, onOpenDetail, comp
   const auraHealthClass =
     post.interestScore >= 75 ? "aura-health-good" : post.interestScore >= 50 ? "aura-health-warn" : "aura-health-bad";
   const snippet = post.status === "collapsed"
-    ? pick(language, "Contenido colapsado por moderación.", "Content collapsed by moderation.")
+    ? pick(language, "Contenido oculto por moderación.", "Content hidden by moderation.", "Contido oculto por moderación.")
     : (post.text ?? "").trim();
   const auraWhy = post.rationale.slice(0, 3);
   const deleteTooltip = pick(language, "Clica aquí para eliminar", "Click here to delete", "Clica aquí para eliminar");
@@ -115,7 +115,7 @@ export const PostCard = ({ post, canDelete = false, onDelete, onOpenDetail, comp
               {pick(language, "Aura", "Aura")} {formatAuraScore(post.interestScore)}
             </button>
             <span className={auraOpen ? "interest-tooltip open" : "interest-tooltip"}>
-              <strong>{pick(language, "Por qué este Aura", "Why this Aura", "Por que esta Aura")}</strong>
+              <strong>{pick(language, "Por qué tiene este Aura", "Why this Aura score", "Por que ten esta Aura")}</strong>
               {auraWhy.length > 0 ? (
                 <ul>
                   {auraWhy.map((line) => (
@@ -123,7 +123,7 @@ export const PostCard = ({ post, canDelete = false, onDelete, onOpenDetail, comp
                   ))}
                 </ul>
               ) : (
-                <p>{pick(language, "Basado en señales de la comunidad y contexto del hilo.", "Based on community signals and thread context.", "Baseado en sinais da comunidade e contexto do fío.")}</p>
+                <p>{pick(language, "Sale de señales del grupo y del contexto del hilo.", "Based on group signals and thread context.", "Sae de sinais do grupo e do contexto do fío.")}</p>
               )}
             </span>
           </span>

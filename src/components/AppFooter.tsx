@@ -27,7 +27,7 @@ export const AppFooter = () => {
       <footer className="app-footer">
         <section className="footer-bar">
           <div className="footer-copy">
-            <p>{pick(language, "Wee · comparte aquí primero y decide mejor en comunidad", "Wee · share here first and decide better as a community")}</p>
+            <p>{pick(language, "Wee · pásalo por aquí primero y decidís mejor en grupo", "Wee · share it here first and decide better as a group", "Wee · pásao por aquí primeiro e decidides mellor en grupo")}</p>
             <p className="footer-meta">
               {pick(
                 language,
@@ -38,7 +38,7 @@ export const AppFooter = () => {
             </p>
           </div>
           <button type="button" className="btn" onClick={() => setOpen(true)}>
-            <Icon name="book" size={14} /> {pick(language, "Sobre Wee", "About Wee")}
+            <Icon name="book" size={14} /> {pick(language, "Sobre Wee", "About Wee", "Sobre Wee")}
           </button>
         </section>
       </footer>
@@ -68,33 +68,33 @@ export const AppFooter = () => {
             >
               <header className="modal-head">
                 <div>
-                  <h2 id="about-wee-title">{pick(language, "Sobre Wee", "About Wee")}</h2>
-                  <p>{pick(language, "Wee está hecha para microcomunidades: intereses comunes, hilos por tema y señal clara de Aura.", "Wee is built for microcommunities: shared interests, topic threads and clear Aura signals.")}</p>
+                  <h2 id="about-wee-title">{pick(language, "Sobre Wee", "About Wee", "Sobre Wee")}</h2>
+                  <p>{pick(language, "Wee está pensada para grupos pequeños: intereses en común, hilos por tema y señal clara de Aura.", "Wee is made for small groups: shared interests, topic threads and clear Aura signals.", "Wee está pensada para grupos pequenos: intereses en común, fíos por tema e sinal clara de Aura.")}</p>
                 </div>
                 <button type="button" className="btn" onClick={() => setOpen(false)}>
-                  {pick(language, "Cerrar", "Close")}
+                  {pick(language, "Cerrar", "Close", "Pechar")}
                 </button>
               </header>
 
               <div className="about-grid">
                 <article className="about-card">
-                  <h3><Icon name="users" /> {pick(language, "Qué es Wee", "What Wee is")}</h3>
+                  <h3><Icon name="users" /> {pick(language, "Qué es Wee", "What Wee is", "Que é Wee")}</h3>
                   <p>
-                    {pick(language, "Wee es un espacio para grupos pequeños con intereses compartidos. Aquí no se pierden enlaces: quedan agrupados por tema y listos para seguir el hilo.", "Wee is a space for small groups with shared interests. Links are not lost here: they stay grouped by topic and ready to follow in-thread.")}
+                    {pick(language, "Wee es un sitio para grupos pequeños con intereses parecidos. Aquí los links no se pierden: quedan agrupados por tema y listos para seguir el hilo.", "Wee is a space for small groups with shared interests. Links don't get lost: they stay grouped by topic and ready to follow in-thread.", "Wee é un sitio para grupos pequenos con intereses parecidos. Aquí as ligazóns non se perden: quedan agrupadas por tema e listas para seguir o fío.")}
                   </p>
                 </article>
 
                 <article className="about-card">
-                  <h3><Icon name="target" /> {pick(language, "Cómo funciona", "How it works")}</h3>
+                  <h3><Icon name="target" /> {pick(language, "Cómo funciona", "How it works", "Como funciona")}</h3>
                   <p>
-                    {pick(language, "Compartes un enlace, Wee lo clasifica por tema y subtema, evita duplicados y suma comentarios con Aura. Así se construyen hilos claros y se mantiene el contexto dentro de la comunidad.", "You share a link, Wee classifies it by topic and subtopic, avoids duplicates and adds Aura comments. This creates clear threads and keeps context inside the community.")}
+                    {pick(language, "Compartes un link, Wee lo coloca por tema y subtema, evita duplicados y suma comentarios con Aura. Resultado: hilos claros y contexto siempre a mano.", "You share a link, Wee places it by topic and subtopic, avoids duplicates and adds Aura comments. Result: clear threads and context always in reach.", "Compartes unha ligazón, Wee colócaa por tema e subtema, evita duplicados e suma comentarios con Aura. Resultado: fíos claros e contexto sempre a man.")}
                   </p>
                 </article>
 
                 <article className="about-card">
-                  <h3><Icon name="heart" /> {pick(language, "Señal de Aura", "Aura signal")}</h3>
+                  <h3><Icon name="heart" /> {pick(language, "Cómo va Aura", "How Aura works", "Como vai Aura")}</h3>
                   <p>
-                    {pick(language, "Usamos reglas claras para Aura: señales de fuente, contexto, actualidad y valoración del grupo. Así sube lo útil para la comunidad.", "We use clear Aura rules: source signals, context, recency and group ratings. Useful content rises for the community.")}
+                    {pick(language, "Aura usa reglas claras: señales de fuente, contexto, actualidad y valoración del grupo. Así sube lo útil y baja el ruido.", "Aura uses clear rules: source signals, context, recency and group ratings. Useful content goes up, noise goes down.", "Aura usa regras claras: sinais de fonte, contexto, actualidade e valoración do grupo. Así sobe o útil e baixa o ruído.")}
                   </p>
                 </article>
               </div>

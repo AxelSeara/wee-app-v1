@@ -59,7 +59,7 @@ export const CommunityPage = ({
       await navigator.clipboard.writeText(value);
       onToast?.(pick(language, `${label} copiado.`, `${label} copied.`, `${label} copiado.`));
     } catch {
-      onToast?.(pick(language, "No se pudo copiar.", "Could not copy.", "Non se puido copiar."));
+      onToast?.(pick(language, "No se pudo copiar, prueba de nuevo.", "Couldn't copy it, try again.", "Non se puido copiar, proba outra vez."));
     }
   };
 
@@ -73,7 +73,7 @@ export const CommunityPage = ({
       });
       onToast?.(pick(language, "Comunidad actualizada.", "Community updated.", "Comunidade actualizada."));
     } catch (error) {
-      onToast?.(error instanceof Error ? error.message : pick(language, "No se pudo guardar.", "Could not save.", "Non se puido gardar."));
+      onToast?.(error instanceof Error ? error.message : pick(language, "No se guardó, inténtalo otra vez.", "Couldn't save, please try again.", "Non se gardou, inténtao outra vez."));
     } finally {
       setSaving(false);
     }
@@ -83,12 +83,12 @@ export const CommunityPage = ({
     try {
       const created = await onCreateInvite();
       setInvite({ code: created.code, token: created.token, link: created.link });
-      onToast?.(pick(language, "Invitación creada.", "Invite created.", "Invitación creada."));
+      onToast?.(pick(language, "Invitación lista para compartir.", "Invite ready to share.", "Invitación lista para compartir."));
     } catch (error) {
       onToast?.(
         error instanceof Error
           ? error.message
-          : pick(language, "No se pudo crear la invitación.", "Could not create invite.", "Non se puido crear a invitación.")
+          : pick(language, "No pudimos crear la invitación ahora.", "We couldn't create the invite right now.", "Non puidemos crear a invitación agora.")
       );
     }
   };
@@ -115,13 +115,13 @@ export const CommunityPage = ({
         </div>
 
         <article className="settings-card">
-          <h3>{pick(language, "Datos de la comunidad", "Community details", "Datos da comunidade")}</h3>
+          <h3>{pick(language, "Ajustes de comunidad", "Community settings", "Axustes da comunidade")}</h3>
           <p className="hint">
             {pick(
               language,
-              "Aquí ajustas el nombre, descripción y normas para que todos tengáis el mismo contexto.",
-              "Adjust name, description, and rules so everyone shares the same context.",
-              "Aquí axustas nome, descrición e normas para compartir o mesmo contexto."
+              "Aquí podéis dejar nombre, descripción y normas claras para todo el grupo.",
+              "Set name, description and rules so everyone stays on the same page.",
+              "Aquí podedes deixar nome, descrición e normas claras para todo o grupo."
             )}
           </p>
           <div className="stack">
@@ -155,7 +155,7 @@ export const CommunityPage = ({
                 <Icon name="check" /> {pick(language, "Guardar cambios", "Save changes", "Gardar cambios")}
               </button>
             ) : (
-              <p className="hint">{pick(language, "Solo los admins pueden editar esta sección.", "Only admins can edit this section.", "Só os admins poden editar esta sección.")}</p>
+              <p className="hint">{pick(language, "Solo admins pueden editar esto.", "Only admins can edit this.", "Só admins poden editar isto.")}</p>
             )}
           </div>
         </article>
@@ -163,8 +163,8 @@ export const CommunityPage = ({
         <div className="settings-grid">
           <article className="settings-card">
             <h3><Icon name="users" /> {pick(language, "Miembros", "Members", "Membros")}</h3>
-            <p className="hint">{pick(language, "Quién está dentro y quién puede moderar.", "Who is in and who can moderate.", "Quen está dentro e quen pode moderar.")}</p>
-            {members.length === 0 ? <p className="hint">{pick(language, "Sin miembros aún.", "No members yet.", "Aínda non hai membros.")}</p> : null}
+            <p className="hint">{pick(language, "Quién está dentro y quién lleva tareas de admin.", "Who is in and who has admin permissions.", "Quen está dentro e quen ten permisos admin.")}</p>
+            {members.length === 0 ? <p className="hint">{pick(language, "Todavía no hay miembros.", "No members yet.", "Aínda non hai membros.")}</p> : null}
             <ul className="user-list">
               {members.map((member) => (
                 <li key={member.id} className="user-option" style={{ justifyContent: "space-between" }}>
@@ -176,11 +176,11 @@ export const CommunityPage = ({
           </article>
 
           <article className="settings-card">
-            <h3><Icon name="link" /> {pick(language, "Invitar nuevos miembros", "Invite new members", "Convidar novos membros")}</h3>
-            <p className="hint">{pick(language, "Comparte código o enlace para que se unan en un paso.", "Share code or link so people can join in one step.", "Comparte código ou ligazón para unirse nun paso.")}</p>
+            <h3><Icon name="link" /> {pick(language, "Invitar gente", "Invite people", "Convidar xente")}</h3>
+            <p className="hint">{pick(language, "Comparte código o enlace y entran en un momento.", "Share code or link and they can join in seconds.", "Comparte código ou ligazón e entran nun momento.")}</p>
             <div className="stack">
               <button type="button" className="btn btn-primary" onClick={generateInvite}>
-                <Icon name="plus" /> {pick(language, "Generar invitación", "Generate invite", "Xerar invitación")}
+                <Icon name="plus" /> {pick(language, "Crear invitación", "Create invite", "Crear invitación")}
               </button>
               {invite ? (
                 <>
@@ -196,7 +196,7 @@ export const CommunityPage = ({
                   </div>
                 </>
               ) : (
-                <p className="hint">{pick(language, "Genera un código o enlace para compartirlo por donde quieras.", "Create a code or link to share anywhere.", "Xera un código ou ligazón para compartilo onde queiras.")}</p>
+                <p className="hint">{pick(language, "Crea una invitación y compártela donde quieras.", "Create an invite and share it anywhere.", "Crea unha invitación e compártea onde queiras.")}</p>
               )}
             </div>
           </article>

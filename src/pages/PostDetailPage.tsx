@@ -146,9 +146,9 @@ export const PostDetailPage = ({
       <main>
         <TopBar user={activeUser} onOpenShare={onOpenShareModal} onLogout={onLogout} />
         <section className="page-section narrow">
-          <h2>{pick(language, "Noticia no encontrada", "Post not found")}</h2>
-          <p className="hint">{pick(language, "Puede que se haya eliminado o que se haya fusionado con un duplicado.", "It may have been deleted or merged with a duplicate.")}</p>
-          <Link to="/home" className="btn"><Icon name="arrowLeft" /> {pick(language, "Volver al inicio", "Back to home")}</Link>
+          <h2>{pick(language, "No encontramos esta noticia", "We can't find this post", "Non atopamos esta nova")}</h2>
+          <p className="hint">{pick(language, "Puede que se haya eliminado o fusionado con un duplicado.", "It may have been removed or merged as duplicate.", "Pode que se eliminase ou fusionase cun duplicado.")}</p>
+          <Link to="/home" className="btn"><Icon name="arrowLeft" /> {pick(language, "Volver al inicio", "Back home", "Volver ao inicio")}</Link>
         </section>
       </main>
     );
@@ -165,15 +165,15 @@ export const PostDetailPage = ({
             <div className="detail-head-actions page-head-actions">
               {current.url ? <span className="badge">{sourceLabel(current)}</span> : null}
               <button type="button" className="btn btn-nav" onClick={() => navigate(-1)}>
-                <Icon name="arrowLeft" /> {pick(language, "Volver", "Back")}
+                <Icon name="arrowLeft" /> {pick(language, "Volver", "Back", "Volver")}
               </button>
               <details className="detail-settings-menu" ref={settingsRef}>
                 <summary className="btn btn-nav">
-                  <Icon name="settings" /> {pick(language, "Ajustes", "Settings")}
+                  <Icon name="settings" /> {pick(language, "Ajustes", "Settings", "Axustes")}
                 </summary>
                 <div className="detail-settings-panel">
                   <div className="detail-settings-head">
-                    <h3>{pick(language, "Ajustes rápidos", "Quick settings")}</h3>
+                    <h3>{pick(language, "Ajustes rápidos", "Quick settings", "Axustes rápidos")}</h3>
                     <button
                       type="button"
                       className="btn btn-nav detail-settings-close"
@@ -181,7 +181,7 @@ export const PostDetailPage = ({
                         if (settingsRef.current) settingsRef.current.open = false;
                       }}
                     >
-                      {pick(language, "Cerrar", "Close")}
+                      {pick(language, "Cerrar", "Close", "Pechar")}
                     </button>
                   </div>
                   <div className="detail-actions detail-actions-compact">
@@ -189,14 +189,14 @@ export const PostDetailPage = ({
                       <input
                         value={manualTopic}
                         onChange={(event) => setManualTopic(event.target.value)}
-                        placeholder={pick(language, "Ejemplo: energia", "Example: energy")}
+                        placeholder={pick(language, "Ejemplo: energia", "Example: energy", "Exemplo: enerxia")}
                       />
                       <button
                         type="button"
                         className="btn detail-inline-icon-btn"
                         disabled={!manualTopic.trim() || topicBusy}
-                        title={pick(language, "Añadir tema", "Add topic")}
-                        aria-label={pick(language, "Añadir tema", "Add topic")}
+                        title={pick(language, "Añadir tema", "Add topic", "Engadir tema")}
+                        aria-label={pick(language, "Añadir tema", "Add topic", "Engadir tema")}
                         onClick={async () => {
                           setTopicBusy(true);
                           const result = await onAddPostTopic(current.id, manualTopic);
@@ -225,19 +225,19 @@ export const PostDetailPage = ({
                   {isAdmin ? (
                     <div className="detail-settings-admin">
                       <details className="detail-subsection">
-                        <summary>{pick(language, "Moderación admin", "Admin moderation")}</summary>
+                        <summary>{pick(language, "Moderación admin", "Admin moderation", "Moderación admin")}</summary>
                         <div className="detail-actions detail-actions-compact">
                           <div className="detail-inline-action">
                             <input
                               value={adminTopic}
                               onChange={(event) => setAdminTopic(event.target.value)}
-                              placeholder={pick(language, "Nuevo tema", "New topic")}
+                              placeholder={pick(language, "Nuevo tema", "New topic", "Novo tema")}
                             />
                             <button
                               type="button"
                               className="btn detail-inline-icon-btn"
-                              title={pick(language, "Cambiar tema", "Change topic")}
-                              aria-label={pick(language, "Cambiar tema", "Change topic")}
+                              title={pick(language, "Cambiar tema", "Change topic", "Cambiar tema")}
+                              aria-label={pick(language, "Cambiar tema", "Change topic", "Cambiar tema")}
                               onClick={async () => {
                                 const result = await onAdminUpdatePostTopic(current.id, adminTopic);
                                 onToast(result.message);
@@ -249,7 +249,7 @@ export const PostDetailPage = ({
                           <input
                             value={moderationReason}
                             onChange={(event) => setModerationReason(event.target.value)}
-                            placeholder={pick(language, "Motivo moderación (opcional)", "Moderation reason (optional)")}
+                            placeholder={pick(language, "Motivo de moderación (opcional)", "Moderation reason (optional)", "Motivo de moderación (opcional)")}
                           />
                           <div className="detail-actions detail-actions-grid">
                             <button
@@ -273,7 +273,7 @@ export const PostDetailPage = ({
                                 }
                               }}
                             >
-                              {pick(language, "Colapsar", "Collapse")}
+                              {pick(language, "Colapsar", "Collapse", "Colapsar")}
                             </button>
                             <button
                               type="button"
@@ -284,7 +284,7 @@ export const PostDetailPage = ({
                                 if (result.ok) navigate("/home");
                               }}
                             >
-                              {pick(language, "Retirar", "Remove")}
+                              {pick(language, "Retirar", "Remove", "Retirar")}
                             </button>
                             <button
                               type="button"
@@ -301,20 +301,20 @@ export const PostDetailPage = ({
                                 }
                               }}
                             >
-                              {pick(language, "Restaurar", "Restore")}
+                              {pick(language, "Restaurar", "Restore", "Restaurar")}
                             </button>
                             <button
                               type="button"
                               className="btn"
                               onClick={async () => {
-                                const okDelete = window.confirm(pick(language, "¿Eliminar esta noticia?", "Delete this post?"));
+                                const okDelete = window.confirm(pick(language, "¿Eliminar esta noticia?", "Delete this post?", "Eliminar esta nova?"));
                                 if (!okDelete) return;
                                 const result = await onAdminDeletePost(current.id);
                                 onToast(result.message);
                                 if (result.ok) navigate("/home");
                               }}
                             >
-                              {pick(language, "Eliminar noticia", "Delete post")}
+                              {pick(language, "Eliminar noticia", "Delete post", "Eliminar nova")}
                             </button>
                           </div>
                         </div>
@@ -324,7 +324,7 @@ export const PostDetailPage = ({
 
                   {isAdmin && current.topicExplanationV2 ? (
                     <div className="detail-settings-admin">
-                      <h3>{pick(language, "Topic explain v2", "Topic explain v2")}</h3>
+                      <h3>{pick(language, "Explicación de tema v2", "Topic explanation v2", "Explicación de tema v2")}</h3>
                       <p className="hint">
                         {pick(
                           language,
@@ -333,7 +333,7 @@ export const PostDetailPage = ({
                         )}
                       </p>
                       <p className="hint">
-                        {pick(language, "Top candidates", "Top candidates")}:{" "}
+                        {pick(language, "Top candidatos", "Top candidates", "Top candidatos")}:{" "}
                         {(current.topicCandidatesV2 ?? [])
                           .slice(0, 3)
                           .map((candidate) => `${candidate.topic} (${candidate.score})`)
@@ -358,7 +358,7 @@ export const PostDetailPage = ({
                 {formatAuraScore(current.interestScore)} <span className={`aura-trend aura-trend-${auraTrend}`}>{auraArrow}</span>
               </button>
               <span className={auraOpen ? "interest-tooltip open" : "interest-tooltip"}>
-                <strong>{pick(language, "Por qué esta nota", "Why this post", "Por que esta nota")}</strong>
+                <strong>{pick(language, "Por qué tiene esta nota", "Why this score", "Por que ten esta nota")}</strong>
                 {auraWhy.length > 0 ? (
                   <ul>
                     {auraWhy.map((line) => (
@@ -366,12 +366,12 @@ export const PostDetailPage = ({
                     ))}
                   </ul>
                 ) : (
-                  <p>{pick(language, "Basado en señales de la comunidad y contexto del hilo.", "Based on community signals and thread context.", "Baseado en sinais da comunidade e contexto do fío.")}</p>
+                  <p>{pick(language, "Sale de señales de la comunidad y del contexto del hilo.", "Based on community signals and thread context.", "Sae de sinais da comunidade e do contexto do fío.")}</p>
                 )}
               </span>
             </span>
             <span className="badge">{formatNewsDate(extractNewsDate(current))}</span>
-            {author ? <Link to={`/profile/${author.id}/posts`} className="badge">{pick(language, "Publicado por", "Posted by")} {author.alias}</Link> : null}
+            {author ? <Link to={`/profile/${author.id}/posts`} className="badge">{pick(language, "Publicado por", "Posted by", "Publicado por")} {author.alias}</Link> : null}
             <span className="detail-meta-topics">
               {current.topics.map((topic) => (
                 <Link key={topic} to={`/topic/${topic}`} className="chip chip-topic" style={topicColorVars(topic)}>
@@ -392,13 +392,13 @@ export const PostDetailPage = ({
             </div>
           ) : null}
 
-          {current.text ? <p className="post-text">{current.text}</p> : <p className="post-text">{pick(language, "No hay resumen disponible.", "No summary available.")}</p>}
+          {current.text ? <p className="post-text">{current.text}</p> : <p className="post-text">{pick(language, "No hay resumen disponible.", "No summary available.", "Non hai resumo dispoñible.")}</p>}
           {!isAdmin ? (
             <div className="detail-actions">
               <input
                 value={reportReason}
                 onChange={(event) => setReportReason(event.target.value)}
-                placeholder={pick(language, "Motivo para reportar", "Reason to report")}
+                placeholder={pick(language, "Motivo del reporte", "Reason for report", "Motivo do reporte")}
               />
               <button
                 type="button"
@@ -409,7 +409,7 @@ export const PostDetailPage = ({
                   if (result.ok) setReportReason("");
                 }}
               >
-                <Icon name="shield" /> {pick(language, "Reportar", "Report")}
+                <Icon name="shield" /> {pick(language, "Reportar", "Report", "Reportar")}
               </button>
             </div>
           ) : null}
@@ -437,24 +437,25 @@ export const PostDetailPage = ({
                     setShowSourceVoteHint(false);
                     onToast(
                       openedWindow
-                        ? pick(language, "Fuente abierta. Ya puedes valorar esta noticia.", "Source opened. You can now rate this post.")
-                        : pick(language, "Si no se abrió la pestaña, revisa el bloqueador. Ya puedes valorar esta noticia.", "If the tab did not open, check popup blocker. You can now rate this post.")
+                        ? pick(language, "Fuente abierta. Ya puedes valorar esta noticia.", "Source opened. You can now rate this post.", "Fonte aberta. Xa podes valorar esta nova.")
+                        : pick(language, "Si no se abrió la pestaña, revisa el bloqueador. Ya puedes valorar esta noticia.", "If no tab opened, check your popup blocker. You can now rate this post.", "Se non se abriu a pestana, revisa o bloqueador. Xa podes valorar esta nova.")
                     );
                   } catch {
                     onToast(
                       pick(
                         language,
-                        "No pudimos registrar la apertura de fuente. Reintenta en unos segundos.",
-                        "Could not register source opening. Try again in a few seconds."
+                        "No pudimos registrar la apertura de la fuente. Reintenta en unos segundos.",
+                        "Couldn't register source opening. Try again in a few seconds.",
+                        "Non puidemos rexistrar a apertura da fonte. Reintenta nuns segundos."
                       )
                     );
                   }
                 }}
               >
-                <Icon name="news" /> {pick(language, "Fuente", "Source", "Fonte")}
+              <Icon name="news" /> {pick(language, "Fuente", "Source", "Fonte")}
               </button>
             ) : (
-              <span className="hint">{pick(language, "Esta noticia no tiene URL externa.", "This post has no external URL.")}</span>
+              <span className="hint">{pick(language, "Esta noticia no tiene URL externa.", "This post has no external URL.", "Esta nova non ten URL externa.")}</span>
             )}
 
             <button
@@ -514,7 +515,7 @@ export const PostDetailPage = ({
               <Icon name="thumbDown" />
             </button>
           </div>
-          {(!canRate && current.url) || (showSourceVoteHint && !canRate && current.url) ? <p className="warning">{pick(language, "Visita la fuente para poder valorarla primero.", "Visit the source before rating it.")}</p> : null}
+          {(!canRate && current.url) || (showSourceVoteHint && !canRate && current.url) ? <p className="warning">{pick(language, "Visita la fuente antes de votar esta noticia.", "Visit the source before rating this post.", "Visita a fonte antes de votar esta nova.")}</p> : null}
 
           <section className="detail-comments">
             <CommentsPanel
@@ -533,17 +534,17 @@ export const PostDetailPage = ({
 
         <aside className="detail-side">
           <article className="detail-side-card detail-side-topic">
-            <h3><Icon name="tag" /> {pick(language, "Contexto del tema", "Topic context")}</h3>
+            <h3><Icon name="tag" /> {pick(language, "Contexto del tema", "Topic context", "Contexto do tema")}</h3>
             <p className="topic-intro">{topicIntro(current.topics, language)}</p>
             {current.topics[0] ? (
                 <Link to={`/topic/${current.topics[0]}`} className="btn">
-                <Icon name="timeline" /> {pick(language, "Ir al tema", "Go to topic")}
+                <Icon name="timeline" /> {pick(language, "Ir al tema", "Go to topic", "Ir ao tema")}
                 </Link>
             ) : null}
           </article>
 
           <article className="detail-side-card detail-side-timeline">
-            <h3><Icon name="timeline" /> {pick(language, "Más en este hilo", "More in this thread")}</h3>
+            <h3><Icon name="timeline" /> {pick(language, "Más en este hilo", "More in this thread", "Máis neste fío")}</h3>
             <div className="detail-related-list">
               {related.slice(0, 5).map((item) => (
                 <button

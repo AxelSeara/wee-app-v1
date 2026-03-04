@@ -54,6 +54,7 @@ export const TopicPage = ({
   const [shareUrl, setShareUrl] = useState("");
   const [sharing, setSharing] = useState(false);
   const [topicSettingsOpen, setTopicSettingsOpen] = useState(false);
+  const [threadExpanded, setThreadExpanded] = useState(false);
   const isAdmin = activeUser.role === "admin";
   useEffect(() => {
     setRenameTopic(topic);
@@ -78,6 +79,10 @@ export const TopicPage = ({
     });
   }, [topicPosts]);
 
+  useEffect(() => {
+    setThreadExpanded(false);
+  }, [selectedPostId]);
+
   const selectedPost = topicPosts.find((entry) => entry.post.id === selectedPostId)?.post ?? topicPosts[0]?.post ?? null;
 
   const topicChat = useMemo(() => {
@@ -85,21 +90,21 @@ export const TopicPage = ({
       .flatMap(({ post }) =>
         (post.comments ?? []).map((comment) => ({
           postId: post.id,
-          postTitle: displayTitle(post),
           comment
         }))
       )
       .sort((a, b) => b.comment.createdAt - a.comment.createdAt);
   }, [topicPosts]);
   const totalComments = topicChat.length;
+  const selectedPostComments = useMemo(() => {
+    if (!selectedPost) return [];
+    return [...(selectedPost.comments ?? [])].sort((a, b) => a.createdAt - b.createdAt);
+  }, [selectedPost]);
+  const latestSelectedComment =
+    selectedPostComments.length > 0 ? selectedPostComments[selectedPostComments.length - 1] : null;
   const averageAura = topicAverageAura(topicPosts.map((entry) => entry.post));
   const averageAuraClass =
     averageAura >= 75 ? "aura-health-good" : averageAura >= 50 ? "aura-health-warn" : "aura-health-bad";
-  const postOrderById = useMemo(
-    () => new Map(topicPosts.map(({ post }, index) => [post.id, index + 1])),
-    [topicPosts]
-  );
-
   const relativeTime = (timestamp: number): string => {
     const diffMs = Date.now() - timestamp;
     const mins = Math.max(1, Math.floor(diffMs / 60000));
@@ -259,19 +264,10 @@ export const TopicPage = ({
             <aside className="topic-chat-column">
               <div className="topic-chat-head">
                 <h3><Icon name="comment" size={14} /> {pick(language, "Chat del tema", "Topic chat", "Chat do tema")}</h3>
-                <span className="badge">{topicChat.length}</span>
+                <span className="badge">
+                  {selectedPostComments.length}/{topicChat.length}
+                </span>
               </div>
-              <p className="hint topic-chat-focus">
-                {selectedPost
-                  ? (
-                    <>
-                      {pick(language, "Comentando en", "Commenting on", "Comentando en")}:
-                      {" "}
-                      <strong className="topic-chat-focus-title">{displayTitle(selectedPost)}</strong>
-                    </>
-                  )
-                  : pick(language, "Selecciona una noticia para comentar.", "Select a post to comment.", "Selecciona unha nova para comentar.")}
-              </p>
               <form className="topic-chat-form" onSubmit={submitTopicComment}>
                 <div className="topic-chat-input-wrap">
                   <input
@@ -297,75 +293,118 @@ export const TopicPage = ({
               </form>
 
               <div className="topic-chat-list">
-                {topicChat.length === 0 ? (
-                  <p className="hint">{pick(language, "Sin comentarios todavía en este tema.", "No comments in this topic yet.", "Sen comentarios aínda neste tema.")}</p>
+                {!selectedPost ? (
+                  <article className="empty-state">
+                    <h3>{pick(language, "Selecciona una noticia", "Select a post", "Selecciona unha nova")}</h3>
+                    <p>{pick(language, "Pasa por una tarjeta del timeline para abrir su conversación.", "Hover or click a timeline card to open its conversation.", "Pasa por unha tarxeta do timeline para abrir a súa conversa.")}</p>
+                  </article>
+                ) : topicChat.length === 0 ? (
+                  <article className="empty-state">
+                    <h3>{pick(language, "Sin comentarios todavía", "No comments yet", "Sen comentarios aínda")}</h3>
+                    <p>{pick(language, "Selecciona una noticia del timeline y abre la conversación del tema.", "Select a timeline post and open the topic conversation.", "Selecciona unha nova do timeline e abre a conversa do tema.")}</p>
+                  </article>
                 ) : (
-                  topicChat.map(({ postId, postTitle, comment }) => {
-                    const author = usersById.get(comment.userId);
-                    const auraCount = comment.auraUserIds?.length ?? 0;
-                    const auraActive = !!activeUserId && (comment.auraUserIds ?? []).includes(activeUserId);
-                    const contextIndex = postOrderById.get(postId) ?? 0;
-                    return (
-                      <article
-                        key={comment.id}
-                        className={postId === selectedPostId ? "topic-chat-item topic-chat-item-active" : "topic-chat-item"}
-                      >
-                        {isAdmin && commentDeleteMode ? (
-                          <button
-                            type="button"
-                            className="comment-delete-corner"
-                            onClick={async () => {
-                              const result = await onAdminDeleteComment(postId, comment.id);
-                              onToast(result.message);
-                            }}
-                            title={pick(language, "Eliminar comentario", "Delete comment", "Eliminar comentario")}
-                            aria-label={pick(language, "Eliminar comentario", "Delete comment", "Eliminar comentario")}
-                          >
-                            <Icon name="trash" size={12} />
-                          </button>
-                        ) : null}
-                        <header>
-                          {author ? <Avatar user={author} size={20} /> : null}
-                          <strong>{author?.alias ?? pick(language, "usuario", "user")}</strong>
-                          <span className="hint">{relativeTime(comment.createdAt)}</span>
-                        </header>
-                        <p>{comment.text}</p>
-                        <div className="topic-chat-meta">
-                          <button
-                            type="button"
-                            className={auraActive ? "btn btn-primary aura-btn" : "btn aura-btn"}
-                            disabled={!activeUserId}
-                            onClick={async () => {
-                              const result = await onVoteCommentAura(postId, comment.id);
-                              onToast(result.message);
-                            }}
-                          >
-                            Aura {auraCount}
-                          </button>
-                          <button
-                            type="button"
-                            className="btn aura-btn topic-chat-open-btn"
-                            onClick={() => navigate(`/post/${postId}`)}
-                            title={pick(language, "Ver noticia", "Open post", "Ver nova")}
-                            aria-label={pick(language, "Ver noticia", "Open post", "Ver nova")}
-                          >
-                            <Icon name="eye" size={13} />
-                          </button>
-                          <span
-                            className="topic-chat-context"
-                            title={pick(
+                  <article
+                    className={`topic-comment-thread-card ${threadExpanded ? "is-open" : ""}`}
+                  >
+                    <button
+                      type="button"
+                      className="topic-thread-bubble"
+                      onClick={() => setThreadExpanded((prev) => !prev)}
+                      aria-expanded={threadExpanded}
+                    >
+                      <span className="topic-thread-bubble-label">
+                        <Icon name="comment" size={13} />
+                        {pick(language, "Conversación de la noticia seleccionada", "Conversation for selected post", "Conversa da nova seleccionada")}
+                      </span>
+                      <span className="topic-thread-bubble-meta">
+                        {selectedPostComments.length === 0
+                          ? pick(language, "Sin comentarios aún", "No comments yet", "Sen comentarios aínda")
+                          : pick(
                               language,
-                              `Comentario ligado a: ${postTitle}`,
-                              `Comment linked to: ${postTitle}`,
-                              `Comentario ligado a: ${postTitle}`
+                              `${selectedPostComments.length} comentarios en este hilo`,
+                              `${selectedPostComments.length} comments in this thread`,
+                              `${selectedPostComments.length} comentarios neste fío`
                             )}
-                          >
-                            <Icon name="timeline" size={12} /> #{contextIndex}
-                          </span>
-                        </div>
+                      </span>
+                      <span className={`topic-thread-toggle ${threadExpanded ? "open" : ""}`}>
+                        {threadExpanded
+                          ? pick(language, "Ocultar historial", "Hide history", "Ocultar historial")
+                          : pick(language, "Ver historial", "Show history", "Ver historial")}
+                        <span aria-hidden="true">▾</span>
+                      </span>
+                    </button>
+
+                    {latestSelectedComment ? (
+                      <div className="topic-thread-latest">
+                        <header>
+                          {usersById.get(latestSelectedComment.userId) ? (
+                            <Avatar user={usersById.get(latestSelectedComment.userId)!} size={20} />
+                          ) : null}
+                          <strong>
+                            {usersById.get(latestSelectedComment.userId)?.alias ??
+                              pick(language, "usuario", "user")}
+                          </strong>
+                          <span className="hint">{relativeTime(latestSelectedComment.createdAt)}</span>
+                        </header>
+                        <p>{latestSelectedComment.text}</p>
+                      </div>
+                    ) : (
+                      <article className="empty-state">
+                        <h3>{pick(language, "Este punto del hilo está vacío", "This thread point is empty", "Este punto do fío está baleiro")}</h3>
+                        <p>{pick(language, "Deja el primer comentario para abrir conversación.", "Leave the first comment to start the conversation.", "Deixa o primeiro comentario para abrir conversa.")}</p>
                       </article>
-                    );
-                  })
+                    )}
+
+                    {threadExpanded && selectedPostComments.length > 0 ? (
+                      <div className="topic-thread-history">
+                        {selectedPostComments.map((comment) => {
+                          const author = usersById.get(comment.userId);
+                          const auraCount = comment.auraUserIds?.length ?? 0;
+                          const auraActive = !!activeUserId && (comment.auraUserIds ?? []).includes(activeUserId);
+                          return (
+                            <article key={comment.id} className="topic-chat-item topic-chat-item-active">
+                              {isAdmin && commentDeleteMode ? (
+                                <button
+                                  type="button"
+                                  className="comment-delete-corner"
+                                  onClick={async (event) => {
+                                    event.stopPropagation();
+                                    const result = await onAdminDeleteComment(selectedPost.id, comment.id);
+                                    onToast(result.message);
+                                  }}
+                                  title={pick(language, "Eliminar comentario", "Delete comment", "Eliminar comentario")}
+                                  aria-label={pick(language, "Eliminar comentario", "Delete comment", "Eliminar comentario")}
+                                >
+                                  <Icon name="trash" size={12} />
+                                </button>
+                              ) : null}
+                              <header>
+                                {author ? <Avatar user={author} size={20} /> : null}
+                                <strong>{author?.alias ?? pick(language, "usuario", "user")}</strong>
+                                <span className="hint">{relativeTime(comment.createdAt)}</span>
+                              </header>
+                              <p>{comment.text}</p>
+                              <div className="topic-chat-meta">
+                                <button
+                                  type="button"
+                                  className={auraActive ? "btn btn-primary aura-btn" : "btn aura-btn"}
+                                  disabled={!activeUserId}
+                                  onClick={async (event) => {
+                                    event.stopPropagation();
+                                    const result = await onVoteCommentAura(selectedPost.id, comment.id);
+                                    onToast(result.message);
+                                  }}
+                                >
+                                  Aura {auraCount}
+                                </button>
+                              </div>
+                            </article>
+                          );
+                        })}
+                      </div>
+                    ) : null}
+                  </article>
                 )}
               </div>
             </aside>

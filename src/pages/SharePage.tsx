@@ -49,7 +49,7 @@ export const SharePage = ({ activeUser, onShareUrl, getDuplicatePreview, onToast
           <li>{pick(language, "Publícala para abrir o reforzar el hilo", "Post it to open or reinforce the thread", "Publícaa para abrir ou reforzar o fío")}</li>
         </ol>
         <form className="stack" onSubmit={submit}>
-          <label>
+          <label className="form-field">
             URL
             <input
               type="url"

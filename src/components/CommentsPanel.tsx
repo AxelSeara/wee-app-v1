@@ -143,7 +143,10 @@ export const CommentsPanel = ({
 
       <div className="comments-list">
         {sortedComments.length === 0 ? (
-          <p className="hint">{pick(language, "Aún no hay comentarios.", "No comments yet.")}</p>
+          <article className="empty-state">
+            <h3>{pick(language, "Todavía no hay comentarios", "No comments yet", "Aínda non hai comentarios")}</h3>
+            <p>{pick(language, "Sé la primera persona en aportar contexto a esta noticia.", "Be the first person to add context to this post.", "Sé a primeira persoa en aportar contexto a esta nova.")}</p>
+          </article>
         ) : (
           sortedComments.slice(0, compact ? 3 : 12).map((comment) => {
             const author = usersById.get(comment.userId);

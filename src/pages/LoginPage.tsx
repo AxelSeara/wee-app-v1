@@ -304,11 +304,11 @@ export const LoginPage = ({ users, onCreateOrLogin }: LoginPageProps) => {
           </p>
 
           <form onSubmit={submitLogin} className="stack">
-            <label>
+            <label className="form-field">
               {pick(language, "Tu alias", "Your alias", "O teu alias")}
               <input value={alias} onChange={(event) => setAlias(event.target.value)} placeholder={pick(language, "Ej: Alex", "Ex: Alex", "Ex: Alex")} />
             </label>
-            <label>
+            <label className="form-field">
               {pick(language, "Contraseña", "Password", "Contrasinal")}
               <input
                 type="password"
@@ -346,7 +346,7 @@ export const LoginPage = ({ users, onCreateOrLogin }: LoginPageProps) => {
             <form onSubmit={submitRegister} className="stack">
               <div className="auth-form-grid">
                 <div className="stack">
-                  <label>
+                  <label className="form-field">
                     {pick(language, "Tu alias", "Your alias", "O teu alias")}
                     <div className="alias-row">
                       <input value={alias} onChange={(event) => setAlias(event.target.value)} placeholder={pick(language, "Ej: Alex", "Ex: Alex", "Ex: Alex")} />
@@ -361,7 +361,7 @@ export const LoginPage = ({ users, onCreateOrLogin }: LoginPageProps) => {
                     </div>
                   </label>
 
-                  <label>
+                  <label className="form-field">
                     {pick(language, "Contraseña", "Password", "Contrasinal")}
                     <input
                       type="password"
@@ -370,7 +370,7 @@ export const LoginPage = ({ users, onCreateOrLogin }: LoginPageProps) => {
                       placeholder={pick(language, "Tu contraseña", "Your password", "O teu contrasinal")}
                     />
                   </label>
-                  <label>
+                  <label className="form-field">
                     {pick(language, "Repite contraseña", "Repeat password", "Repite contrasinal")}
                     <input
                       type="password"
@@ -405,7 +405,7 @@ export const LoginPage = ({ users, onCreateOrLogin }: LoginPageProps) => {
                 </aside>
               </div>
 
-              <label>
+              <label className="form-field">
                 {pick(language, "Idioma del perfil", "Profile language", "Idioma do perfil")}
                 <select value={profileLanguage} onChange={(event) => setProfileLanguage(event.target.value as AppLanguage)}>
                   <option value="es">Español</option>

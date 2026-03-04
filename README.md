@@ -43,6 +43,20 @@ Tests:
 npm run test
 ```
 
+UX guardrails (design lint):
+
+```bash
+npm run design:lint
+```
+
+Documentación de auditoría UX/UI:
+
+- `docs/ux_audit/sitemap.md`
+- `docs/ux_audit/report.md`
+- `docs/ux_audit/tokens.md`
+- `docs/ux_audit/design_rules.md`
+- `docs/ux_audit/backlog.md`
+
 Reporte rápido de AURA (desde export JSON):
 
 ```bash

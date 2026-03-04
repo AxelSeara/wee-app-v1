@@ -80,9 +80,9 @@ export const UserPostsPage = ({
         </div>
 
         <div className="tabs">
-          <button className={tab === "shared" ? "tab active" : "tab"} onClick={() => setTab("shared")}><Icon name="news" /> {pick(language, "Publicadas", "Posted", "Publicadas")}</button>
-          <button className={tab === "quality" ? "tab active" : "tab"} onClick={() => setTab("quality")}><Icon name="check" /> {pick(language, "Mejor calidad", "Best quality", "Mellor calidade")}</button>
-          <button className={tab === "interest" ? "tab active" : "tab"} onClick={() => setTab("interest")}><Icon name="heart" /> {pick(language, "Más Aura", "More Aura", "Máis Aura")}</button>
+          <button type="button" className={tab === "shared" ? "tab active" : "tab"} onClick={() => setTab("shared")}><Icon name="news" /> {pick(language, "Publicadas", "Posted", "Publicadas")}</button>
+          <button type="button" className={tab === "quality" ? "tab active" : "tab"} onClick={() => setTab("quality")}><Icon name="check" /> {pick(language, "Mejor calidad", "Best quality", "Mellor calidade")}</button>
+          <button type="button" className={tab === "interest" ? "tab active" : "tab"} onClick={() => setTab("interest")}><Icon name="heart" /> {pick(language, "Más Aura", "More Aura", "Máis Aura")}</button>
         </div>
 
         <div className="post-grid">

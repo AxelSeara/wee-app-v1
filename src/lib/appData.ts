@@ -1,7 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   addPost,
-  addUser,
   deletePostById,
   deleteUserById,
   exportAllData,
@@ -18,11 +17,21 @@ import {
   updatePost,
   upsertPreferences
 } from "./store";
-import { remoteModeEnabled, supabase } from "./backend/supabase";
+import {
+  confirmJoinCommunity,
+  createCommunity,
+  leaveCommunity,
+  loadCommunityMeta,
+  loginCommunityUser,
+  logoutCommunityUser,
+  previewCommunity,
+  registerCommunityUser
+} from "./communityApi";
+import { clearCommunitySession, getCommunitySession, getSelectedCommunity, setSelectedCommunity, type CommunitySelection } from "./communitySession";
 import type { AppLanguage, ExportBundle, Post, SearchFilters, User, UserCommunityStats, UserPreferences } from "./types";
-import { hashPassword, isStrongPassword, verifyPassword } from "./auth";
+import { isStrongPassword } from "./auth";
 import { auraRuntimeConfig, computeUserInfluenceScore, computeUserQualityScore } from "./auraEngine";
-import { clamp, colorFromString, generateId, getInitials, normalizeSpace } from "./utils";
+import { clamp, colorFromString, getInitials, normalizeSpace } from "./utils";
 
 interface CreateOrLoginResult {
   user: User;
@@ -81,22 +90,6 @@ const pointsForLevel = (level: number): number => {
   return (safeLevel - 1) * (safeLevel - 1) * 110;
 };
 
-const aliasToAuthEmail = (alias: string): string => {
-  const base = alias
-    .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "")
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, ".")
-    .replace(/^\.+|\.+$/g, "")
-    .slice(0, 24) || "user";
-  let hash = 0;
-  for (let i = 0; i < alias.length; i += 1) {
-    hash = (hash * 31 + alias.charCodeAt(i)) >>> 0;
-  }
-  const suffix = hash.toString(36).slice(0, 6) || "x";
-  return `${base}.${suffix}@weeapp.dev`;
-};
-
 const toPublicBackendError = (raw: string): string => {
   const value = raw.toLowerCase();
   if (value.includes("remote_required_missing_config")) return "BACKEND_CONFIG_MISSING";
@@ -113,6 +106,9 @@ export const useAppData = () => {
   const [users, setUsers] = useState<User[]>([]);
   const [posts, setPosts] = useState<Post[]>([]);
   const [activeUserId, setActiveUserIdState] = useState<string | null>(getActiveUserId());
+  const [selectedCommunity, setSelectedCommunityState] = useState<CommunitySelection | null>(getSelectedCommunity());
+  const [communityRulesText, setCommunityRulesText] = useState("");
+  const [communityMembers, setCommunityMembers] = useState<Array<{ id: string; alias: string; role: "admin" | "member" }>>([]);
   const [preferences, setPreferences] = useState<UserPreferences | null>(null);
   const [loading, setLoading] = useState(true);
   const [backendError, setBackendError] = useState<string | null>(null);
@@ -123,9 +119,20 @@ export const useAppData = () => {
       setLoading(true);
     }
     try {
+      const session = getCommunitySession();
+      if (!session) {
+        setUsers([]);
+        setPosts([]);
+        setPreferences(null);
+        setBackendError(null);
+        setLoading(false);
+        return;
+      }
       const [fetchedUsers, fetchedPosts] = await Promise.all([getUsers(), listPosts()]);
       setUsers(fetchedUsers);
       setPosts(fetchedPosts);
+      setSelectedCommunityState(session.community);
+      setSelectedCommunity(session.community);
 
       if (activeUserId) {
         const prefs = await getPreferences(activeUserId);
@@ -149,27 +156,11 @@ export const useAppData = () => {
   }, [reload]);
 
   useEffect(() => {
-    if (!remoteModeEnabled || !supabase) return;
-    let cancelled = false;
-
-    void (async () => {
-      const { data } = await supabase.auth.getSession();
-      const sessionUserId = data.session?.user.id ?? null;
-      if (cancelled) return;
-      setActiveUserId(sessionUserId);
-      setActiveUserIdState(sessionUserId);
-    })();
-
-    const { data: listener } = supabase.auth.onAuthStateChange((_event, session) => {
-      const sessionUserId = session?.user.id ?? null;
-      setActiveUserId(sessionUserId);
-      setActiveUserIdState(sessionUserId);
-    });
-
-    return () => {
-      cancelled = true;
-      listener.subscription.unsubscribe();
-    };
+    const session = getCommunitySession();
+    const userId = session?.userId ?? null;
+    setActiveUserId(userId);
+    setActiveUserIdState(userId);
+    setSelectedCommunityState(session?.community ?? getSelectedCommunity());
   }, []);
 
   const activeUser = useMemo(
@@ -177,30 +168,19 @@ export const useAppData = () => {
     [users, activeUserId]
   );
 
-  useEffect(() => {
-    if (loading) return;
-    if (users.length === 0) return;
-    const hasAdmin = users.some((user) => user.role === "admin");
-    if (hasAdmin) return;
-    const firstUser = [...users].sort((a, b) => a.createdAt - b.createdAt)[0];
-    if (!firstUser) return;
-    void (async () => {
-      await updateUser({ ...firstUser, role: "admin" });
-      await reload();
-    })();
-  }, [users, loading, reload]);
-
   const loginWithUserId = useCallback((userId: string) => {
     setActiveUserId(userId);
     setActiveUserIdState(userId);
   }, []);
 
   const logout = useCallback(() => {
-    if (remoteModeEnabled && supabase) {
-      void supabase.auth.signOut();
-    }
+    void logoutCommunityUser().catch(() => undefined);
+    clearCommunitySession();
     setActiveUserId(null);
     setActiveUserIdState(null);
+    setUsers([]);
+    setPosts([]);
+    setPreferences(null);
   }, []);
 
   const createOrLogin = useCallback(
@@ -219,133 +199,127 @@ export const useAppData = () => {
       if (!cleanPassword) {
         throw new Error("PASSWORD_REQUIRED");
       }
+      const selected = selectedCommunity ?? getSelectedCommunity();
+      if (!selected?.id) throw new Error("COMMUNITY_REQUIRED");
       const existing = users.find((user) => user.alias.toLowerCase() === normalizedAlias.toLowerCase());
-      if (remoteModeEnabled && supabase) {
-        if (existing) {
-          const authEmail = existing.authEmail ?? aliasToAuthEmail(existing.alias);
-          const { data, error } = await supabase.auth.signInWithPassword({
-            email: authEmail,
-            password: cleanPassword
-          });
-          if (error || !data.user) throw new Error("INVALID_PASSWORD");
-          const updatedUser = { ...existing, id: data.user.id, authEmail };
-          if (updatedUser.id !== existing.id || updatedUser.authEmail !== existing.authEmail) {
-            await updateUser(updatedUser);
-            await reload();
-          }
-          loginWithUserId(updatedUser.id);
-          return { user: updatedUser, isNewUser: false };
-        }
-
-        if (!isStrongPassword(cleanPassword)) throw new Error("WEAK_PASSWORD");
-        if (!acceptedPrivacy) throw new Error("PRIVACY_CONSENT_REQUIRED");
-
-        const authEmail = aliasToAuthEmail(normalizedAlias);
-        const { data, error } = await supabase.auth.signUp({
-          email: authEmail,
-          password: cleanPassword
-        });
-        if (error) {
-          if (error.message.toLowerCase().includes("already registered")) {
-            throw new Error("ALIAS_EXISTS");
-          }
-          throw new Error(`AUTH_SIGNUP_FAILED:${error.message}`);
-        }
-        const authUserId = data.user?.id;
-        if (!authUserId) throw new Error("AUTH_SIGNUP_FAILED");
-
-        let sessionUserId = data.session?.user.id ?? null;
-        if (!sessionUserId) {
-          const signInAfterSignup = await supabase.auth.signInWithPassword({
-            email: authEmail,
-            password: cleanPassword
-          });
-          if (signInAfterSignup.error || !signInAfterSignup.data.user) {
-            throw new Error(
-              `AUTH_SIGNIN_AFTER_SIGNUP_FAILED:${signInAfterSignup.error?.message ?? "unknown error"}`
-            );
-          }
-          sessionUserId = signInAfterSignup.data.user.id;
-        }
-
-        const isFirstUser = users.length === 0;
-        const newUser: User = {
-          id: sessionUserId,
-          alias: normalizedAlias,
-          authEmail,
-          role: isFirstUser ? "admin" : "member",
-          language: language ?? "es",
-          privacyConsentAt: Date.now(),
-          privacyPolicyVersion: PRIVACY_POLICY_VERSION,
-          avatarDataUrl,
-          avatarColor: avatarDataUrl ? undefined : colorFromString(normalizedAlias),
-          initials: getInitials(normalizedAlias),
-          createdAt: Date.now()
-        };
-
-        await addUser(newUser);
-        await reload();
-        loginWithUserId(newUser.id);
-        return { user: newUser, isNewUser: true };
-      }
 
       if (existing) {
-        let updatedUser = existing;
-        if (existing.passwordHash) {
-          const valid = await verifyPassword(cleanPassword, existing.passwordHash);
-          if (!valid) throw new Error("INVALID_PASSWORD");
-          if (!existing.passwordHash.startsWith("pbkdf2$")) {
-            updatedUser = {
-              ...existing,
-              passwordHash: await hashPassword(cleanPassword)
-            };
-          }
-        } else {
-          if (!isStrongPassword(cleanPassword)) throw new Error("WEAK_PASSWORD");
-          updatedUser = {
-            ...existing,
-            passwordHash: await hashPassword(cleanPassword),
-            role: existing.role ?? "member"
-          };
-        }
-
-        const nextLanguage = language ?? updatedUser.language ?? "es";
-        if ((updatedUser.language ?? "es") !== nextLanguage || updatedUser !== existing) {
-          await updateUser({ ...updatedUser, language: nextLanguage });
-          await reload();
-          updatedUser = { ...updatedUser, language: nextLanguage };
-        }
-        loginWithUserId(updatedUser.id);
-        return { user: updatedUser, isNewUser: false };
+        const session = await loginCommunityUser({
+          community_id: selected.id,
+          alias: normalizedAlias,
+          password: cleanPassword
+        });
+        setActiveUserId(session.userId);
+        setActiveUserIdState(session.userId);
+        await reload();
+        const user = (await getUserById(session.userId)) ?? {
+          id: session.userId,
+          alias: session.alias,
+          role: "member",
+          language: session.community.invitePolicy ? language ?? "es" : "es",
+          createdAt: Date.now()
+        };
+        return { user, isNewUser: false };
       }
 
+      if (!acceptedPrivacy) throw new Error("PRIVACY_CONSENT_REQUIRED");
       if (!isStrongPassword(cleanPassword)) throw new Error("WEAK_PASSWORD");
-      const isFirstUser = users.length === 0;
-      if (!acceptedPrivacy) {
-        throw new Error("PRIVACY_CONSENT_REQUIRED");
-      }
 
-      const newUser: User = {
-        id: generateId(),
+      const session = await registerCommunityUser({
+        community_id: selected.id,
         alias: normalizedAlias,
-        passwordHash: await hashPassword(cleanPassword),
-        role: isFirstUser ? "admin" : "member",
+        password: cleanPassword,
+        avatar_url: avatarDataUrl,
+        language: language ?? "es"
+      });
+      setActiveUserId(session.userId);
+      setActiveUserIdState(session.userId);
+      await reload();
+      const user = (await getUserById(session.userId)) ?? {
+        id: session.userId,
+        alias: session.alias,
+        role: "member",
         language: language ?? "es",
-        privacyConsentAt: Date.now(),
-        privacyPolicyVersion: PRIVACY_POLICY_VERSION,
         avatarDataUrl,
         avatarColor: avatarDataUrl ? undefined : colorFromString(normalizedAlias),
         initials: getInitials(normalizedAlias),
+        privacyConsentAt: Date.now(),
+        privacyPolicyVersion: PRIVACY_POLICY_VERSION,
         createdAt: Date.now()
       };
-
-      await addUser(newUser);
-      await reload();
-      loginWithUserId(newUser.id);
-      return { user: newUser, isNewUser: true };
+      return { user, isNewUser: true };
     },
-    [users, loginWithUserId, reload]
+    [users, reload, selectedCommunity]
   );
+
+  const createCommunityFlow = useCallback(
+    async (
+      input: { name: string; description?: string; rulesText?: string; invitePolicy: "admins_only" | "members_allowed"; inviteExpiry?: string }
+    ): Promise<{ id: string; name: string; description?: string; inviteCode?: string; inviteToken?: string }> => {
+      const created = await createCommunity({
+        name: input.name,
+        description: input.description,
+        rules_text: input.rulesText,
+        invite_policy: input.invitePolicy,
+        invite_expires_at: input.inviteExpiry
+      });
+      const selected: CommunitySelection = {
+        id: created.community_id,
+        name: created.name,
+        description: created.description
+      };
+      setSelectedCommunity(selected);
+      setSelectedCommunityState(selected);
+      return { id: created.community_id, name: created.name, description: created.description };
+    },
+    []
+  );
+
+  const previewCommunityInvite = useCallback(
+    async (input: { code?: string; token?: string }): Promise<CommunitySelection> => {
+      const data = await previewCommunity(input);
+      return { id: data.community_id, name: data.name, description: data.description };
+    },
+    []
+  );
+
+  const confirmCommunityInvite = useCallback(
+    async (input: { code?: string; token?: string }): Promise<CommunitySelection> => {
+      const selected = await confirmJoinCommunity(input);
+      setSelectedCommunityState(selected);
+      return selected;
+    },
+    []
+  );
+
+  const leaveCurrentCommunity = useCallback(async (): Promise<void> => {
+    await leaveCommunity();
+    clearCommunitySession();
+    setSelectedCommunity(null);
+    setSelectedCommunityState(null);
+    setActiveUserId(null);
+    setActiveUserIdState(null);
+    setUsers([]);
+    setPosts([]);
+    setPreferences(null);
+  }, []);
+
+  const loadCommunityOverview = useCallback(async () => {
+    const data = await loadCommunityMeta();
+    setCommunityRulesText(data.community.rulesText ?? "");
+    setCommunityMembers(data.members);
+    if (data.community.id && data.community.name) {
+      const selected: CommunitySelection = {
+        id: data.community.id,
+        name: data.community.name,
+        description: data.community.description,
+        rulesText: data.community.rulesText
+      };
+      setSelectedCommunityState(selected);
+      setSelectedCommunity(selected);
+    }
+    return data;
+  }, []);
 
   const createPost = useCallback(
     async (post: Post) => {
@@ -662,12 +636,20 @@ export const useAppData = () => {
     posts,
     activeUser,
     activeUserId,
+    selectedCommunity,
+    communityRulesText,
+    communityMembers,
     loading,
     backendError,
     preferences,
     reload,
     loginWithUserId,
     createOrLogin,
+    createCommunityFlow,
+    previewCommunityInvite,
+    confirmCommunityInvite,
+    leaveCurrentCommunity,
+    loadCommunityOverview,
     logout,
     createPost,
     savePost,

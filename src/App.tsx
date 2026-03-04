@@ -26,6 +26,7 @@ import { SettingsPage } from "./pages/SettingsPage";
 import { SharePage } from "./pages/SharePage";
 import { TopicPage } from "./pages/TopicPage";
 import { UserPostsPage } from "./pages/UserPostsPage";
+import { CommunityPage } from "./pages/CommunityPage";
 
 const AppRoutes = () => {
   const location = useLocation();
@@ -33,10 +34,18 @@ const AppRoutes = () => {
     users,
     posts,
     activeUser,
+    selectedCommunity,
+    communityRulesText,
+    communityMembers,
     preferences,
     loading,
     backendError,
     createOrLogin,
+    createCommunityFlow,
+    previewCommunityInvite,
+    confirmCommunityInvite,
+    leaveCurrentCommunity,
+    loadCommunityOverview,
     loginWithUserId,
     logout,
     createPost,
@@ -65,6 +74,11 @@ const AppRoutes = () => {
   useEffect(() => {
     trackPageView(location.pathname);
   }, [location.pathname]);
+
+  useEffect(() => {
+    if (!activeUser) return;
+    void loadCommunityOverview().catch(() => undefined);
+  }, [activeUser, loadCommunityOverview]);
 
   useLayoutEffect(() => {
     window.scrollTo({ top: 0, left: 0, behavior: "auto" });
@@ -928,7 +942,14 @@ const AppRoutes = () => {
           path="/login"
           element={
             <PageTransition>
-              <LoginPage users={users} onCreateOrLogin={createOrLogin} />
+              <LoginPage
+                users={users}
+                selectedCommunity={selectedCommunity}
+                onCreateCommunity={createCommunityFlow}
+                onPreviewCommunity={previewCommunityInvite}
+                onConfirmCommunity={confirmCommunityInvite}
+                onCreateOrLogin={createOrLogin}
+              />
             </PageTransition>
           }
         />
@@ -1084,6 +1105,26 @@ const AppRoutes = () => {
                   onDeleteMyData={onDeleteMyData}
                   onOpenShareModal={() => setShareModalOpen(true)}
                   onLogout={logout}
+                />
+              </PageTransition>
+            </RequireAuth>
+          }
+        />
+
+        <Route
+          path="/community"
+          element={
+            <RequireAuth activeUser={activeUser}>
+              <PageTransition>
+                <CommunityPage
+                  activeUser={activeUser as NonNullable<typeof activeUser>}
+                  selectedCommunity={selectedCommunity}
+                  members={communityMembers}
+                  rulesText={communityRulesText}
+                  onLeaveCommunity={leaveCurrentCommunity}
+                  onLogout={logout}
+                  onOpenShareModal={() => setShareModalOpen(true)}
+                  onToast={showToast}
                 />
               </PageTransition>
             </RequireAuth>

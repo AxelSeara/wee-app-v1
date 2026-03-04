@@ -4,12 +4,21 @@ import { Avatar } from "../components/Avatar";
 import { Icon } from "../components/Icon";
 import { generateAlias } from "../lib/aliasGenerator";
 import { isStrongPassword } from "../lib/auth";
-import { remoteModeEnabled } from "../lib/backend/supabase";
+import type { CommunitySelection } from "../lib/communitySession";
 import { pick, useI18n } from "../lib/i18n";
 import type { AppLanguage, User } from "../lib/types";
 
 interface LoginPageProps {
   users: User[];
+  selectedCommunity: CommunitySelection | null;
+  onCreateCommunity: (input: {
+    name: string;
+    description?: string;
+    rulesText?: string;
+    invitePolicy: "admins_only" | "members_allowed";
+  }) => Promise<{ id: string; name: string; description?: string }>;
+  onPreviewCommunity: (input: { code?: string; token?: string }) => Promise<CommunitySelection>;
+  onConfirmCommunity: (input: { code?: string; token?: string }) => Promise<CommunitySelection>;
   onCreateOrLogin: (
     alias: string,
     password: string,
@@ -27,78 +36,123 @@ const fileToDataUrl = (file: File): Promise<string> =>
     reader.readAsDataURL(file);
   });
 
-export const LoginPage = ({ users, onCreateOrLogin }: LoginPageProps) => {
+export const LoginPage = ({
+  users,
+  selectedCommunity,
+  onCreateCommunity,
+  onPreviewCommunity,
+  onConfirmCommunity,
+  onCreateOrLogin
+}: LoginPageProps) => {
   const { language } = useI18n();
-  const [view, setView] = useState<"landing" | "login" | "register">("landing");
+  const navigate = useNavigate();
+
+  const [view, setView] = useState<"landing" | "create_community" | "join_community" | "confirm_community" | "login" | "register">("landing");
+  const [error, setError] = useState<string | null>(null);
+
+  const [communityName, setCommunityName] = useState("");
+  const [communityDescription, setCommunityDescription] = useState("");
+  const [communityRules, setCommunityRules] = useState("");
+  const [invitePolicy, setInvitePolicy] = useState<"admins_only" | "members_allowed">("admins_only");
+  const [joinCodeOrLink, setJoinCodeOrLink] = useState("");
+  const [preview, setPreview] = useState<CommunitySelection | null>(selectedCommunity);
+
   const [alias, setAlias] = useState("");
   const [password, setPassword] = useState("");
   const [passwordConfirm, setPasswordConfirm] = useState("");
   const [avatarDataUrl, setAvatarDataUrl] = useState<string | undefined>(undefined);
   const [profileLanguage, setProfileLanguage] = useState<AppLanguage>("es");
   const [privacyAccepted, setPrivacyAccepted] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [showWelcome, setShowWelcome] = useState(false);
-  const navigate = useNavigate();
 
   const sortedUsers = useMemo(() => [...users].sort((a, b) => b.createdAt - a.createdAt), [users]);
   const aliasMatchesExisting = useMemo(() => users.some((user) => user.alias.toLowerCase() === alias.trim().toLowerCase()), [users, alias]);
 
-  const resetCommonState = (): void => {
+  const resetAuth = (): void => {
     setError(null);
+    setAlias("");
     setPassword("");
     setPasswordConfirm("");
     setAvatarDataUrl(undefined);
     setPrivacyAccepted(false);
   };
 
-  const goToLogin = (): void => {
-    resetCommonState();
-    setView("login");
+  const parseJoinInput = (raw: string): { code?: string; token?: string } => {
+    const value = raw.trim();
+    if (!value) return {};
+    if (value.includes("invite=")) {
+      const hash = value.split("#")[1] ?? value;
+      const query = hash.includes("?") ? hash.split("?")[1] : "";
+      const token = new URLSearchParams(query).get("invite") ?? undefined;
+      return token ? { token } : { code: value.toUpperCase() };
+    }
+    if (/^[A-Za-z0-9]{12,}$/.test(value)) {
+      return { token: value };
+    }
+    return { code: value.toUpperCase() };
   };
 
-  const goToRegister = (): void => {
-    resetCommonState();
-    setView("register");
+  const submitCreateCommunity = async (event: FormEvent) => {
+    event.preventDefault();
+    setError(null);
+    if (communityName.trim().length < 2) {
+      setError(pick(language, "Nombre de comunidad obligatorio.", "Community name is required.", "Nome da comunidade obrigatorio."));
+      return;
+    }
+    try {
+      const created = await onCreateCommunity({
+        name: communityName.trim(),
+        description: communityDescription.trim() || undefined,
+        rulesText: communityRules.trim() || undefined,
+        invitePolicy
+      });
+      setPreview({ id: created.id, name: created.name, description: created.description });
+      setView("register");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : pick(language, "No se pudo crear la comunidad.", "Could not create community."));
+    }
+  };
+
+  const submitPreview = async (event: FormEvent) => {
+    event.preventDefault();
+    setError(null);
+    const parsed = parseJoinInput(joinCodeOrLink);
+    if (!parsed.code && !parsed.token) {
+      setError(pick(language, "Introduce un código o link válido.", "Enter a valid code or link."));
+      return;
+    }
+    try {
+      const data = await onPreviewCommunity(parsed);
+      setPreview(data);
+      setView("confirm_community");
+    } catch {
+      setError(pick(language, "No encontramos esa comunidad o el enlace ha expirado.", "Community not found or invite expired."));
+    }
+  };
+
+  const confirmJoin = async () => {
+    setError(null);
+    const parsed = parseJoinInput(joinCodeOrLink);
+    try {
+      await onConfirmCommunity(parsed);
+      setView("login");
+      resetAuth();
+    } catch {
+      setError(pick(language, "No se pudo confirmar la invitación.", "Could not confirm invite."));
+    }
   };
 
   const submitLogin = async (event: FormEvent) => {
     event.preventDefault();
     setError(null);
-    const cleanAlias = alias.trim();
-    if (!cleanAlias) {
-      setError(pick(language, "El alias es obligatorio.", "Alias is required.", "O alias é obrigatorio."));
-      return;
-    }
-    if (!password.trim()) {
-      setError(pick(language, "La contraseña es obligatoria.", "Password is required.", "O contrasinal é obrigatorio."));
-      return;
-    }
-    const existing = users.find((user) => user.alias.toLowerCase() === cleanAlias.toLowerCase());
-    if (!existing) {
-      setError(pick(language, "Ese alias no existe todavía. Regístralo primero.", "That alias does not exist yet. Register it first.", "Ese alias aínda non existe. Rexístrao primeiro."));
+    if (!alias.trim() || !password.trim()) {
+      setError(pick(language, "Alias y contraseña son obligatorios.", "Alias and password are required."));
       return;
     }
     try {
-      await onCreateOrLogin(cleanAlias, password);
+      await onCreateOrLogin(alias.trim(), password);
       navigate("/home");
     } catch (err) {
-      const code = err instanceof Error ? err.message : "";
-      if (code === "INVALID_PASSWORD") {
-        setError(pick(language, "Contraseña incorrecta.", "Incorrect password.", "Contrasinal incorrecto."));
-        return;
-      }
-      if (code === "CRYPTO_UNAVAILABLE") {
-        setError(
-          pick(
-            language,
-            "Tu navegador no soporta cifrado seguro para contraseñas. Actualízalo para continuar.",
-            "Your browser does not support secure password encryption. Please update it to continue.",
-            "O teu navegador non soporta cifrado seguro para contrasinais. Actualízao para continuar."
-          )
-        );
-        return;
-      }
-      setError(pick(language, "No pudimos entrar con ese alias.", "We could not sign in with that alias.", "Non puidemos entrar con ese alias."));
+      setError(err instanceof Error ? err.message : pick(language, "No pudimos iniciar sesión.", "Could not sign in."));
     }
   };
 
@@ -107,150 +161,34 @@ export const LoginPage = ({ users, onCreateOrLogin }: LoginPageProps) => {
     setError(null);
     const cleanAlias = alias.trim();
     if (!cleanAlias) {
-      setError(pick(language, "El alias es obligatorio.", "Alias is required.", "O alias é obrigatorio."));
-      return;
-    }
-    if (!password.trim()) {
-      setError(pick(language, "La contraseña es obligatoria.", "Password is required.", "O contrasinal é obrigatorio."));
+      setError(pick(language, "El alias es obligatorio.", "Alias is required."));
       return;
     }
     if (aliasMatchesExisting) {
-      setError(pick(language, "Ese alias ya existe. Elige otro.", "That alias already exists. Pick another one.", "Ese alias xa existe. Escolle outro."));
+      setError(pick(language, "Ese alias ya existe en esta comunidad.", "That alias already exists in this community."));
       return;
     }
     if (password !== passwordConfirm) {
-      setError(pick(language, "Las contraseñas no coinciden.", "Passwords do not match.", "Os contrasinais non coinciden."));
+      setError(pick(language, "Las contraseñas no coinciden.", "Passwords do not match."));
       return;
     }
     if (!isStrongPassword(password)) {
-      setError(
-        pick(
-          language,
-          "La contraseña debe tener al menos 6 caracteres.",
-          "Password must be at least 6 characters.",
-          "O contrasinal debe ter polo menos 6 caracteres."
-        )
-      );
+      setError(pick(language, "La contraseña debe tener al menos 6 caracteres.", "Password must be at least 6 characters."));
       return;
     }
     if (!privacyAccepted) {
-      setError(
-        pick(
-          language,
-          remoteModeEnabled
-            ? "Debes aceptar la política de privacidad para crear tu cuenta."
-            : "Debes aceptar la política de privacidad local para crear tu cuenta.",
-          remoteModeEnabled
-            ? "You must accept the privacy policy to create your account."
-            : "You must accept the local privacy policy to create your account.",
-          remoteModeEnabled
-            ? "Debes aceptar a política de privacidade para crear a túa conta."
-            : "Debes aceptar a política de privacidade local para crear a túa conta."
-        )
-      );
+      setError(pick(language, "Debes aceptar la política de privacidad.", "You must accept the privacy policy."));
       return;
     }
     try {
-      const result = await onCreateOrLogin(cleanAlias, password, avatarDataUrl, profileLanguage, true);
-      if (!result.isNewUser) {
-        setError(pick(language, "Ese alias ya existe. Inicia sesión.", "That alias already exists. Sign in instead.", "Ese alias xa existe. Inicia sesión."));
-        return;
-      }
+      await onCreateOrLogin(cleanAlias, password, avatarDataUrl, profileLanguage, true);
       navigate("/home");
     } catch (err) {
-      const code = err instanceof Error ? err.message : "";
-      if (code === "WEAK_PASSWORD") {
-        setError(
-          pick(
-            language,
-            "La contraseña debe tener al menos 6 caracteres.",
-            "Password must be at least 6 characters.",
-            "O contrasinal debe ter polo menos 6 caracteres."
-          )
-        );
-        return;
-      }
-      if (code === "PRIVACY_CONSENT_REQUIRED") {
-        setError(
-          pick(
-            language,
-            remoteModeEnabled
-              ? "Debes aceptar la política de privacidad para crear tu cuenta."
-              : "Debes aceptar la política de privacidad local para crear tu cuenta.",
-            remoteModeEnabled
-              ? "You must accept the privacy policy to create your account."
-              : "You must accept the local privacy policy to create your account.",
-            remoteModeEnabled
-              ? "Debes aceptar a política de privacidade para crear a túa conta."
-              : "Debes aceptar a política de privacidade local para crear a túa conta."
-          )
-        );
-        return;
-      }
-      if (code === "ALIAS_EXISTS") {
-        setError(pick(language, "Ese alias ya existe. Inicia sesión.", "That alias already exists. Sign in instead.", "Ese alias xa existe. Inicia sesión."));
-        return;
-      }
-      if (code === "AUTH_SIGNUP_FAILED") {
-        setError(
-          pick(
-            language,
-            "No pudimos crear la cuenta en el backend. Revisa la conexión o la configuración de Supabase.",
-            "We could not create the account in the backend. Check connection or Supabase setup.",
-            "Non puidemos crear a conta no backend. Revisa a conexión ou a configuración de Supabase."
-          )
-        );
-        return;
-      }
-      if (code.startsWith("AUTH_SIGNUP_FAILED:")) {
-        const detail = code.slice("AUTH_SIGNUP_FAILED:".length).trim();
-        setError(
-          pick(
-            language,
-            `No pudimos crear la cuenta en Supabase: ${detail}`,
-            `Could not create account in Supabase: ${detail}`,
-            `Non puidemos crear a conta en Supabase: ${detail}`
-          )
-        );
-        return;
-      }
-      if (code === "AUTH_SIGNIN_AFTER_SIGNUP_FAILED") {
-        setError(
-          pick(
-            language,
-            "Cuenta creada, pero no pudimos iniciar sesión automática. Revisa la confirmación de email en Supabase o entra manualmente.",
-            "Account created, but automatic sign-in failed. Check email confirmation in Supabase or sign in manually.",
-            "Conta creada, pero fallou o inicio automático. Revisa a confirmación de email en Supabase ou entra manualmente."
-          )
-        );
-        return;
-      }
-      if (code.startsWith("AUTH_SIGNIN_AFTER_SIGNUP_FAILED:")) {
-        const detail = code.slice("AUTH_SIGNIN_AFTER_SIGNUP_FAILED:".length).trim();
-        setError(
-          pick(
-            language,
-            `Cuenta creada, pero falló el login automático: ${detail}`,
-            `Account created, but auto sign-in failed: ${detail}`,
-            `Conta creada, pero fallou o login automático: ${detail}`
-          )
-        );
-        return;
-      }
-      if (code === "CRYPTO_UNAVAILABLE") {
-        setError(
-          pick(
-            language,
-            "Tu navegador no soporta cifrado seguro para contraseñas. Actualízalo para continuar.",
-            "Your browser does not support secure password encryption. Please update it to continue.",
-            "O teu navegador non soporta cifrado seguro para contrasinais. Actualízao para continuar."
-          )
-        );
-        return;
-      }
-      setError(pick(language, "No pudimos entrar con ese alias.", "We could not sign in with that alias.", "Non puidemos entrar con ese alias."));
+      setError(err instanceof Error ? err.message : pick(language, "No se pudo crear la cuenta.", "Could not create account."));
     }
   };
+
+  const currentCommunity = selectedCommunity ?? preview;
 
   return (
     <main className={view === "register" ? "auth-layout" : "auth-layout auth-layout-single"}>
@@ -258,30 +196,65 @@ export const LoginPage = ({ users, onCreateOrLogin }: LoginPageProps) => {
         <section className="auth-card auth-card-entry">
           <h1 className="auth-hero-title">
             <span className="auth-hero-brand">Wee</span>
-            <span className="auth-hero-claim">
-              {pick(
-                language,
-                "Comparte con tu gente. Crea hilos por tema.",
-                "Share with your people. Create topic threads.",
-                "Comparte coa túa xente. Crea fíos por tema."
-              )}
-            </span>
+            <span className="auth-hero-claim">{pick(language, "Microcomunidades con contexto", "Micro-communities with context")}</span>
           </h1>
-          <p>
-            {pick(
-              language,
-              "Un espacio simple para tu grupo: pegas un link, se ordena por tema y decidís mejor juntos.",
-              "A simple space for your group: paste a link, sort it by topic, and decide better together.",
-              "Un espazo simple para o teu grupo: pegas unha ligazón, ordénase por tema e decidides mellor xuntos."
-            )}
-          </p>
+          <p>{pick(language, "Crea una comunidad o únete con un código para compartir enlaces y debatir con orden.", "Create a community or join with a code to share links and discuss with context.")}</p>
           <div className="auth-entry-actions">
-            <button type="button" className="btn btn-primary" onClick={goToRegister}>
-              <Icon name="spark" /> {pick(language, "Crear cuenta", "Create account", "Crear conta")}
+            <button type="button" className="btn btn-primary" onClick={() => setView("create_community")}>
+              <Icon name="spark" /> {pick(language, "Crear comunidad", "Create community")}
             </button>
-            <button type="button" className="btn" onClick={goToLogin}>
-              <Icon name="user" /> {pick(language, "Ya tengo cuenta", "I already have an account", "Xa teño conta")}
+            <button type="button" className="btn" onClick={() => setView("join_community")}>
+              <Icon name="users" /> {pick(language, "Unirse a comunidad", "Join community")}
             </button>
+          </div>
+        </section>
+      ) : null}
+
+      {view === "create_community" ? (
+        <section className="auth-card auth-card-main">
+          <div className="section-head">
+            <h2>{pick(language, "Crear comunidad", "Create community")}</h2>
+            <button type="button" className="btn" onClick={() => setView("landing")}><Icon name="arrowLeft" /> {pick(language, "Volver", "Back")}</button>
+          </div>
+          <form className="stack" onSubmit={submitCreateCommunity}>
+            <label className="form-field">{pick(language, "Nombre", "Name")}<input value={communityName} onChange={(event) => setCommunityName(event.target.value)} /></label>
+            <label className="form-field">{pick(language, "Descripción", "Description")}<input value={communityDescription} onChange={(event) => setCommunityDescription(event.target.value)} /></label>
+            <label className="form-field">{pick(language, "Normas", "Rules")}<textarea value={communityRules} onChange={(event) => setCommunityRules(event.target.value)} rows={4} /></label>
+            <label className="form-field">{pick(language, "Política de invitación", "Invite policy")}
+              <select value={invitePolicy} onChange={(event) => setInvitePolicy(event.target.value as "admins_only" | "members_allowed")}>
+                <option value="admins_only">{pick(language, "Solo admins", "Admins only")}</option>
+                <option value="members_allowed">{pick(language, "Miembros pueden invitar", "Members can invite")}</option>
+              </select>
+            </label>
+            {error ? <p className="error">{error}</p> : null}
+            <button type="submit" className="btn btn-primary"><Icon name="spark" /> {pick(language, "Continuar", "Continue")}</button>
+          </form>
+        </section>
+      ) : null}
+
+      {view === "join_community" ? (
+        <section className="auth-card auth-card-main">
+          <div className="section-head">
+            <h2>{pick(language, "Unirse a comunidad", "Join community")}</h2>
+            <button type="button" className="btn" onClick={() => setView("landing")}><Icon name="arrowLeft" /> {pick(language, "Volver", "Back")}</button>
+          </div>
+          <form className="stack" onSubmit={submitPreview}>
+            <label className="form-field">{pick(language, "Código o link", "Code or link")}<input value={joinCodeOrLink} onChange={(event) => setJoinCodeOrLink(event.target.value)} placeholder="ABCD1234 o #/login?invite=..." /></label>
+            {error ? <p className="error">{error}</p> : null}
+            <button type="submit" className="btn btn-primary"><Icon name="spark" /> {pick(language, "Ver comunidad", "Preview community")}</button>
+          </form>
+        </section>
+      ) : null}
+
+      {view === "confirm_community" && preview ? (
+        <section className="auth-card auth-card-main">
+          <h2>{pick(language, "Confirmar comunidad", "Confirm community")}</h2>
+          <p><strong>{preview.name}</strong></p>
+          {preview.description ? <p className="hint">{preview.description}</p> : null}
+          {error ? <p className="error">{error}</p> : null}
+          <div className="auth-entry-actions">
+            <button type="button" className="btn btn-primary" onClick={confirmJoin}>{pick(language, "Confirmar", "Confirm")}</button>
+            <button type="button" className="btn" onClick={() => setView("join_community")}>{pick(language, "Cambiar", "Change")}</button>
           </div>
         </section>
       ) : null}
@@ -289,38 +262,16 @@ export const LoginPage = ({ users, onCreateOrLogin }: LoginPageProps) => {
       {view === "login" ? (
         <section className="auth-card auth-card-main">
           <div className="section-head">
-            <h2>{pick(language, "Login", "Login", "Login")}</h2>
-            <button type="button" className="btn" onClick={() => setView("landing")}>
-              <Icon name="arrowLeft" /> {pick(language, "Volver", "Back", "Volver")}
-            </button>
+            <h2>{pick(language, "Login", "Login")}</h2>
+            <button type="button" className="btn" onClick={() => setView("landing")}><Icon name="arrowLeft" /> {pick(language, "Volver", "Back")}</button>
           </div>
-          <p className="hint">
-            {pick(
-              language,
-              "Entra con tu alias y sigue el hilo donde lo dejaste.",
-              "Sign in with your alias and continue where you left off.",
-              "Entra co teu alias e segue o fío onde o deixaches."
-            )}
-          </p>
-
+          <p className="hint">{pick(language, "Comunidad", "Community")}: <strong>{currentCommunity?.name ?? "-"}</strong></p>
           <form onSubmit={submitLogin} className="stack">
-            <label className="form-field">
-              {pick(language, "Tu alias", "Your alias", "O teu alias")}
-              <input value={alias} onChange={(event) => setAlias(event.target.value)} placeholder={pick(language, "Ej: Alex", "Ex: Alex", "Ex: Alex")} />
-            </label>
-            <label className="form-field">
-              {pick(language, "Contraseña", "Password", "Contrasinal")}
-              <input
-                type="password"
-                value={password}
-                onChange={(event) => setPassword(event.target.value)}
-                placeholder={pick(language, "Tu contraseña", "Your password", "O teu contrasinal")}
-              />
-            </label>
+            <label className="form-field">{pick(language, "Alias", "Alias")}<input value={alias} onChange={(event) => setAlias(event.target.value)} /></label>
+            <label className="form-field">{pick(language, "Contraseña", "Password")}<input type="password" value={password} onChange={(event) => setPassword(event.target.value)} /></label>
             {error ? <p className="error">{error}</p> : null}
-            <button type="submit" className="btn btn-primary">
-              <Icon name="spark" /> {pick(language, "Entrar", "Continue", "Entrar")}
-            </button>
+            <button type="submit" className="btn btn-primary"><Icon name="spark" /> {pick(language, "Entrar", "Enter")}</button>
+            <button type="button" className="btn" onClick={() => { resetAuth(); setView("register"); }}>{pick(language, "No tengo cuenta", "Create account")}</button>
           </form>
         </section>
       ) : null}
@@ -329,170 +280,57 @@ export const LoginPage = ({ users, onCreateOrLogin }: LoginPageProps) => {
         <>
           <section className="auth-card auth-card-main">
             <div className="section-head">
-              <h2>{pick(language, "Registro", "Register", "Rexistro")}</h2>
-              <button type="button" className="btn" onClick={() => setView("landing")}>
-                <Icon name="arrowLeft" /> {pick(language, "Volver", "Back", "Volver")}
-              </button>
+              <h2>{pick(language, "Registro", "Register")}</h2>
+              <button type="button" className="btn" onClick={() => setView("landing")}><Icon name="arrowLeft" /> {pick(language, "Volver", "Back")}</button>
             </div>
-            <p className="hint">
-              {pick(
-                language,
-                "Crea tu perfil en menos de un minuto. Alias, contraseña y listo.",
-                "Create your profile in under a minute. Alias, password, done.",
-                "Crea o teu perfil en menos dun minuto. Alias, contrasinal e listo."
-              )}
-            </p>
-
+            <p className="hint">{pick(language, "Comunidad", "Community")}: <strong>{currentCommunity?.name ?? "-"}</strong></p>
             <form onSubmit={submitRegister} className="stack">
-              <div className="auth-form-grid">
-                <div className="stack">
-                  <label className="form-field">
-                    {pick(language, "Tu alias", "Your alias", "O teu alias")}
-                    <div className="alias-row">
-                      <input value={alias} onChange={(event) => setAlias(event.target.value)} placeholder={pick(language, "Ej: Alex", "Ex: Alex", "Ex: Alex")} />
-                      <button
-                        type="button"
-                        className="btn dice-btn"
-                        onClick={() => setAlias(generateAlias())}
-                        title={pick(language, "Generar alias aleatorio", "Generate random alias", "Xerar alias aleatorio")}
-                      >
-                        <Icon name="dice" size={14} />
-                      </button>
-                    </div>
-                  </label>
-
-                  <label className="form-field">
-                    {pick(language, "Contraseña", "Password", "Contrasinal")}
-                    <input
-                      type="password"
-                      value={password}
-                      onChange={(event) => setPassword(event.target.value)}
-                      placeholder={pick(language, "Tu contraseña", "Your password", "O teu contrasinal")}
-                    />
-                  </label>
-                  <label className="form-field">
-                    {pick(language, "Repite contraseña", "Repeat password", "Repite contrasinal")}
-                    <input
-                      type="password"
-                      value={passwordConfirm}
-                      onChange={(event) => setPasswordConfirm(event.target.value)}
-                      placeholder={pick(language, "Repite tu contraseña", "Repeat your password", "Repite o teu contrasinal")}
-                    />
-                  </label>
-                  <p className="hint">
-                    {pick(
-                      language,
-                      "Mínimo 6 caracteres.",
-                      "Minimum 6 characters.",
-                      "Mínimo 6 caracteres."
-                    )}
-                  </p>
-                </div>
-
-                <aside className="auth-upload-side">
-                  <h3><Icon name="camera" /> {pick(language, "Foto de perfil", "Profile photo", "Imaxe de perfil")}</h3>
-                  <p className="hint">{pick(language, "Opcional, pero ayuda a reconocer a cada miembro.", "Optional, but helps identify each member.", "Opcional, pero axuda a recoñecer cada membro.")}</p>
-                  <input
-                    type="file"
-                    accept="image/*"
-                    onChange={async (event) => {
-                      const file = event.target.files?.[0];
-                      if (!file) return;
-                      const encoded = await fileToDataUrl(file);
-                      setAvatarDataUrl(encoded);
-                    }}
-                  />
-                </aside>
-              </div>
-
               <label className="form-field">
-                {pick(language, "Idioma del perfil", "Profile language", "Idioma do perfil")}
+                {pick(language, "Alias", "Alias")}
+                <div className="alias-row">
+                  <input value={alias} onChange={(event) => setAlias(event.target.value)} />
+                  <button type="button" className="btn dice-btn" onClick={() => setAlias(generateAlias())}><Icon name="dice" size={14} /></button>
+                </div>
+              </label>
+              <label className="form-field">{pick(language, "Contraseña", "Password")}<input type="password" value={password} onChange={(event) => setPassword(event.target.value)} /></label>
+              <label className="form-field">{pick(language, "Repite contraseña", "Repeat password")}<input type="password" value={passwordConfirm} onChange={(event) => setPasswordConfirm(event.target.value)} /></label>
+              <label className="form-field">{pick(language, "Idioma", "Language")}
                 <select value={profileLanguage} onChange={(event) => setProfileLanguage(event.target.value as AppLanguage)}>
                   <option value="es">Español</option>
                   <option value="en">English</option>
                   <option value="gl">Galego</option>
                 </select>
               </label>
+              <label className="form-field">{pick(language, "Foto de perfil", "Profile photo")}<input type="file" accept="image/*" onChange={async (event) => {
+                const file = event.target.files?.[0];
+                if (!file) return;
+                const encoded = await fileToDataUrl(file);
+                setAvatarDataUrl(encoded);
+              }} /></label>
               <label className="consent-row">
-                <input
-                  type="checkbox"
-                  checked={privacyAccepted}
-                  onChange={(event) => setPrivacyAccepted(event.target.checked)}
-                />
-                <span>
-                  {pick(
-                    language,
-                    remoteModeEnabled
-                      ? "Acepto la política de privacidad (datos compartidos con tu comunidad en este backend de pruebas)."
-                      : "Acepto la política de privacidad local (datos guardados solo en este dispositivo).",
-                    remoteModeEnabled
-                      ? "I accept the privacy policy (data is shared with your community in this testing backend)."
-                      : "I accept the local privacy policy (data is stored only on this device).",
-                    remoteModeEnabled
-                      ? "Acepto a política de privacidade (datos compartidos coa túa comunidade neste backend de probas)."
-                      : "Acepto a política de privacidade local (datos gardados só neste dispositivo)."
-                  )}
-                </span>
+                <input type="checkbox" checked={privacyAccepted} onChange={(event) => setPrivacyAccepted(event.target.checked)} />
+                <span>{pick(language, "Acepto la política de privacidad.", "I accept the privacy policy.")}</span>
               </label>
-
               {error ? <p className="error">{error}</p> : null}
-
-              <button type="submit" className="btn btn-primary">
-                <Icon name="spark" /> {pick(language, "Crear cuenta", "Create account", "Crear conta")}
-              </button>
+              <button type="submit" className="btn btn-primary"><Icon name="spark" /> {pick(language, "Crear cuenta", "Create account")}</button>
             </form>
           </section>
-
           <section className="auth-card auth-card-community">
-            <h2><Icon name="users" /> {pick(language, "Personas que ya están dentro", "People already inside", "Persoas que xa están dentro")}</h2>
-            {sortedUsers.length === 0 ? <p>{pick(language, "Aún no hay usuarios registrados.", "There are no registered users yet.", "Aínda non hai usuarios rexistrados.")}</p> : null}
+            <h2><Icon name="users" /> {pick(language, "Miembros de esta comunidad", "Community members")}</h2>
+            {sortedUsers.length === 0 ? <p>{pick(language, "Aún no hay miembros registrados.", "No members registered yet.")}</p> : null}
             <ul className="user-list">
               {sortedUsers.map((user) => (
                 <li key={user.id}>
-                  <button
-                    type="button"
-                    className="user-option"
-                    onClick={() => {
-                      setAlias(user.alias);
-                      setError(null);
-                    }}
-                  >
+                  <button type="button" className="user-option" onClick={() => setAlias(user.alias)}>
                     <Avatar user={user} size={34} />
                     <span>{user.alias}</span>
-                    {user.role === "admin" ? <span className="badge">{pick(language, "Admin", "Admin", "Admin")}</span> : null}
+                    {user.role === "admin" ? <span className="badge">{pick(language, "Admin", "Admin")}</span> : null}
                   </button>
                 </li>
               ))}
             </ul>
           </section>
         </>
-      ) : null}
-
-      {showWelcome ? (
-        <section className="modal-overlay" role="dialog" aria-modal="true" aria-label={pick(language, "Bienvenida a Wee", "Welcome to Wee")}>
-          <article className="modal-card modal-card-compact welcome-modal">
-            <h2>{pick(language, "Bienvenida a Wee", "Welcome to Wee")}</h2>
-            <p>
-              {pick(
-                language,
-                "Aquí montáis una microcomunidad con contenido ordenado y contexto compartido.",
-                "Here you build a microcommunity with organized content and shared context."
-              )}
-            </p>
-            <p>
-              {pick(
-                language,
-                "Publicar es simple: pegas un enlace, Wee lo clasifica y el grupo decide su valor.",
-                "Publishing is simple: paste a link, Wee classifies it, and the group decides its value."
-              )}
-            </p>
-            <div className="welcome-modal-actions">
-              <button type="button" className="btn btn-primary" onClick={() => navigate("/home")}>
-                <Icon name="spark" /> {pick(language, "Entrar a Wee", "Enter Wee")}
-              </button>
-            </div>
-          </article>
-        </section>
       ) : null}
     </main>
   );

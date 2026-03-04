@@ -4,6 +4,8 @@ Wee es una app de curación de noticias para microcomunidades: compartir enlaces
 
 ## Qué hace hoy
 
+- Comunidades aisladas (multi-tenant) con auth propia por comunidad (sin Supabase Auth).
+- Flujo de entrada: crear/unirse, preview+confirmación y luego login/registro dentro de la comunidad.
 - Publicación rápida de enlaces desde navbar (modal).
 - Clasificación heurística por tema y subtema (sin IA).
 - Detección y fusión de duplicados por URL canónica.
@@ -136,6 +138,12 @@ Para mejorar el scraping en producción, Wee usa una Edge Function de Supabase (
   - [supabase/sql/topic_v3.sql](supabase/sql/topic_v3.sql)
 
 ## Supabase (backend de pruebas reales)
+
+### Modo comunidades v5 (recomendado ahora)
+
+- SQL: `supabase/sql/community_v5.sql`
+- Edge function: `supabase/functions/community-api`
+- Guía paso a paso: [docs/COMMUNITY_V5.md](docs/COMMUNITY_V5.md)
 
 Variables de entorno esperadas:
 

@@ -60,6 +60,8 @@ export const CommentsPanel = ({
   const { language } = useI18n();
   const [draft, setDraft] = useState("");
   const [busy, setBusy] = useState(false);
+  const [settingsOpen, setSettingsOpen] = useState(false);
+  const [deleteMode, setDeleteMode] = useState(false);
   const comments = post.comments ?? [];
 
   const sortedComments = useMemo(
@@ -86,8 +88,33 @@ export const CommentsPanel = ({
     <section className={compact ? "comments-panel comments-panel-compact" : "comments-panel"}>
       <div className="comments-head">
         <h4>{pick(language, "Comentarios", "Comments")}</h4>
-        <span className="badge">{comments.length}</span>
+        <div className="comments-head-actions">
+          <span className="badge">{comments.length}</span>
+          {canModerateComments && onDeleteComment ? (
+            <button
+              type="button"
+              className="btn"
+              onClick={() => setSettingsOpen((prev) => !prev)}
+            >
+              <Icon name="settings" size={14} /> {pick(language, "Ajustes", "Settings", "Axustes")}
+            </button>
+          ) : null}
+        </div>
       </div>
+      {canModerateComments && onDeleteComment && settingsOpen ? (
+        <div className="comments-tools">
+          <button
+            type="button"
+            className={deleteMode ? "btn btn-primary comments-tools-toggle" : "btn comments-tools-toggle"}
+            onClick={() => setDeleteMode((prev) => !prev)}
+          >
+            <Icon name="trash" size={13} />{" "}
+            {deleteMode
+              ? pick(language, "Modo eliminar: activo", "Delete mode: on", "Modo eliminar: activo")
+              : pick(language, "Eliminar comentarios", "Delete comments", "Eliminar comentarios")}
+          </button>
+        </div>
+      ) : null}
 
       <form className="comments-form" onSubmit={submit}>
         <div className="comment-input-wrap">
@@ -124,6 +151,26 @@ export const CommentsPanel = ({
             const auraActive = !!activeUserId && (comment.auraUserIds ?? []).includes(activeUserId);
             return (
               <article key={comment.id} className="comment-item">
+                {canModerateComments && onDeleteComment && deleteMode ? (
+                  <button
+                    type="button"
+                    className="comment-delete-corner"
+                    onClick={async () => {
+                      const result = await onDeleteComment(post.id, comment.id);
+                      onToast(result.message);
+                      if (result.ok && onPostUpdate) {
+                        onPostUpdate({
+                          ...post,
+                          comments: comments.filter((entry) => entry.id !== comment.id)
+                        });
+                      }
+                    }}
+                    title={pick(language, "Eliminar comentario", "Delete comment", "Eliminar comentario")}
+                    aria-label={pick(language, "Eliminar comentario", "Delete comment", "Eliminar comentario")}
+                  >
+                    <Icon name="trash" size={12} />
+                  </button>
+                ) : null}
                 <header>
                   {author ? <Avatar user={author} size={22} /> : null}
                   {author ? <Link to={`/profile/${author.id}/posts`} className="comment-author-link">{author.alias}</Link> : <strong>{pick(language, "usuario", "user")}</strong>}
@@ -142,18 +189,6 @@ export const CommentsPanel = ({
                 >
                   Aura {auraCount}
                 </button>
-                {canModerateComments && onDeleteComment ? (
-                  <button
-                    type="button"
-                    className="btn aura-btn"
-                    onClick={async () => {
-                      const result = await onDeleteComment(post.id, comment.id);
-                      onToast(result.message);
-                    }}
-                  >
-                    {pick(language, "Eliminar", "Delete")}
-                  </button>
-                ) : null}
               </article>
             );
           })

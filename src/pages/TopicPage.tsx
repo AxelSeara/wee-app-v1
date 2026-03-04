@@ -5,7 +5,7 @@ import { EmojiMenu } from "../components/EmojiMenu";
 import { Icon } from "../components/Icon";
 import { PostCard } from "../components/PostCard";
 import { pick, useI18n } from "../lib/i18n";
-import { displayTitle, extractNewsDate, formatNewsDate } from "../lib/presentation";
+import { displayTitle, extractNewsDate, formatNewsDate, formatTopicLabel } from "../lib/presentation";
 import { rankTopicPosts, topicAverageAura, topicForumScore } from "../lib/topicForum";
 import { TopBar } from "../components/TopBar";
 import type { Post, User } from "../lib/types";
@@ -50,12 +50,14 @@ export const TopicPage = ({
   const [selectedPostId, setSelectedPostId] = useState<string | null>(null);
   const [chatDraft, setChatDraft] = useState("");
   const [chatBusy, setChatBusy] = useState(false);
+  const [commentDeleteMode, setCommentDeleteMode] = useState(false);
   const [shareUrl, setShareUrl] = useState("");
   const [sharing, setSharing] = useState(false);
   const [topicSettingsOpen, setTopicSettingsOpen] = useState(false);
   const isAdmin = activeUser.role === "admin";
   useEffect(() => {
     setRenameTopic(topic);
+    setCommentDeleteMode(false);
   }, [topic]);
   const usersById = useMemo(() => new Map(users.map((user) => [user.id, user])), [users]);
 
@@ -136,7 +138,7 @@ export const TopicPage = ({
       <TopBar user={activeUser} onOpenShare={onOpenShareModal} onLogout={onLogout} />
       <section className="page-section">
         <div className="section-head">
-          <h2><Icon name="tag" /> {pick(language, "Hilo", "Thread")}: {topic}</h2>
+          <h2><Icon name="tag" /> {pick(language, "Hilo", "Thread")}: {formatTopicLabel(topic)}</h2>
           <div className="topic-head-meta">
             <div className="topic-head-kpis">
               <span className="badge">{topicPosts.length} {pick(language, "noticias", "posts", "novas")}</span>
@@ -200,6 +202,16 @@ export const TopicPage = ({
                   }}
                 >
                   {pick(language, "Renombrar tema", "Rename topic")}
+                </button>
+                <button
+                  type="button"
+                  className={commentDeleteMode ? "btn btn-primary" : "btn"}
+                  onClick={() => setCommentDeleteMode((prev) => !prev)}
+                >
+                  <Icon name="trash" />{" "}
+                  {commentDeleteMode
+                    ? pick(language, "Modo eliminar activo", "Delete mode on", "Modo eliminar activo")
+                    : pick(language, "Eliminar comentarios", "Delete comments", "Eliminar comentarios")}
                 </button>
               </>
             ) : (
@@ -298,6 +310,20 @@ export const TopicPage = ({
                         key={comment.id}
                         className={postId === selectedPostId ? "topic-chat-item topic-chat-item-active" : "topic-chat-item"}
                       >
+                        {isAdmin && commentDeleteMode ? (
+                          <button
+                            type="button"
+                            className="comment-delete-corner"
+                            onClick={async () => {
+                              const result = await onAdminDeleteComment(postId, comment.id);
+                              onToast(result.message);
+                            }}
+                            title={pick(language, "Eliminar comentario", "Delete comment", "Eliminar comentario")}
+                            aria-label={pick(language, "Eliminar comentario", "Delete comment", "Eliminar comentario")}
+                          >
+                            <Icon name="trash" size={12} />
+                          </button>
+                        ) : null}
                         <header>
                           {author ? <Avatar user={author} size={20} /> : null}
                           <strong>{author?.alias ?? pick(language, "usuario", "user")}</strong>
@@ -316,20 +342,14 @@ export const TopicPage = ({
                           >
                             Aura {auraCount}
                           </button>
-                          {isAdmin ? (
-                            <button
-                              type="button"
-                              className="btn aura-btn"
-                              onClick={async () => {
-                                const result = await onAdminDeleteComment(postId, comment.id);
-                                onToast(result.message);
-                              }}
-                            >
-                              {pick(language, "Eliminar", "Delete", "Eliminar")}
-                            </button>
-                          ) : null}
-                          <button type="button" className="link-btn" onClick={() => navigate(`/post/${postId}`)}>
-                            {pick(language, "Ver noticia", "Open post", "Ver nova")}
+                          <button
+                            type="button"
+                            className="btn aura-btn topic-chat-open-btn"
+                            onClick={() => navigate(`/post/${postId}`)}
+                            title={pick(language, "Ver noticia", "Open post", "Ver nova")}
+                            aria-label={pick(language, "Ver noticia", "Open post", "Ver nova")}
+                          >
+                            <Icon name="eye" size={13} />
                           </button>
                           <span
                             className="topic-chat-context"

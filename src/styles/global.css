@@ -1657,7 +1657,8 @@ textarea::placeholder {
   display: inline-flex;
   align-items: center;
   gap: 0.28rem;
-  z-index: 6;
+  z-index: 40;
+  overflow: visible;
 }
 
 .aura-badge-btn {
@@ -1734,7 +1735,7 @@ textarea::placeholder {
   visibility: hidden;
   transform: translateY(-3px);
   transition: opacity var(--motion-fast) var(--ease-standard), transform var(--motion-fast) var(--ease-standard), visibility var(--motion-fast) var(--ease-standard);
-  z-index: 20;
+  z-index: 1200;
 }
 
 .interest-tooltip strong {
@@ -2184,6 +2185,20 @@ textarea::placeholder {
   font-size: 0.9rem;
 }
 
+.comments-head-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+
+.comments-tools {
+  margin: 0 0 0.55rem;
+}
+
+.comments-tools-toggle {
+  min-height: 32px;
+}
+
 .comments-form {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
@@ -2218,6 +2233,7 @@ textarea::placeholder {
   border-radius: 8px;
   background: rgb(14 27 48 / 74%);
   padding: 0.45rem 0.5rem;
+  position: relative;
 }
 
 .comment-item header {
@@ -2249,6 +2265,27 @@ textarea::placeholder {
 .aura-btn {
   padding: 0.25rem 0.5rem;
   font-size: 0.78rem;
+}
+
+.comment-delete-corner {
+  position: absolute;
+  right: 0.42rem;
+  top: 0.4rem;
+  width: 24px;
+  height: 24px;
+  border-radius: 999px;
+  border: 1px solid #7f4b61;
+  background: linear-gradient(180deg, #4a2a38, #3a2230);
+  color: #ffd2dd;
+  display: inline-grid;
+  place-items: center;
+  cursor: pointer;
+  transition: border-color var(--motion-base) var(--ease-standard), transform var(--motion-fast) var(--ease-standard);
+}
+
+.comment-delete-corner:hover {
+  border-color: #c77b87;
+  transform: scale(1.05);
 }
 
 .modal-overlay {
@@ -2378,6 +2415,8 @@ textarea::placeholder {
 .detail-side {
   display: grid;
   gap: 0.7rem;
+  position: relative;
+  overflow: visible;
 }
 
 .detail-side-card {
@@ -2385,6 +2424,7 @@ textarea::placeholder {
   border-radius: 10px;
   background: rgb(13 26 46 / 70%);
   padding: 0.72rem;
+  overflow: visible;
 }
 
 .detail-side-topic {
@@ -2409,9 +2449,13 @@ textarea::placeholder {
 .detail-related-list {
   display: grid;
   gap: 0.45rem;
+  position: relative;
+  overflow: visible;
+  isolation: isolate;
 }
 
 .detail-related-item {
+  position: relative;
   text-align: left;
   border: 1px solid #36527f;
   border-radius: 9px;
@@ -2419,12 +2463,29 @@ textarea::placeholder {
   color: #d6e5ff;
   padding: 0.48rem 0.55rem;
   cursor: pointer;
+  overflow: visible;
+}
+
+.detail-related-item:hover,
+.detail-related-item:focus-visible,
+.detail-related-item:focus-within {
+  z-index: 1300;
 }
 
 .detail-related-item strong {
   display: block;
   margin-top: 0.16rem;
   font-size: 0.86rem;
+}
+
+.detail-related-meta {
+  display: inline-flex;
+  align-items: center;
+  margin-top: 0.26rem;
+}
+
+.detail-related-item .interest-wrap {
+  z-index: 1301;
 }
 
 .detail-hero-image {
@@ -2598,6 +2659,25 @@ textarea::placeholder {
   35%,
   100% {
     transform: translateX(140%);
+  }
+}
+
+.thumb-up-pulse {
+  animation: thumb-up-pulse 0.62s var(--ease-standard);
+}
+
+@keyframes thumb-up-pulse {
+  0% {
+    transform: scale(1);
+    box-shadow: 0 0 0 0 rgb(132 231 183 / 0%);
+  }
+  38% {
+    transform: scale(1.09);
+    box-shadow: 0 0 0 5px rgb(132 231 183 / 25%);
+  }
+  100% {
+    transform: scale(1);
+    box-shadow: 0 0 0 0 rgb(132 231 183 / 0%);
   }
 }
 
@@ -2824,6 +2904,15 @@ textarea::placeholder {
   align-items: center;
   gap: 0.4rem;
   flex-wrap: wrap;
+}
+
+.topic-chat-open-btn {
+  min-width: 30px;
+  width: 30px;
+  height: 30px;
+  padding: 0;
+  display: inline-grid;
+  place-items: center;
 }
 
 .topic-chat-context {

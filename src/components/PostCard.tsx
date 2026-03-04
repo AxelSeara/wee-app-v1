@@ -4,7 +4,7 @@ import { Link } from "react-router-dom";
 import { useNavigate } from "react-router-dom";
 import { pick, translateRationale, useI18n } from "../lib/i18n";
 import { EASE_STANDARD, MOTION_DURATION, VIEWPORT_ONCE } from "../lib/motion";
-import { displayTitle, formatAuraScore, previewImage } from "../lib/presentation";
+import { displayTitle, formatAuraScore, formatTopicLabel, previewImage } from "../lib/presentation";
 import { topicColorVars } from "../lib/topicColors";
 import type { Post, User } from "../lib/types";
 import { Icon } from "./Icon";
@@ -70,7 +70,7 @@ export const PostCard = ({ post, canDelete = false, onDelete, onOpenDetail, comp
                   navigate(`/topic/${topic}`);
                 }}
               >
-                {topic}
+                {formatTopicLabel(topic)}
               </button>
             ))}
           </div>
@@ -90,7 +90,7 @@ export const PostCard = ({ post, canDelete = false, onDelete, onOpenDetail, comp
                 navigate(`/topic/${topic}`);
               }}
             >
-              {topic}
+              {formatTopicLabel(topic)}
             </button>
           ))}
         </div>

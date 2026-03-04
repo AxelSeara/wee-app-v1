@@ -352,7 +352,11 @@ const AppRoutes = () => {
     if (!post) return;
     const openedBy = new Set(post.openedByUserIds ?? []);
     openedBy.add(activeUser.id);
-    await savePost({ ...post, openedByUserIds: Array.from(openedBy) });
+    try {
+      await savePost({ ...post, openedByUserIds: Array.from(openedBy) });
+    } catch {
+      // Keep UX unblocked: session mark is enough for local gating in this tab.
+    }
     trackOpenSource({ sourceDomain: post.sourceDomain, primaryTopic: post.topics?.[0] });
   };
 

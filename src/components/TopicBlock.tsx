@@ -4,7 +4,7 @@ import { useNavigate } from "react-router-dom";
 import { Icon } from "./Icon";
 import { pick, useI18n } from "../lib/i18n";
 import { EASE_STANDARD, MOTION_DURATION, VIEWPORT_ONCE } from "../lib/motion";
-import { displayTitle, extractNewsDate, formatNewsDate, topicIntro } from "../lib/presentation";
+import { displayTitle, extractNewsDate, formatNewsDate, formatTopicLabel, topicIntro } from "../lib/presentation";
 import { topicColorVars } from "../lib/topicColors";
 import { rankTopicPosts, topicAverageAura } from "../lib/topicForum";
 import type { Post } from "../lib/types";
@@ -49,7 +49,7 @@ export const TopicBlock = ({ topic, posts }: TopicBlockProps) => {
       }}
     >
       <div className="topic-head">
-        <h4 className="topic-title">{topic}</h4>
+        <h4 className="topic-title">{formatTopicLabel(topic)}</h4>
         <div className="topic-head-badges">
           <span className="topic-hot-tag"><Icon name="chili" size={13} /> {pick(language, "En movimiento", "Active now")}: {hotCount}</span>
           <span className="badge"><Icon name="spark" size={12} /> {pick(language, "Aura media", "Avg Aura", "Aura media")} {avgAura}</span>

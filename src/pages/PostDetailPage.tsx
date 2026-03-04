@@ -7,6 +7,7 @@ import { pick, translateRationale, useI18n } from "../lib/i18n";
 import {
   displayTitle,
   extractNewsDate,
+  formatTopicLabel,
   formatAuraScore,
   formatNewsDate,
   previewImage,
@@ -69,6 +70,7 @@ export const PostDetailPage = ({
   const [ratingBusy, setRatingBusy] = useState(false);
   const [showSourceVoteHint, setShowSourceVoteHint] = useState(false);
   const [auraOpen, setAuraOpen] = useState(false);
+  const [thumbUpPulse, setThumbUpPulse] = useState(false);
   const [manualTopic, setManualTopic] = useState("");
   const [topicBusy, setTopicBusy] = useState(false);
   const [adminTopic, setAdminTopic] = useState("");
@@ -78,6 +80,7 @@ export const PostDetailPage = ({
     setCurrent(postFromState);
     setShowSourceVoteHint(false);
     setAuraOpen(false);
+    setThumbUpPulse(false);
     setManualTopic("");
     setAdminTopic(postFromState?.topics?.[0] ?? "");
   }, [postFromState]);
@@ -241,7 +244,7 @@ export const PostDetailPage = ({
             <span className="detail-meta-topics">
               {current.topics.map((topic) => (
                 <Link key={topic} to={`/topic/${topic}`} className="chip chip-topic" style={topicColorVars(topic)}>
-                  {topic}
+                  {formatTopicLabel(topic)}
                 </Link>
               ))}
               {(current.subtopics ?? []).map((subtopic) => (
@@ -265,12 +268,10 @@ export const PostDetailPage = ({
               <button
                 type="button"
                 className="btn btn-primary source-cta"
+                disabled={canRate}
                 onClick={async () => {
+                  if (canRate) return;
                   const openedWindow = window.open(current.url, "_blank", "noopener,noreferrer");
-                  if (!openedWindow) {
-                    onToast(pick(language, "Tu navegador bloqueó la pestaña. Activa las ventanas emergentes para esta web.", "Your browser blocked the new tab. Enable popups for this site."));
-                    return;
-                  }
                   await onOpenExternalSource(current.id);
                   setCurrent((prev) =>
                     prev
@@ -282,10 +283,14 @@ export const PostDetailPage = ({
                       : prev
                   );
                   setShowSourceVoteHint(false);
-                  onToast(pick(language, "Fuente abierta. Ya puedes valorar esta noticia.", "Source opened. You can now rate this post."));
+                  onToast(
+                    openedWindow
+                      ? pick(language, "Fuente abierta. Ya puedes valorar esta noticia.", "Source opened. You can now rate this post.")
+                      : pick(language, "Si no se abrió la pestaña, revisa el bloqueador. Ya puedes valorar esta noticia.", "If the tab did not open, check popup blocker. You can now rate this post.")
+                  );
                 }}
               >
-                <Icon name="news" /> {pick(language, "Abrir fuente", "Open source")}
+                <Icon name="news" /> {pick(language, "Fuente", "Source", "Fonte")}
               </button>
             ) : (
               <span className="hint">{pick(language, "Esta noticia no tiene URL externa.", "This post has no external URL.")}</span>
@@ -293,8 +298,8 @@ export const PostDetailPage = ({
 
             <button
               type="button"
-              className={currentUserVote === 1 ? "btn btn-primary" : "btn"}
-              disabled={ratingBusy || !current.url}
+              className={currentUserVote === 1 ? `btn btn-primary ${thumbUpPulse ? "thumb-up-pulse" : ""}` : "btn"}
+              disabled={ratingBusy || !current.url || !canRate}
               onClick={async () => {
                 setRatingBusy(true);
                 const result = await onRatePost(current.id, 1);
@@ -312,8 +317,8 @@ export const PostDetailPage = ({
                       : [...feedbacks, { userId: activeUserId, vote: 1 as const, votedAt: Date.now() }];
                     return { ...prev, feedbacks: nextFeedbacks };
                   });
-                } else if (!canRate && current.url) {
-                  setShowSourceVoteHint(true);
+                  setThumbUpPulse(true);
+                  window.setTimeout(() => setThumbUpPulse(false), 650);
                 }
                 setRatingBusy(false);
               }}
@@ -323,7 +328,7 @@ export const PostDetailPage = ({
             <button
               type="button"
               className={currentUserVote === -1 ? "btn btn-primary" : "btn"}
-              disabled={ratingBusy || !current.url}
+              disabled={ratingBusy || !current.url || !canRate}
               onClick={async () => {
                 setRatingBusy(true);
                 const result = await onRatePost(current.id, -1);
@@ -341,8 +346,6 @@ export const PostDetailPage = ({
                       : [...feedbacks, { userId: activeUserId, vote: -1 as const, votedAt: Date.now() }];
                     return { ...prev, feedbacks: nextFeedbacks };
                   });
-                } else if (!canRate && current.url) {
-                  setShowSourceVoteHint(true);
                 }
                 setRatingBusy(false);
               }}
@@ -350,7 +353,7 @@ export const PostDetailPage = ({
               <Icon name="thumbDown" />
             </button>
           </div>
-          {showSourceVoteHint && !canRate && current.url ? <p className="warning">{pick(language, "Visita la fuente para poder valorarla primero.", "Visit the source before rating it.")}</p> : null}
+          {(!canRate && current.url) || (showSourceVoteHint && !canRate && current.url) ? <p className="warning">{pick(language, "Visita la fuente para poder valorarla primero.", "Visit the source before rating it.")}</p> : null}
 
           <section className="detail-comments">
             <CommentsPanel
@@ -390,7 +393,29 @@ export const PostDetailPage = ({
                 >
                   <span className="timeline-date">{formatNewsDate(extractNewsDate(item))}</span>
                   <strong>{displayTitle(item)}</strong>
-                  <span className="hint">Aura {formatAuraScore(item.interestScore)}/100</span>
+                  <span className="detail-related-meta">
+                    <span className="interest-wrap">
+                      <span
+                        className={`badge aura-health ${
+                          item.interestScore >= 75 ? "aura-health-good" : item.interestScore >= 50 ? "aura-health-warn" : "aura-health-bad"
+                        }`}
+                      >
+                        {pick(language, "Aura", "Aura")} {formatAuraScore(item.interestScore)}
+                      </span>
+                      <span className="interest-tooltip">
+                        <strong>{pick(language, "Por qué este Aura", "Why this Aura", "Por que esta Aura")}</strong>
+                        {item.rationale.slice(0, 3).length > 0 ? (
+                          <ul>
+                            {item.rationale.slice(0, 3).map((line) => (
+                              <li key={line}>{translateRationale(language, line)}</li>
+                            ))}
+                          </ul>
+                        ) : (
+                          <p>{pick(language, "Basado en calidad, señales y contexto del hilo.", "Based on quality, signals and thread context.", "Baseado en calidade, sinais e contexto do fío.")}</p>
+                        )}
+                      </span>
+                    </span>
+                  </span>
                 </button>
               ))}
             </div>

@@ -53,6 +53,15 @@ const toSentenceCase = (value: string): string => {
   return value.charAt(0).toUpperCase() + value.slice(1);
 };
 
+export const formatTopicLabel = (value: string): string => {
+  const clean = decodeURIComponent(value).replace(/[-_]+/g, " ").trim();
+  if (!clean) return value;
+  return clean
+    .split(/\s+/)
+    .map((word) => (word ? word.charAt(0).toUpperCase() + word.slice(1) : word))
+    .join(" ");
+};
+
 const BAD_TITLE_PATTERNS: RegExp[] = [
   /\bverifying\b/i,
   /\bverify(ing)?\b.*\b(human|device|browser)\b/i,

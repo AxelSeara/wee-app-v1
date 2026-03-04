@@ -149,6 +149,7 @@ const requireSession = async (req: Request): Promise<{
 };
 
 const bad = (message: string): Response => json(400, { message });
+const gone = (message: string): Response => json(410, { message });
 
 const ensureAdmin = (role: Role): Response | null => (role === "admin" ? null : json(403, { message: "Admin required" }));
 
@@ -762,48 +763,7 @@ const handlers = {
   },
 
   "/community/create": async (req: Request) => {
-    const body = await parseBody(req);
-    const name = String(body.name ?? "").trim();
-    if (name.length < 2) return bad("Community name is required");
-
-    const description = String(body.description ?? "").trim() || null;
-    const rulesText = String(body.rules_text ?? "").trim() || null;
-    const invitePolicy: InvitePolicy = body.invite_policy === "members_allowed" ? "members_allowed" : "admins_only";
-    const code = normalizeCode(String(body.code ?? randomCode()));
-    const expiresAt = body.invite_expires_at ? new Date(String(body.invite_expires_at)).toISOString() : null;
-
-    try {
-      if (await communityNameExists(name)) {
-        return json(409, { message: "COMMUNITY_NAME_EXISTS" });
-      }
-    } catch (error) {
-      return json(500, { message: error instanceof Error ? error.message : "Could not validate community name" });
-    }
-
-    const { data: community, error: cErr } = await db
-      .from("communities")
-      .insert({ name, description, rules_text: rulesText, invite_policy: invitePolicy })
-      .select("id,name,description")
-      .single();
-    if (cErr || !community) return json(500, { message: cErr?.message ?? "Create community failed" });
-
-    const token = randomToken();
-    const { error: iErr } = await db.from("community_invites").insert({
-      community_id: community.id,
-      code,
-      token,
-      created_by: null,
-      created_at: nowIso(),
-      expires_at: expiresAt
-    });
-    if (iErr) return json(500, { message: iErr.message });
-
-    return json(200, {
-      community_id: community.id,
-      name: community.name,
-      description: community.description,
-      invite: { code, token, link: buildInviteUrl(token) }
-    });
+    return gone("LEGACY_COMMUNITY_CREATE_DISABLED");
   },
 
   "/community/create_global": async (req: Request) => {
@@ -828,7 +788,7 @@ const handlers = {
 
     const createCommunityRes = await db
       .from("communities")
-      .insert({ name, description, rules_text: rulesText, invite_policy: invitePolicy })
+      .insert({ name, name_norm: normalizeCommunityName(name), description, rules_text: rulesText, invite_policy: invitePolicy })
       .select("id,name,description")
       .single();
     if (createCommunityRes.error || !createCommunityRes.data) {
@@ -909,44 +869,7 @@ const handlers = {
   },
 
   "/community/join/confirm": async (req: Request) => {
-    const body = await parseBody(req);
-    const code = body.code ? normalizeCode(String(body.code)) : null;
-    const token = body.token ? String(body.token).trim() : null;
-    if (!code && !token) return bad("code or token required");
-
-    const query = db
-      .from("community_invites")
-      .select("community_id,created_by,expires_at,revoked_at,communities(name,description)")
-      .is("revoked_at", null)
-      .limit(1);
-
-    const { data, error } = code ? await query.eq("code", code).maybeSingle() : await query.eq("token", token).maybeSingle();
-    if (error || !data) return json(404, { message: "Invite not found" });
-    if (data.expires_at && Date.parse(data.expires_at) < Date.now()) return json(410, { message: "Invite expired" });
-
-    const community = data.communities as { name: string; description: string | null };
-    let inviter: { alias: string; avatar_url: string | null } | null = null;
-    if (data.created_by) {
-      const inviterRes = await db
-        .from("community_users")
-        .select("alias,avatar_url")
-        .eq("id", data.created_by)
-        .eq("community_id", data.community_id)
-        .maybeSingle();
-      if (!inviterRes.error && inviterRes.data) inviter = inviterRes.data as { alias: string; avatar_url: string | null };
-    }
-    return json(200, {
-      community_id: data.community_id,
-      name: community.name,
-      description: community.description ?? undefined,
-      inviter: inviter
-        ? {
-            alias: inviter.alias,
-            avatar_url: inviter.avatar_url ?? undefined
-          }
-        : undefined,
-      confirmed: true
-    });
+    return gone("LEGACY_JOIN_CONFIRM_DISABLED");
   },
 
   "/community/join/by_invite": async (req: Request) => {
@@ -989,149 +912,11 @@ const handlers = {
   },
 
   "/auth/register": async (req: Request) => {
-    const body = await parseBody(req);
-    const communityId = String(body.community_id ?? "").trim();
-    const alias = String(body.alias ?? "").trim();
-    const password = String(body.password ?? "");
-    const language = ["es", "en", "gl"].includes(String(body.language)) ? String(body.language) : "es";
-    const avatarUrl = String(body.avatar ?? body.avatar_url ?? "").trim() || null;
-
-    if (!communityId) return bad("community_id required");
-    if (alias.length < 2) return bad("alias too short");
-    if (password.length < 4) return bad("password too short");
-
-    const normalizedAlias = normalizeAlias(alias);
-    const passwordHash = await sha256Hex(password);
-
-    const existing = await db
-      .from("community_users")
-      .select("id,alias,status")
-      .eq("community_id", communityId)
-      .eq("normalized_alias", normalizedAlias)
-      .maybeSingle();
-    if (existing.error) return json(400, { message: existing.error.message });
-
-    let user: { id: string; alias: string; community_id: string } | null = null;
-    if (existing.data) {
-      if (existing.data.status === "active") {
-        return json(409, { message: "ALIAS_EXISTS" });
-      }
-      const revived = await db
-        .from("community_users")
-        .update({
-          alias,
-          password_hash: passwordHash,
-          avatar_url: avatarUrl,
-          language,
-          status: "active"
-        })
-        .eq("id", existing.data.id)
-        .eq("community_id", communityId)
-        .select("id,alias,community_id")
-        .single();
-      if (revived.error || !revived.data) return json(400, { message: revived.error?.message ?? "Register failed" });
-      user = revived.data as { id: string; alias: string; community_id: string };
-    } else {
-      const inserted = await db
-        .from("community_users")
-        .insert({
-          community_id: communityId,
-          alias,
-          normalized_alias: normalizedAlias,
-          password_hash: passwordHash,
-          avatar_url: avatarUrl,
-          language,
-          status: "active"
-        })
-        .select("id,alias,community_id")
-        .single();
-      if (inserted.error || !inserted.data) return json(400, { message: inserted.error?.message ?? "Register failed" });
-      user = inserted.data as { id: string; alias: string; community_id: string };
-    }
-
-    const { count: adminCount, error: adminCountError } = await db
-      .from("community_user_roles")
-      .select("user_id", { count: "exact", head: true })
-      .eq("community_id", communityId)
-      .eq("role", "admin");
-    if (adminCountError) return json(500, { message: adminCountError.message });
-
-    const role: Role = (adminCount ?? 0) === 0 ? "admin" : "member";
-    const { error: rErr } = await db.from("community_user_roles").upsert({ community_id: communityId, user_id: user.id, role }, { onConflict: "community_id,user_id" });
-    if (rErr) return json(500, { message: rErr.message });
-
-    const token = randomToken();
-    const tokenHash = await sha256Hex(token);
-    const expiresAt = new Date(Date.now() + 1000 * 60 * 60 * 24 * 30).toISOString();
-
-    const { error: sErr } = await db.from("sessions").insert({
-      community_id: communityId,
-      user_id: user.id,
-      session_token_hash: tokenHash,
-      created_at: nowIso(),
-      expires_at: expiresAt
-    });
-    if (sErr) return json(500, { message: sErr.message });
-
-    const { data: community } = await db
-      .from("communities")
-      .select("id,name,description,rules_text,invite_policy")
-      .eq("id", communityId)
-      .single();
-
-    return json(200, {
-      session_token: token,
-      user: { id: user.id, alias: user.alias, language },
-      community
-    }, {
-      "Set-Cookie": `wee_session=${token}; Path=/; HttpOnly; SameSite=Lax; Max-Age=${60 * 60 * 24 * 30}`
-    });
+    return gone("LEGACY_COMMUNITY_AUTH_DISABLED");
   },
 
   "/auth/login": async (req: Request) => {
-    const body = await parseBody(req);
-    const communityId = String(body.community_id ?? "").trim();
-    const alias = String(body.alias ?? "").trim();
-    const password = String(body.password ?? "");
-    if (!communityId || !alias || !password) return bad("community_id, alias, password required");
-
-    const normalizedAlias = normalizeAlias(alias);
-    const passwordHash = await sha256Hex(password);
-    const { data: user, error } = await db
-      .from("community_users")
-      .select("id,alias,language,password_hash,status")
-      .eq("community_id", communityId)
-      .eq("normalized_alias", normalizedAlias)
-      .maybeSingle();
-
-    if (error || !user) return json(401, { message: "Invalid credentials" });
-    if (user.status !== "active") return json(403, { message: "User inactive" });
-    if (user.password_hash !== passwordHash) return json(401, { message: "Invalid credentials" });
-
-    const token = randomToken();
-    const tokenHash = await sha256Hex(token);
-    const expiresAt = new Date(Date.now() + 1000 * 60 * 60 * 24 * 30).toISOString();
-    await db.from("sessions").insert({
-      community_id: communityId,
-      user_id: user.id,
-      session_token_hash: tokenHash,
-      created_at: nowIso(),
-      expires_at: expiresAt
-    });
-
-    const { data: community } = await db
-      .from("communities")
-      .select("id,name,description,rules_text,invite_policy")
-      .eq("id", communityId)
-      .single();
-
-    return json(200, {
-      session_token: token,
-      user: { id: user.id, alias: user.alias, language: user.language },
-      community
-    }, {
-      "Set-Cookie": `wee_session=${token}; Path=/; HttpOnly; SameSite=Lax; Max-Age=${60 * 60 * 24 * 30}`
-    });
+    return gone("LEGACY_COMMUNITY_AUTH_DISABLED");
   },
 
   "/auth/logout": async (req: Request) => {
@@ -1188,7 +973,10 @@ const handlers = {
     }
 
     const payload: Record<string, unknown> = {};
-    if (name !== undefined) payload.name = name;
+    if (name !== undefined) {
+      payload.name = name;
+      payload.name_norm = normalizeCommunityName(name);
+    }
     if (description !== undefined) payload.description = description || null;
     if (rulesText !== undefined) payload.rules_text = rulesText || null;
     if (Object.keys(payload).length === 0) return bad("No changes");
@@ -1229,6 +1017,19 @@ const handlers = {
 
     await db.from("sessions").update({ revoked_at: nowIso() }).eq("user_id", auth.user.id).eq("community_id", auth.community.id).is("revoked_at", null);
     await db.from("community_users").update({ status: "left" }).eq("id", auth.user.id).eq("community_id", auth.community.id);
+    const globalLink = await db
+      .from("community_users")
+      .select("global_user_id")
+      .eq("id", auth.user.id)
+      .eq("community_id", auth.community.id)
+      .maybeSingle();
+    if (globalLink.data?.global_user_id) {
+      await db
+        .from("community_members")
+        .update({ status: "left" })
+        .eq("community_id", auth.community.id)
+        .eq("user_id", globalLink.data.global_user_id);
+    }
     return json(200, { ok: true });
   },
 
@@ -1241,6 +1042,15 @@ const handlers = {
     const body = await parseBody(req);
     const target = String(body.target_user_id ?? "").trim();
     if (!target) return bad("target_user_id required");
+    const targetUser = await db
+      .from("community_users")
+      .select("id,status")
+      .eq("community_id", auth.community.id)
+      .eq("id", target)
+      .maybeSingle();
+    if (targetUser.error || !targetUser.data || targetUser.data.status !== "active") {
+      return json(404, { message: "Target user not found in this community" });
+    }
 
     await db.from("community_user_roles").upsert({ community_id: auth.community.id, user_id: target, role: "admin" }, { onConflict: "community_id,user_id" });
     return json(200, { ok: true });
@@ -1255,6 +1065,15 @@ const handlers = {
     const body = await parseBody(req);
     const target = String(body.target_user_id ?? "").trim();
     if (!target) return bad("target_user_id required");
+    const targetUser = await db
+      .from("community_users")
+      .select("id,status")
+      .eq("community_id", auth.community.id)
+      .eq("id", target)
+      .maybeSingle();
+    if (targetUser.error || !targetUser.data || targetUser.data.status !== "active") {
+      return json(404, { message: "Target user not found in this community" });
+    }
 
     if (target === auth.user.id) {
       const { count } = await db

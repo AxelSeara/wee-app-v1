@@ -21,7 +21,13 @@ export const shouldAutoEnterDefaultCommunity = (input: {
 
 export const isCommunitySessionAccessError = (message: string): boolean => {
   const value = message.toLowerCase();
-  return value.includes("membership required") || value.includes("invalid session");
+  return (
+    value.includes("membership required") ||
+    value.includes("invalid session") ||
+    value.includes("session expired") ||
+    value.includes("community not found") ||
+    value.includes("role missing")
+  );
 };
 
 export const parseCommunityJoinInput = (value: string): { code?: string; token?: string } => {

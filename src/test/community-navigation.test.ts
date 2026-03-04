@@ -27,6 +27,9 @@ describe("community navigation", () => {
   it("fallbacks to community picker after membership/session errors", () => {
     expect(isCommunitySessionAccessError("Membership required")).toBe(true);
     expect(isCommunitySessionAccessError("Invalid session")).toBe(true);
+    expect(isCommunitySessionAccessError("Session expired")).toBe(true);
+    expect(isCommunitySessionAccessError("Community not found")).toBe(true);
+    expect(isCommunitySessionAccessError("Role missing")).toBe(true);
     expect(isCommunitySessionAccessError("Other backend error")).toBe(false);
   });
 

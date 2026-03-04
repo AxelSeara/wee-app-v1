@@ -25,6 +25,14 @@ let cache: { users: User[]; posts: Post[]; preferences: UserPreferences | null }
   preferences: null
 };
 
+export const clearStoreCache = (): void => {
+  cache = {
+    users: [],
+    posts: [],
+    preferences: null
+  };
+};
+
 const ensureSession = () => {
   const session = getCommunitySession();
   if (!session) throw new Error("COMMUNITY_SESSION_REQUIRED");

@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   addPost,
+  clearStoreCache,
   deletePostById,
   deleteUserById,
   exportAllData,
@@ -38,6 +39,7 @@ import {
 } from "./communityApi";
 import {
   clearCommunitySession,
+  clearGlobalSession,
   getCommunitySession,
   getGlobalSession,
   getSelectedCommunity,
@@ -212,7 +214,9 @@ export const useAppData = () => {
   }, []);
 
   const logoutGlobal = useCallback(async () => {
-    await logoutGlobalUser();
+    await logoutGlobalUser().catch(() => undefined);
+    clearCommunitySession();
+    clearGlobalSession();
     setGlobalSessionState(null);
     setGlobalSettingsState({});
     setSelectedCommunityState(null);
@@ -248,6 +252,7 @@ export const useAppData = () => {
 
   const setCommunityAsActive = useCallback(async (communityId: string) => {
     const session = await enterCommunity({ community_id: communityId });
+    clearStoreCache();
     setSelectedCommunityState(session.community);
     setActiveUserId(session.userId);
     setActiveUserIdState(session.userId);

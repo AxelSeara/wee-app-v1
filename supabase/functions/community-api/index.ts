@@ -519,13 +519,14 @@ const handlers = {
       user = inserted.data as { id: string; alias: string; community_id: string };
     }
 
-    const { data: adminCount } = await db
+    const { count: adminCount, error: adminCountError } = await db
       .from("community_user_roles")
       .select("user_id", { count: "exact", head: true })
       .eq("community_id", communityId)
       .eq("role", "admin");
+    if (adminCountError) return json(500, { message: adminCountError.message });
 
-    const role: Role = (adminCount as any)?.count === 0 ? "admin" : "member";
+    const role: Role = (adminCount ?? 0) === 0 ? "admin" : "member";
     const { error: rErr } = await db.from("community_user_roles").upsert({ community_id: communityId, user_id: user.id, role }, { onConflict: "community_id,user_id" });
     if (rErr) return json(500, { message: rErr.message });
 
@@ -1063,7 +1064,10 @@ Deno.serve(async (req) => {
   if (req.method !== "POST") return json(405, { message: "Method not allowed" });
 
   const url = new URL(req.url);
-  const path = url.pathname.replace(/^\/functions\/v1\/community-api/, "");
+  const path = url.pathname
+    .replace(/^\/functions\/v1\/community-api/, "")
+    .replace(/^\/community-api/, "")
+    .replace(/^\/community-api\/?/, "/");
   const handler = (handlers as Record<string, (request: Request) => Promise<Response>>)[path];
   if (!handler) return json(404, { message: "Not found" });
 

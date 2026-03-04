@@ -42,6 +42,28 @@ const decodeEntities = (value: string): string =>
     .replace(/&lt;/g, "<")
     .replace(/&gt;/g, ">");
 
+const parseAttributes = (tag: string): Record<string, string> => {
+  const attrs: Record<string, string> = {};
+  const attrPattern = /([^\s=/>]+)\s*=\s*("([^"]*)"|'([^']*)'|([^\s>]+))/g;
+  let match: RegExpExecArray | null;
+  while ((match = attrPattern.exec(tag))) {
+    const key = match[1].toLowerCase();
+    const value = match[3] ?? match[4] ?? match[5] ?? "";
+    attrs[key] = decodeEntities(value.trim());
+  }
+  return attrs;
+};
+
+const collectMeta = (html: string): Array<Record<string, string>> => {
+  const list: Array<Record<string, string>> = [];
+  const pattern = /<meta\b[^>]*>/gi;
+  let match: RegExpExecArray | null;
+  while ((match = pattern.exec(html))) {
+    list.push(parseAttributes(match[0]));
+  }
+  return list;
+};
+
 const absoluteUrl = (candidate: string | undefined, baseUrl: string): string | undefined => {
   if (!candidate) return undefined;
   try {
@@ -93,20 +115,14 @@ const canonicalizeUrl = (input: string): string => {
 };
 
 const pickMeta = (html: string, keys: string[]): string | undefined => {
+  const metas = collectMeta(html);
   for (const key of keys) {
-    const propertyPattern = new RegExp(
-      `<meta[^>]+property=["']${key}["'][^>]+content=["']([^"']+)["'][^>]*>`,
-      "i"
-    );
-    const propertyMatch = html.match(propertyPattern);
-    if (propertyMatch?.[1]) return decodeEntities(propertyMatch[1]);
-
-    const namePattern = new RegExp(
-      `<meta[^>]+name=["']${key}["'][^>]+content=["']([^"']+)["'][^>]*>`,
-      "i"
-    );
-    const nameMatch = html.match(namePattern);
-    if (nameMatch?.[1]) return decodeEntities(nameMatch[1]);
+    const normalized = key.toLowerCase();
+    const found = metas.find((meta) => {
+      const target = (meta.property ?? meta.name ?? meta["http-equiv"] ?? "").toLowerCase();
+      return target === normalized && typeof meta.content === "string" && meta.content.trim().length > 0;
+    });
+    if (found?.content) return found.content;
   }
   return undefined;
 };
@@ -117,6 +133,41 @@ const pickTitle = (html: string): string | undefined => {
   const match = html.match(/<title[^>]*>([^<]+)<\/title>/i);
   if (!match?.[1]) return undefined;
   return decodeEntities(match[1]);
+};
+
+const pickLinkHref = (html: string, relValues: string[]): string | undefined => {
+  const pattern = /<link\b[^>]*>/gi;
+  let match: RegExpExecArray | null;
+  while ((match = pattern.exec(html))) {
+    const attrs = parseAttributes(match[0]);
+    const rel = (attrs.rel ?? "").toLowerCase();
+    if (!rel || !relValues.includes(rel)) continue;
+    const href = attrs.href?.trim();
+    if (href) return href;
+  }
+  return undefined;
+};
+
+const pickJsonLdImage = (html: string): string | undefined => {
+  const scriptPattern = /<script[^>]+type=["']application\/ld\+json["'][^>]*>([\s\S]*?)<\/script>/gi;
+  let match: RegExpExecArray | null;
+  while ((match = scriptPattern.exec(html))) {
+    const raw = match[1]?.trim();
+    if (!raw) continue;
+    try {
+      const parsed = JSON.parse(raw);
+      const candidates = Array.isArray(parsed) ? parsed : [parsed];
+      for (const candidate of candidates) {
+        const image = candidate?.image;
+        if (typeof image === "string" && image.trim()) return image.trim();
+        if (Array.isArray(image) && typeof image[0] === "string") return image[0];
+        if (image && typeof image.url === "string") return image.url;
+      }
+    } catch {
+      // ignore malformed JSON-LD
+    }
+  }
+  return undefined;
 };
 
 const toResponseFromCache = (row: CacheRow): UnfurlResponse => ({
@@ -202,7 +253,10 @@ Deno.serve(async (req) => {
     const description = clean(pickMeta(html, ["og:description", "twitter:description", "description"]), 320);
     const siteName = clean(pickMeta(html, ["og:site_name", "application-name"]), 80);
 
-    const imageCandidate = pickMeta(html, ["og:image", "og:image:secure_url", "twitter:image", "thumbnail"]);
+    const imageCandidate =
+      pickMeta(html, ["og:image:secure_url", "og:image", "twitter:image", "thumbnail"]) ??
+      pickLinkHref(html, ["image_src"]) ??
+      pickJsonLdImage(html);
     const imageUrl = clean(absoluteUrl(imageCandidate, finalUrl), 1000);
 
     const now = new Date();

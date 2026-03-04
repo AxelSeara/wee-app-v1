@@ -162,15 +162,7 @@ export const enrichUrl = async (url: string): Promise<UrlMetadata> => {
   if (!url) return {};
 
   const fromEdge = await edgeUnfurl(url);
-  if (fromEdge && (fromEdge.title || fromEdge.description || fromEdge.imageUrl)) {
-    const safeTitle = fromEdge.title && !isUnusableTitle(fromEdge.title) ? fromEdge.title : undefined;
-    return {
-      ...fromEdge,
-      title: safeTitle,
-      siteName: fromEdge.siteName ?? hostnameFromUrl(url),
-      imageUrl: fromEdge.imageUrl ?? screenshotFallback(url)
-    };
-  }
+  const edgeTitle = fromEdge?.title && !isUnusableTitle(fromEdge.title) ? fromEdge.title : undefined;
 
   const fromYoutube = isYoutubeUrl(url) ? await youtubeOEmbed(url) : null;
   if (fromYoutube) return fromYoutube;
@@ -181,19 +173,20 @@ export const enrichUrl = async (url: string): Promise<UrlMetadata> => {
     if (result && (result.title || result.description || result.imageUrl)) {
       const safeTitle = result.title && !isUnusableTitle(result.title) ? result.title : undefined;
       return {
-        ...result,
-        title: safeTitle,
-        siteName: result.siteName ?? hostnameFromUrl(url),
-        imageUrl: result.imageUrl ?? screenshotFallback(url)
+        title: edgeTitle ?? safeTitle,
+        description: fromEdge?.description ?? result.description,
+        imageUrl: fromEdge?.imageUrl ?? result.imageUrl ?? screenshotFallback(url),
+        siteName: fromEdge?.siteName ?? result.siteName ?? hostnameFromUrl(url)
       };
     }
   }
 
-  const fallbackTitle = hostnameFromUrl(url);
+  const fallbackTitle = edgeTitle ?? hostnameFromUrl(url);
   return {
-    title: fallbackTitle,
-    siteName: fallbackTitle,
-    imageUrl: screenshotFallback(url)
+    title: fallbackTitle ?? undefined,
+    description: fromEdge?.description,
+    siteName: fromEdge?.siteName ?? fallbackTitle,
+    imageUrl: fromEdge?.imageUrl ?? screenshotFallback(url)
   };
 };
 

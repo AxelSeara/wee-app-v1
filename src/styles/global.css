@@ -100,6 +100,27 @@ h4 {
   font-size: 0.84rem;
 }
 
+.loading-dots {
+  display: inline-grid;
+  inline-size: 1.1em;
+  justify-content: start;
+  margin-left: 0.08rem;
+}
+
+.loading-dots::after {
+  content: "...";
+  inline-size: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  animation: loading-dots 1s steps(4, end) infinite;
+}
+
+@keyframes loading-dots {
+  to {
+    inline-size: 1.1em;
+  }
+}
+
 .sk {
   display: block;
   position: relative;
@@ -2282,6 +2303,22 @@ textarea::placeholder {
   align-items: center;
   gap: 0.5rem;
   flex-wrap: wrap;
+}
+
+.topic-share-row {
+  width: 100%;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 0.55rem;
+}
+
+.topic-share-row input {
+  min-width: 0;
+}
+
+.topic-share-row .btn {
+  white-space: nowrap;
 }
 
 .score-details {

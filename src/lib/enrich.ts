@@ -1,5 +1,6 @@
 import type { Post } from "./types";
 import { isUnusableTitle } from "./presentation";
+import { supabase } from "./backend/supabase";
 
 export interface UrlMetadata {
   title?: string;
@@ -130,8 +131,46 @@ const jsonLink = async (url: string): Promise<UrlMetadata | null> => {
 const screenshotFallback = (url: string): string =>
   `https://image.thum.io/get/width/1200/crop/700/noanimate/${url}`;
 
+const edgeUnfurl = async (url: string): Promise<UrlMetadata | null> => {
+  if (!supabase) return null;
+  try {
+    const { data, error } = await withTimeout(
+      supabase.functions.invoke("unfurl", {
+        body: { url }
+      }),
+      5500
+    );
+    if (error) return null;
+    const payload = (data ?? {}) as {
+      title?: string;
+      description?: string;
+      imageUrl?: string;
+      siteName?: string;
+    };
+    const title = clean(payload.title, 140);
+    const description = clean(payload.description, 320);
+    const imageUrl = clean(payload.imageUrl, 800);
+    const siteName = clean(payload.siteName, 80);
+    if (!title && !description && !imageUrl && !siteName) return null;
+    return { title, description, imageUrl, siteName };
+  } catch {
+    return null;
+  }
+};
+
 export const enrichUrl = async (url: string): Promise<UrlMetadata> => {
   if (!url) return {};
+
+  const fromEdge = await edgeUnfurl(url);
+  if (fromEdge && (fromEdge.title || fromEdge.description || fromEdge.imageUrl)) {
+    const safeTitle = fromEdge.title && !isUnusableTitle(fromEdge.title) ? fromEdge.title : undefined;
+    return {
+      ...fromEdge,
+      title: safeTitle,
+      siteName: fromEdge.siteName ?? hostnameFromUrl(url),
+      imageUrl: fromEdge.imageUrl ?? screenshotFallback(url)
+    };
+  }
 
   const fromYoutube = isYoutubeUrl(url) ? await youtubeOEmbed(url) : null;
   if (fromYoutube) return fromYoutube;

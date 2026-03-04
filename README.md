@@ -73,6 +73,13 @@ Más detalle en [docs/DEPLOY.md](docs/DEPLOY.md).
 - No se envían alias, IDs de usuario, texto de comentarios ni URLs completas.
 - Para activarlo en producción, habilita **Analytics** en tu proyecto de Vercel.
 
+## Metadata de noticias (imagen/título)
+
+Para mejorar el scraping en producción, Wee usa una Edge Function de Supabase (`unfurl`) con cache en base de datos.
+
+- Guía paso a paso: [docs/SUPABASE_UNFURL.md](docs/SUPABASE_UNFURL.md)
+- SQL cache: [docs/sql/supabase_unfurl_cache_v1.sql](docs/sql/supabase_unfurl_cache_v1.sql)
+
 ## Supabase (backend de pruebas reales)
 
 Variables de entorno esperadas:
@@ -254,6 +261,7 @@ create policy "preferences_update_own" on user_preferences for update using (aut
 - [Producto](docs/PRODUCT.md)
 - [Arquitectura](docs/ARCHITECTURE.md)
 - [Modelo de datos](docs/DATA_MODEL.md)
+- [Unfurl Supabase](docs/SUPABASE_UNFURL.md)
 - [Aura y scoring](docs/AURA_AND_SCORING.md)
 - [Flujos UX](docs/UX_FLOWS.md)
 - [Testing](docs/TESTING.md)

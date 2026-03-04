@@ -78,6 +78,7 @@ export const ShareLinkModal = ({ open, onClose, onShareUrl, getDuplicatePreview,
                   onChange={(event) => setUrl(event.target.value)}
                   placeholder="https://..."
                   required
+                  disabled={submitting}
                 />
               </label>
 
@@ -99,7 +100,15 @@ export const ShareLinkModal = ({ open, onClose, onShareUrl, getDuplicatePreview,
               ) : null}
 
               <button type="submit" className="btn btn-primary" disabled={submitting}>
-                <Icon name="link" /> {submitting ? pick(language, "Publicando...", "Posting...") : pick(language, "Publicar", "Post")}
+                <Icon name="link" />{" "}
+                {submitting ? (
+                  <>
+                    {pick(language, "Procesando noticia", "Processing post", "Procesando nova")}
+                    <span className="loading-dots" aria-hidden="true" />
+                  </>
+                ) : (
+                  pick(language, "Publicar", "Post")
+                )}
               </button>
             </form>
           </motion.section>

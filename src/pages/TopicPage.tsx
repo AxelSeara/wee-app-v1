@@ -144,16 +144,25 @@ export const TopicPage = ({
             </Link>
           </div>
         </div>
-        <form className="detail-actions" onSubmit={submitShareInTopic}>
+        <form className="detail-actions topic-share-row" onSubmit={submitShareInTopic}>
           <input
             type="url"
             value={shareUrl}
             onChange={(event) => setShareUrl(event.target.value)}
             placeholder={pick(language, "Añadir noticia a este tema (pega URL)", "Add post to this topic (paste URL)")}
             required
+            disabled={sharing}
           />
           <button type="submit" className="btn btn-primary" disabled={sharing}>
-            <Icon name="plus" /> {sharing ? pick(language, "Publicando...", "Posting...") : pick(language, "Añadir a este tema", "Add to this topic")}
+            <Icon name="plus" />{" "}
+            {sharing ? (
+              <>
+                {pick(language, "Procesando noticia", "Processing post", "Procesando nova")}
+                <span className="loading-dots" aria-hidden="true" />
+              </>
+            ) : (
+              pick(language, "Añadir a este tema", "Add to this topic")
+            )}
           </button>
         </form>
         {topicSettingsOpen ? (

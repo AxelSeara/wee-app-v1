@@ -16,19 +16,25 @@ interface SharePageProps {
 export const SharePage = ({ activeUser, onShareUrl, getDuplicatePreview, onToast, onLogout }: SharePageProps) => {
   const { language } = useI18n();
   const [url, setUrl] = useState("");
+  const [submitting, setSubmitting] = useState(false);
   const navigate = useNavigate();
   const duplicateState = getDuplicatePreview(url.trim());
 
   const submit = async (event: FormEvent) => {
     event.preventDefault();
+    if (submitting) return;
     if (!url.trim()) {
       onToast(pick(language, "Pega una URL para compartir.", "Paste a URL to share."));
       return;
     }
-
-    const result = await onShareUrl(url.trim());
-    onToast(result.message);
-    navigate("/home");
+    setSubmitting(true);
+    try {
+      const result = await onShareUrl(url.trim());
+      onToast(result.message);
+      navigate("/home");
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   return (
@@ -51,6 +57,7 @@ export const SharePage = ({ activeUser, onShareUrl, getDuplicatePreview, onToast
               value={url}
               onChange={(event) => setUrl(event.target.value)}
               required
+              disabled={submitting}
             />
           </label>
 
@@ -67,8 +74,16 @@ export const SharePage = ({ activeUser, onShareUrl, getDuplicatePreview, onToast
             </p>
           ) : null}
 
-          <button type="submit" className="btn btn-primary">
-            <Icon name="link" /> {pick(language, "Publicar en Wee", "Post on Wee")}
+          <button type="submit" className="btn btn-primary" disabled={submitting}>
+            <Icon name="link" />{" "}
+            {submitting ? (
+              <>
+                {pick(language, "Procesando noticia", "Processing post", "Procesando nova")}
+                <span className="loading-dots" aria-hidden="true" />
+              </>
+            ) : (
+              pick(language, "Publicar en Wee", "Post on Wee")
+            )}
           </button>
         </form>
       </section>

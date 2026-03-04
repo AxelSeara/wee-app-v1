@@ -9,8 +9,9 @@ import { Toast } from "./components/Toast";
 import { useAppData } from "./lib/appData";
 import { classifyPost } from "./lib/classify";
 import { I18nContext, normalizeLanguage, pick } from "./lib/i18n";
-import { deriveTitleFromUrl, isUnusableTitle, qualityLabelText } from "./lib/presentation";
+import { deriveTitleFromUrl, displayTitle, isUnusableTitle, qualityLabelText } from "./lib/presentation";
 import { enrichUrl } from "./lib/enrich";
+import { NotificationsContext, type AppNotification } from "./lib/notifications";
 import { trackComment, trackOpenSource, trackPageView, trackRate, trackShare } from "./lib/usageAnalytics";
 import { listPosts as listPostsFromStore } from "./lib/store";
 import type { ExportBundle } from "./lib/types";
@@ -57,6 +58,7 @@ const AppRoutes = () => {
 
   const [toast, setToast] = useState<string | null>(null);
   const [shareModalOpen, setShareModalOpen] = useState(false);
+  const [notificationsReadAt, setNotificationsReadAt] = useState(0);
   const language = normalizeLanguage(activeUser?.language);
 
   useEffect(() => {
@@ -67,6 +69,77 @@ const AppRoutes = () => {
     () => Array.from(new Set(posts.flatMap((post) => post.topics))).sort(),
     [posts]
   );
+  const notificationsStorageKey = activeUser ? `wee:notifications:last-read:${activeUser.id}` : "";
+  useEffect(() => {
+    if (!activeUser) {
+      setNotificationsReadAt(0);
+      return;
+    }
+    try {
+      const stored = Number(localStorage.getItem(notificationsStorageKey) ?? "0");
+      setNotificationsReadAt(Number.isFinite(stored) ? stored : 0);
+    } catch {
+      setNotificationsReadAt(0);
+    }
+  }, [activeUser, notificationsStorageKey]);
+
+  const notifications = useMemo((): AppNotification[] => {
+    if (!activeUser) return [];
+    const usersById = new Map(users.map((user) => [user.id, user]));
+    const rows: AppNotification[] = [];
+
+    posts.forEach((post) => {
+      if (post.userId !== activeUser.id) return;
+      const postTitle = displayTitle(post);
+
+      (post.feedbacks ?? []).forEach((feedback) => {
+        if (feedback.userId === activeUser.id) return;
+        const actor = usersById.get(feedback.userId);
+        rows.push({
+          id: `${post.id}:vote:${feedback.userId}:${feedback.votedAt}`,
+          type: "post_aura",
+          postId: post.id,
+          postTitle,
+          actorId: feedback.userId,
+          actorAlias: actor?.alias ?? pick(language, "Usuario", "User", "Usuario"),
+          createdAt: feedback.votedAt ?? post.createdAt,
+          vote: feedback.vote
+        });
+      });
+
+      (post.comments ?? []).forEach((comment) => {
+        if (comment.userId === activeUser.id) return;
+        const actor = usersById.get(comment.userId);
+        rows.push({
+          id: `${post.id}:comment:${comment.id}`,
+          type: "post_comment",
+          postId: post.id,
+          postTitle,
+          actorId: comment.userId,
+          actorAlias: actor?.alias ?? pick(language, "Usuario", "User", "Usuario"),
+          createdAt: comment.createdAt
+        });
+      });
+    });
+
+    return rows.sort((a, b) => b.createdAt - a.createdAt).slice(0, 60);
+  }, [activeUser, posts, users, language]);
+
+  const unreadNotifications = useMemo(
+    () => notifications.filter((notification) => notification.createdAt > notificationsReadAt).length,
+    [notifications, notificationsReadAt]
+  );
+
+  const markAllNotificationsAsRead = (): void => {
+    if (!activeUser) return;
+    const markAt = Date.now();
+    setNotificationsReadAt(markAt);
+    try {
+      localStorage.setItem(notificationsStorageKey, String(markAt));
+    } catch {
+      // ignore storage restrictions
+    }
+  };
   const duplicateLookup = useMemo(() => {
     const map = new Map<string, (typeof posts)[number]>();
     posts.forEach((post) => {
@@ -541,8 +614,17 @@ const AppRoutes = () => {
   if (loading) {
     return (
       <I18nContext.Provider value={{ language }}>
-        <AppSkeleton />
-        <p className="loading-caption">{pick(language, "Cargando tu comunidad...", "Loading your community...")}</p>
+        <NotificationsContext.Provider
+          value={{
+            notifications: [],
+            unreadCount: 0,
+            lastReadAt: 0,
+            markAllAsRead: () => {}
+          }}
+        >
+          <AppSkeleton />
+          <p className="loading-caption">{pick(language, "Cargando tu comunidad...", "Loading your community...")}</p>
+        </NotificationsContext.Provider>
       </I18nContext.Provider>
     );
   }
@@ -550,26 +632,43 @@ const AppRoutes = () => {
   if (backendError) {
     return (
       <I18nContext.Provider value={{ language }}>
-        <main className="page-section narrow">
-          <h2>{pick(language, "Error de conexión de backend", "Backend connection error")}</h2>
-          <p className="warning">
-            {backendError === "REMOTE_REQUIRED_MISSING_CONFIG"
-              ? pick(
-                  language,
-                  "Este despliegue exige backend remoto y no tiene configuración de Supabase. Revisa variables VITE_SUPABASE_* en Vercel.",
-                  "This deployment requires remote backend but Supabase is not configured. Check VITE_SUPABASE_* variables in Vercel."
-                )
-              : backendError}
-          </p>
-        </main>
+        <NotificationsContext.Provider
+          value={{
+            notifications: [],
+            unreadCount: 0,
+            lastReadAt: 0,
+            markAllAsRead: () => {}
+          }}
+        >
+          <main className="page-section narrow">
+            <h2>{pick(language, "Error de conexión de backend", "Backend connection error")}</h2>
+            <p className="warning">
+              {backendError === "REMOTE_REQUIRED_MISSING_CONFIG"
+                ? pick(
+                    language,
+                    "Este despliegue exige backend remoto y no tiene configuración de Supabase. Revisa variables VITE_SUPABASE_* en Vercel.",
+                    "This deployment requires remote backend but Supabase is not configured. Check VITE_SUPABASE_* variables in Vercel."
+                  )
+                : backendError}
+            </p>
+          </main>
+        </NotificationsContext.Provider>
       </I18nContext.Provider>
     );
   }
 
   return (
     <I18nContext.Provider value={{ language }}>
-      <AnimatePresence mode="wait" initial={false}>
-      <Routes location={location} key={location.pathname}>
+      <NotificationsContext.Provider
+        value={{
+          notifications,
+          unreadCount: unreadNotifications,
+          lastReadAt: notificationsReadAt,
+          markAllAsRead: markAllNotificationsAsRead
+        }}
+      >
+        <AnimatePresence mode="wait" initial={false}>
+        <Routes location={location} key={location.pathname}>
         <Route
           path="/login"
           element={
@@ -735,17 +834,18 @@ const AppRoutes = () => {
 
         <Route path="/" element={<Navigate to={activeUser ? "/home" : "/login"} replace />} />
         <Route path="*" element={<Navigate to={activeUser ? "/home" : "/login"} replace />} />
-      </Routes>
-      </AnimatePresence>
-      <Toast message={toast} />
-      <ShareLinkModal
-        open={shareModalOpen}
-        onClose={() => setShareModalOpen(false)}
-        onShareUrl={onShareUrl}
-        getDuplicatePreview={getDuplicatePreview}
-        onToast={showToast}
-      />
-      <AppFooter />
+        </Routes>
+        </AnimatePresence>
+        <Toast message={toast} />
+        <ShareLinkModal
+          open={shareModalOpen}
+          onClose={() => setShareModalOpen(false)}
+          onShareUrl={onShareUrl}
+          getDuplicatePreview={getDuplicatePreview}
+          onToast={showToast}
+        />
+        <AppFooter />
+      </NotificationsContext.Provider>
     </I18nContext.Provider>
   );
 };

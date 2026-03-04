@@ -6,7 +6,7 @@ import { pick, useI18n } from "../lib/i18n";
 import { EASE_STANDARD, MOTION_DURATION, VIEWPORT_ONCE } from "../lib/motion";
 import { displayTitle, extractNewsDate, formatNewsDate, topicIntro } from "../lib/presentation";
 import { topicColorVars } from "../lib/topicColors";
-import { rankTopicPosts } from "../lib/topicForum";
+import { rankTopicPosts, topicAverageAura } from "../lib/topicForum";
 import type { Post } from "../lib/types";
 
 interface TopicBlockProps {
@@ -24,6 +24,7 @@ export const TopicBlock = ({ topic, posts }: TopicBlockProps) => {
   const now = Date.now();
   const hotCount = ranked.filter((post) => now - post.createdAt < 1000 * 60 * 60 * 24).length;
   const veryRecentCount = ranked.filter((post) => now - post.createdAt < 1000 * 60 * 60 * 6).length;
+  const avgAura = topicAverageAura(ranked);
   const chiliCount = Math.min(3, veryRecentCount);
   const style = topicColorVars(topic);
   const intro = topicIntro([topic], language);
@@ -32,11 +33,11 @@ export const TopicBlock = ({ topic, posts }: TopicBlockProps) => {
     <motion.article
       className="topic-block"
       style={style}
-      initial={{ opacity: 0, y: 14 }}
+      initial={{ opacity: 0, y: 8 }}
       whileInView={{ opacity: 1, y: 0 }}
       viewport={VIEWPORT_ONCE}
       transition={{ duration: MOTION_DURATION.base, ease: EASE_STANDARD }}
-      whileHover={{ y: -3 }}
+      whileHover={{ y: -1.5 }}
       onClick={() => navigate(`/topic/${topic}`)}
       role="link"
       tabIndex={0}
@@ -49,7 +50,10 @@ export const TopicBlock = ({ topic, posts }: TopicBlockProps) => {
     >
       <div className="topic-head">
         <h4 className="topic-title">{topic}</h4>
-        <span className="topic-hot-tag"><Icon name="chili" size={13} /> {pick(language, "En movimiento", "Active now")}: {hotCount}</span>
+        <div className="topic-head-badges">
+          <span className="topic-hot-tag"><Icon name="chili" size={13} /> {pick(language, "En movimiento", "Active now")}: {hotCount}</span>
+          <span className="badge"><Icon name="spark" size={12} /> {pick(language, "Aura media", "Avg Aura", "Aura media")} {avgAura}</span>
+        </div>
       </div>
       <p className="topic-summary">{intro}</p>
       <p className="topic-meta">{pick(language, "Publicaciones en este tema", "Posts in this topic")}: {posts.length}</p>

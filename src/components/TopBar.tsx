@@ -4,6 +4,7 @@ import { pick, useI18n } from "../lib/i18n";
 import type { User } from "../lib/types";
 import { Avatar } from "./Avatar";
 import { Icon } from "./Icon";
+import { NotificationsMenu } from "./NotificationsMenu";
 
 interface TopBarProps {
   user: User;
@@ -24,8 +25,7 @@ const TopBarInner = ({ user, searchValue, onSearchChange, onOpenShare, onLogout 
 
   useEffect(() => {
     const onDocClick = (event: MouseEvent) => {
-      if (!menuRef.current) return;
-      if (!menuRef.current.contains(event.target as Node)) {
+      if (menuRef.current && !menuRef.current.contains(event.target as Node)) {
         setOpen(false);
       }
     };
@@ -75,6 +75,8 @@ const TopBarInner = ({ user, searchValue, onSearchChange, onOpenShare, onLogout 
             <Icon name="plus" size={14} /> {pick(language, "Compartir enlace", "Share link")}
           </Link>
         )}
+
+        <NotificationsMenu />
 
         <div className="topbar-user-menu" ref={menuRef}>
           <button

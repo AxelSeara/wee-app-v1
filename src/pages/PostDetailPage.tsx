@@ -67,8 +67,8 @@ export const PostDetailPage = ({
   const postFromState = useMemo(() => posts.find((post) => post.id === postId) ?? null, [posts, postId]);
   const [current, setCurrent] = useState<Post | null>(postFromState);
   const [ratingBusy, setRatingBusy] = useState(false);
-  const [justOpenedExternal, setJustOpenedExternal] = useState(false);
   const [showSourceVoteHint, setShowSourceVoteHint] = useState(false);
+  const [auraOpen, setAuraOpen] = useState(false);
   const [manualTopic, setManualTopic] = useState("");
   const [topicBusy, setTopicBusy] = useState(false);
   const [adminTopic, setAdminTopic] = useState("");
@@ -76,8 +76,8 @@ export const PostDetailPage = ({
 
   useEffect(() => {
     setCurrent(postFromState);
-    setJustOpenedExternal(false);
     setShowSourceVoteHint(false);
+    setAuraOpen(false);
     setManualTopic("");
     setAdminTopic(postFromState?.topics?.[0] ?? "");
   }, [postFromState]);
@@ -103,6 +103,7 @@ export const PostDetailPage = ({
   const auraDelta = current ? (current.feedbacks ?? []).reduce((acc, item) => acc + item.vote, 0) : 0;
   const auraTrend = auraDelta > 0 ? "up" : auraDelta < 0 ? "down" : "flat";
   const auraArrow = auraTrend === "up" ? "▲" : auraTrend === "down" ? "▼" : "•";
+  const auraWhy = current?.rationale.slice(0, 4) ?? [];
 
   if (!current) {
     return (
@@ -125,29 +126,130 @@ export const PostDetailPage = ({
         <article className="detail-main">
           <div className="section-head">
             <h2>{displayTitle(current)}</h2>
-            <button type="button" className="btn" onClick={() => navigate(-1)}>
-              <Icon name="arrowLeft" /> {pick(language, "Volver", "Back")}
-            </button>
+            <div className="detail-head-actions">
+              {current.url ? <span className="badge">{sourceLabel(current)}</span> : null}
+              <button type="button" className="btn" onClick={() => navigate(-1)}>
+                <Icon name="arrowLeft" /> {pick(language, "Volver", "Back")}
+              </button>
+              <details className="detail-settings-menu">
+                <summary className="btn">
+                  <Icon name="settings" /> {pick(language, "Ajustes", "Settings")}
+                </summary>
+                <div className="detail-settings-panel">
+                  <h3>{pick(language, "Ajustar temas", "Adjust topics")}</h3>
+                  <div className="detail-actions">
+                    <input
+                      value={manualTopic}
+                      onChange={(event) => setManualTopic(event.target.value)}
+                      placeholder={pick(language, "Ejemplo: energia", "Example: energy")}
+                    />
+                    <button
+                      type="button"
+                      className="btn"
+                      disabled={!manualTopic.trim() || topicBusy}
+                      onClick={async () => {
+                        setTopicBusy(true);
+                        const result = await onAddPostTopic(current.id, manualTopic);
+                        onToast(result.message);
+                        if (result.ok) {
+                          const nextTopic = manualTopic
+                            .trim()
+                            .toLowerCase()
+                            .replace(/\s+/g, "-")
+                            .replace(/[^a-z0-9-]/g, "")
+                            .slice(0, 36);
+                          setCurrent((prev) => {
+                            if (!prev || prev.topics.includes(nextTopic)) return prev;
+                            return { ...prev, topics: [nextTopic, ...prev.topics].slice(0, 6) };
+                          });
+                          setManualTopic("");
+                        }
+                        setTopicBusy(false);
+                      }}
+                    >
+                      <Icon name="tag" /> {pick(language, "Añadir tema", "Add topic")}
+                    </button>
+                  </div>
+
+                  {isAdmin ? (
+                    <div className="detail-settings-admin">
+                      <h3>{pick(language, "Moderación admin", "Admin moderation")}</h3>
+                      <div className="detail-actions">
+                        <input
+                          value={adminTopic}
+                          onChange={(event) => setAdminTopic(event.target.value)}
+                          placeholder={pick(language, "Nuevo tema", "New topic")}
+                        />
+                        <button
+                          type="button"
+                          className="btn"
+                          onClick={async () => {
+                            const result = await onAdminUpdatePostTopic(current.id, adminTopic);
+                            onToast(result.message);
+                          }}
+                        >
+                          {pick(language, "Cambiar tema", "Change topic")}
+                        </button>
+                        <button
+                          type="button"
+                          className="btn"
+                          onClick={async () => {
+                            const okDelete = window.confirm(pick(language, "¿Eliminar esta noticia?", "Delete this post?"));
+                            if (!okDelete) return;
+                            const result = await onAdminDeletePost(current.id);
+                            onToast(result.message);
+                            if (result.ok) navigate("/home");
+                          }}
+                        >
+                          {pick(language, "Eliminar noticia", "Delete post")}
+                        </button>
+                      </div>
+                    </div>
+                  ) : null}
+                </div>
+              </details>
+            </div>
           </div>
-          <p className="section-intro">{sourceLabel(current)} · {formatNewsDate(extractNewsDate(current))}</p>
 
           <div className="modal-meta">
             <span className={`quality quality-${current.qualityLabel}`}>{qualityLabelText(current.qualityLabel, language)}</span>
-            <span className="badge">
-              Aura {formatAuraScore(current.interestScore)}/100
-              <span className={`aura-trend aura-trend-${auraTrend}`}>{auraArrow}</span>
-            </span>
-            {author ? <Link to={`/profile/${author.id}/posts`} className="badge">{pick(language, "Publicado por", "Posted by")} {author.alias}</Link> : null}
-            {current.topics.map((topic) => (
-              <Link key={topic} to={`/topic/${topic}`} className="chip chip-topic" style={topicColorVars(topic)}>
-                {topic}
-              </Link>
-            ))}
-            {(current.subtopics ?? []).map((subtopic) => (
-              <span key={subtopic} className="chip chip-subtopic">
-                {subtopic}
+            <span className="interest-wrap">
+              <button
+                type="button"
+                className="badge aura-badge-btn aura-health"
+                onClick={() => setAuraOpen((prev) => !prev)}
+                onBlur={() => setAuraOpen(false)}
+                aria-expanded={auraOpen}
+              >
+                {formatAuraScore(current.interestScore)} <span className={`aura-trend aura-trend-${auraTrend}`}>{auraArrow}</span>
+              </button>
+              <span className={auraOpen ? "interest-tooltip open" : "interest-tooltip"}>
+                <strong>{pick(language, "Por qué esta nota", "Why this post", "Por que esta nota")}</strong>
+                {auraWhy.length > 0 ? (
+                  <ul>
+                    {auraWhy.map((line) => (
+                      <li key={line}>{translateRationale(language, line)}</li>
+                    ))}
+                  </ul>
+                ) : (
+                  <p>{pick(language, "Basado en calidad, señales y contexto del hilo.", "Based on quality, signals and thread context.", "Baseado en calidade, sinais e contexto do fío.")}</p>
+                )}
               </span>
-            ))}
+            </span>
+            <span className="badge">{formatNewsDate(extractNewsDate(current))}</span>
+            {author ? <Link to={`/profile/${author.id}/posts`} className="badge">{pick(language, "Publicado por", "Posted by")} {author.alias}</Link> : null}
+            <span className="detail-meta-topics">
+              {current.topics.map((topic) => (
+                <Link key={topic} to={`/topic/${topic}`} className="chip chip-topic" style={topicColorVars(topic)}>
+                  {topic}
+                </Link>
+              ))}
+              {(current.subtopics ?? []).map((subtopic) => (
+                <span key={subtopic} className="chip chip-subtopic">
+                  {subtopic}
+                </span>
+              ))}
+            </span>
           </div>
 
           {coverImage ? (
@@ -179,7 +281,6 @@ export const PostDetailPage = ({
                         }
                       : prev
                   );
-                  setJustOpenedExternal(true);
                   setShowSourceVoteHint(false);
                   onToast(pick(language, "Fuente abierta. Ya puedes valorar esta noticia.", "Source opened. You can now rate this post."));
                 }}
@@ -249,95 +350,21 @@ export const PostDetailPage = ({
               <Icon name="thumbDown" />
             </button>
           </div>
-          {current.url ? <p className="hint">{pick(language, "Para valorar esta noticia, visita primero la fuente.", "To rate this post, visit the source first.")}</p> : null}
           {showSourceVoteHint && !canRate && current.url ? <p className="warning">{pick(language, "Visita la fuente para poder valorarla primero.", "Visit the source before rating it.")}</p> : null}
-          {justOpenedExternal ? <p className="hint">{pick(language, "Gracias por comprobar la fuente.", "Thanks for checking the source.")}</p> : null}
 
-          <details className="score-details">
-            <summary>{pick(language, "Por qué esta nota", "Why this post", "Por que esta nota")}</summary>
-            <p className="score-details-intro">{pick(language, "Señales principales que Wee tuvo en cuenta.", "Main signals Wee considered.", "Sinais principais que Wee tivo en conta.")}</p>
-            <ul className="rationale">
-              {current.rationale.slice(0, 4).map((line) => (
-                <li key={line}>{translateRationale(language, line)}</li>
-              ))}
-            </ul>
-          </details>
-
-          <section className="score-details">
-            <h3>{pick(language, "Ajustar temas", "Adjust topics")}</h3>
-            <p className="score-details-intro">
-              {pick(language, "¿Falta un tema? Añádelo para mejorar este hilo.", "Missing a topic? Add it to improve this thread.")}
-            </p>
-            <div className="detail-actions">
-              <input
-                value={manualTopic}
-                onChange={(event) => setManualTopic(event.target.value)}
-                placeholder={pick(language, "Ejemplo: energia", "Example: energy")}
-              />
-              <button
-                type="button"
-                className="btn"
-                disabled={!manualTopic.trim() || topicBusy}
-                onClick={async () => {
-                  setTopicBusy(true);
-                  const result = await onAddPostTopic(current.id, manualTopic);
-                  onToast(result.message);
-                  if (result.ok) {
-                    const nextTopic = manualTopic
-                      .trim()
-                      .toLowerCase()
-                      .replace(/\s+/g, "-")
-                      .replace(/[^a-z0-9-]/g, "")
-                      .slice(0, 36);
-                    setCurrent((prev) => {
-                      if (!prev || prev.topics.includes(nextTopic)) return prev;
-                      return { ...prev, topics: [nextTopic, ...prev.topics].slice(0, 6) };
-                    });
-                    setManualTopic("");
-                  }
-                  setTopicBusy(false);
-                }}
-              >
-                <Icon name="tag" /> {pick(language, "Añadir tema", "Add topic")}
-              </button>
-            </div>
+          <section className="detail-comments">
+            <CommentsPanel
+              post={current}
+              usersById={usersById}
+              activeUserId={activeUserId}
+              onAddComment={onAddComment}
+              onVoteCommentAura={onVoteCommentAura}
+              onDeleteComment={onAdminDeleteComment}
+              canModerateComments={isAdmin}
+              onPostUpdate={setCurrent}
+              onToast={onToast}
+            />
           </section>
-
-          {isAdmin ? (
-            <section className="score-details">
-              <h3>{pick(language, "Moderación admin", "Admin moderation")}</h3>
-              <div className="detail-actions">
-                <input
-                  value={adminTopic}
-                  onChange={(event) => setAdminTopic(event.target.value)}
-                  placeholder={pick(language, "Nuevo tema", "New topic")}
-                />
-                <button
-                  type="button"
-                  className="btn"
-                  onClick={async () => {
-                    const result = await onAdminUpdatePostTopic(current.id, adminTopic);
-                    onToast(result.message);
-                  }}
-                >
-                  {pick(language, "Cambiar tema", "Change topic")}
-                </button>
-                <button
-                  type="button"
-                  className="btn"
-                  onClick={async () => {
-                    const okDelete = window.confirm(pick(language, "¿Eliminar esta noticia?", "Delete this post?"));
-                    if (!okDelete) return;
-                    const result = await onAdminDeletePost(current.id);
-                    onToast(result.message);
-                    if (result.ok) navigate("/home");
-                  }}
-                >
-                  {pick(language, "Eliminar noticia", "Delete post")}
-                </button>
-              </div>
-            </section>
-          ) : null}
         </article>
 
         <aside className="detail-side">
@@ -369,20 +396,6 @@ export const PostDetailPage = ({
             </div>
           </article>
         </aside>
-      </section>
-
-      <section className="page-section">
-        <CommentsPanel
-          post={current}
-          usersById={usersById}
-          activeUserId={activeUserId}
-          onAddComment={onAddComment}
-          onVoteCommentAura={onVoteCommentAura}
-          onDeleteComment={onAdminDeleteComment}
-          canModerateComments={isAdmin}
-          onPostUpdate={setCurrent}
-          onToast={onToast}
-        />
       </section>
     </main>
   );

@@ -1,11 +1,12 @@
 import { type FormEvent, useEffect, useMemo, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { Avatar } from "../components/Avatar";
+import { EmojiMenu } from "../components/EmojiMenu";
 import { Icon } from "../components/Icon";
 import { PostCard } from "../components/PostCard";
 import { pick, useI18n } from "../lib/i18n";
 import { displayTitle, extractNewsDate, formatNewsDate } from "../lib/presentation";
-import { rankTopicPosts, topicForumScore } from "../lib/topicForum";
+import { rankTopicPosts, topicAverageAura, topicForumScore } from "../lib/topicForum";
 import { TopBar } from "../components/TopBar";
 import type { Post, User } from "../lib/types";
 
@@ -86,9 +87,12 @@ export const TopicPage = ({
           comment
         }))
       )
-      .sort((a, b) => a.comment.createdAt - b.comment.createdAt);
+      .sort((a, b) => b.comment.createdAt - a.comment.createdAt);
   }, [topicPosts]);
   const totalComments = topicChat.length;
+  const averageAura = topicAverageAura(topicPosts.map((entry) => entry.post));
+  const averageAuraClass =
+    averageAura >= 75 ? "aura-health-good" : averageAura >= 50 ? "aura-health-warn" : "aura-health-bad";
   const postOrderById = useMemo(
     () => new Map(topicPosts.map(({ post }, index) => [post.id, index + 1])),
     [topicPosts]
@@ -134,16 +138,26 @@ export const TopicPage = ({
         <div className="section-head">
           <h2><Icon name="tag" /> {pick(language, "Hilo", "Thread")}: {topic}</h2>
           <div className="topic-head-meta">
-            <span className="badge">{topicPosts.length} {pick(language, "noticias", "posts", "novas")}</span>
-            <span className="badge">{totalComments} {pick(language, "comentarios", "comments", "comentarios")}</span>
-            <button type="button" className="btn" onClick={() => setTopicSettingsOpen((prev) => !prev)}>
-              <Icon name="settings" /> {pick(language, "Ajustes", "Settings", "Axustes")}
-            </button>
-            <Link to="/home" className="link-btn">
-              <Icon name="arrowLeft" /> {pick(language, "Volver", "Back")}
-            </Link>
+            <div className="topic-head-kpis">
+              <span className="badge">{topicPosts.length} {pick(language, "noticias", "posts", "novas")}</span>
+              <span className="badge">{totalComments} {pick(language, "comentarios", "comments", "comentarios")}</span>
+              <span className={`badge aura-health ${averageAuraClass}`}>
+                <Icon name="spark" size={12} /> {pick(language, "Aura media", "Avg Aura", "Aura media")} {averageAura}
+              </span>
+            </div>
+            <div className="topic-head-actions-row">
+              <button type="button" className="btn" onClick={() => setTopicSettingsOpen((prev) => !prev)}>
+                <Icon name="settings" /> {pick(language, "Ajustes", "Settings", "Axustes")}
+              </button>
+              <Link to="/home" className="link-btn">
+                <Icon name="arrowLeft" /> {pick(language, "Volver", "Back")}
+              </Link>
+            </div>
           </div>
         </div>
+        <p className="section-intro topic-section-intro">
+          {pick(language, "Timeline del tema con su chat contextual para colaborar sin perder el hilo.", "Topic timeline with contextual chat to collaborate without losing the thread.", "Timeline do tema co seu chat contextual para colaborar sen perder o fío.")}
+        </p>
         <form className="detail-actions topic-share-row" onSubmit={submitShareInTopic}>
           <input
             type="url"
@@ -214,7 +228,10 @@ export const TopicPage = ({
                       <span className="timeline-date">{formatNewsDate(eventDate)}</span>
                     </div>
                     <div className="timeline-card timeline-comment-cue" title={pick(language, "Pasa por aquí para comentar este punto del hilo", "Hover here to comment this point in the thread", "Pasa por aquí para comentar este punto do fío")}>
-                      <p className="timeline-score"><Icon name="timeline" size={14} /> {pick(language, "Relevancia del tema", "Topic relevance")}: {Math.round(forumScore)}</p>
+                      <p className="timeline-score">
+                        <span className="timeline-score-pill"><Icon name="timeline" size={14} /> {pick(language, "Relevancia", "Relevance", "Relevancia")} {Math.round(forumScore)}</span>
+                        <span className="timeline-score-pill"><Icon name="spark" size={13} /> {pick(language, "Aura media", "Avg Aura", "Aura media")} {averageAura}</span>
+                      </p>
                       <PostCard
                         post={post}
                         author={usersById.get(post.userId)}
@@ -232,20 +249,38 @@ export const TopicPage = ({
                 <h3><Icon name="comment" size={14} /> {pick(language, "Chat del tema", "Topic chat", "Chat do tema")}</h3>
                 <span className="badge">{topicChat.length}</span>
               </div>
-              <p className="hint">
+              <p className="hint topic-chat-focus">
                 {selectedPost
-                  ? pick(language, `Comentando en: ${displayTitle(selectedPost)}`, `Commenting on: ${displayTitle(selectedPost)}`, `Comentando en: ${displayTitle(selectedPost)}`)
+                  ? (
+                    <>
+                      {pick(language, "Comentando en", "Commenting on", "Comentando en")}:
+                      {" "}
+                      <strong className="topic-chat-focus-title">{displayTitle(selectedPost)}</strong>
+                    </>
+                  )
                   : pick(language, "Selecciona una noticia para comentar.", "Select a post to comment.", "Selecciona unha nova para comentar.")}
               </p>
               <form className="topic-chat-form" onSubmit={submitTopicComment}>
-                <input
-                  value={chatDraft}
-                  onChange={(event) => setChatDraft(event.target.value)}
-                  placeholder={pick(language, "Añade contexto al hilo...", "Add context to the thread...", "Engade contexto ao fío...")}
+                <div className="topic-chat-input-wrap">
+                  <input
+                    value={chatDraft}
+                    onChange={(event) => setChatDraft(event.target.value)}
+                    placeholder={pick(language, "Añade contexto al hilo...", "Add context to the thread...", "Engade contexto ao fío...")}
+                    disabled={!selectedPost || !activeUserId || chatBusy}
+                  />
+                  <EmojiMenu
+                    disabled={!selectedPost || !activeUserId || chatBusy}
+                    onSelect={(emoji) => setChatDraft((prev) => `${prev}${prev ? " " : ""}${emoji}`)}
+                  />
+                </div>
+                <button
+                  type="submit"
+                  className="btn btn-icon-compact"
                   disabled={!selectedPost || !activeUserId || chatBusy}
-                />
-                <button type="submit" className="btn" disabled={!selectedPost || !activeUserId || chatBusy}>
-                  {pick(language, "Enviar", "Send", "Enviar")}
+                  aria-label={pick(language, "Enviar comentario", "Send comment", "Enviar comentario")}
+                  title={pick(language, "Enviar comentario", "Send comment", "Enviar comentario")}
+                >
+                  <Icon name="send" size={14} />
                 </button>
               </form>
 

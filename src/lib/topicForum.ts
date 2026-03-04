@@ -31,3 +31,9 @@ export const rankTopicPosts = (posts: Post[], topic: string): Post[] =>
     if (b.interestScore !== a.interestScore) return b.interestScore - a.interestScore;
     return a.id.localeCompare(b.id);
   });
+
+export const topicAverageAura = (posts: Post[]): number => {
+  if (posts.length === 0) return 0;
+  const sum = posts.reduce((acc, post) => acc + post.interestScore, 0);
+  return Math.round(sum / posts.length);
+};

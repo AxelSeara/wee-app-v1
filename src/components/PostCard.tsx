@@ -35,11 +35,11 @@ export const PostCard = ({ post, canDelete = false, onDelete, onOpenDetail, comp
   return (
     <motion.article
       className={`post-card ${onOpenDetail ? "post-card-clickable" : ""} ${compact ? "post-card-compact" : ""}`}
-      initial={{ opacity: 0, y: 14 }}
+      initial={{ opacity: 0, y: 8 }}
       whileInView={{ opacity: 1, y: 0 }}
       viewport={VIEWPORT_ONCE}
       transition={{ duration: MOTION_DURATION.base, ease: EASE_STANDARD }}
-      whileHover={onOpenDetail ? { y: -4, borderColor: "#5b8dcc" } : { y: -3 }}
+      whileHover={onOpenDetail ? { y: -2, borderColor: "#5b8dcc" } : { y: -1.5 }}
       onClick={onOpenDetail ? openDetail : undefined}
       role={onOpenDetail ? "button" : undefined}
       tabIndex={onOpenDetail ? 0 : -1}

@@ -18,18 +18,13 @@ export const AppSkeleton = () => (
           <span className="sk sk-line" />
           <span className="sk sk-btn" />
         </article>
-        <article className="skeleton-card">
-          <span className="sk sk-line sk-line-short" />
-          <span className="sk sk-line" />
-          <span className="sk sk-btn" />
-        </article>
       </div>
     </section>
 
     <section className="page-section">
       <span className="sk sk-title" />
       <div className="skeleton-post-grid">
-        {Array.from({ length: 6 }).map((_, index) => (
+        {Array.from({ length: 4 }).map((_, index) => (
           <article className="skeleton-post-card" key={`post-${index}`}>
             <span className="sk sk-media" />
             <span className="sk sk-line sk-line-short" />
@@ -43,7 +38,7 @@ export const AppSkeleton = () => (
     <section className="page-section">
       <span className="sk sk-title" />
       <div className="skeleton-topic-grid">
-        {Array.from({ length: 4 }).map((_, index) => (
+        {Array.from({ length: 3 }).map((_, index) => (
           <article className="skeleton-topic-card" key={`topic-${index}`}>
             <span className="sk sk-line sk-line-short" />
             <span className="sk sk-line sk-line-mid" />

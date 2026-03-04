@@ -2,6 +2,8 @@ import { type FormEvent, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { pick, useI18n } from "../lib/i18n";
 import { Avatar } from "./Avatar";
+import { EmojiMenu } from "./EmojiMenu";
+import { Icon } from "./Icon";
 import type { Post, User } from "../lib/types";
 
 interface CommentActionResult {
@@ -62,12 +64,7 @@ export const CommentsPanel = ({
 
   const sortedComments = useMemo(
     () =>
-      [...comments].sort((a, b) => {
-        const auraA = a.auraUserIds?.length ?? 0;
-        const auraB = b.auraUserIds?.length ?? 0;
-        if (auraB !== auraA) return auraB - auraA;
-        return b.createdAt - a.createdAt;
-      }),
+      [...comments].sort((a, b) => b.createdAt - a.createdAt),
     [comments]
   );
 
@@ -93,15 +90,27 @@ export const CommentsPanel = ({
       </div>
 
       <form className="comments-form" onSubmit={submit}>
-        <input
-          value={draft}
-          onChange={(event) => setDraft(event.target.value)}
-          placeholder={pick(language, "Añade contexto, corrige un dato o comparte una fuente...", "Add context, correct a detail or share a source...")}
-          maxLength={320}
+        <div className="comment-input-wrap">
+          <input
+            value={draft}
+            onChange={(event) => setDraft(event.target.value)}
+            placeholder={pick(language, "Añade contexto, corrige un dato o comparte una fuente...", "Add context, correct a detail or share a source...")}
+            maxLength={320}
+            disabled={!activeUserId || busy}
+          />
+          <EmojiMenu
+            disabled={!activeUserId || busy}
+            onSelect={(emoji) => setDraft((prev) => `${prev}${prev ? " " : ""}${emoji}`)}
+          />
+        </div>
+        <button
+          type="submit"
+          className="btn btn-icon-compact"
           disabled={!activeUserId || busy}
-        />
-        <button type="submit" className="btn" disabled={!activeUserId || busy}>
-          {pick(language, "Publicar", "Post")}
+          aria-label={pick(language, "Enviar comentario", "Send comment", "Enviar comentario")}
+          title={pick(language, "Enviar comentario", "Send comment", "Enviar comentario")}
+        >
+          <Icon name="send" size={14} />
         </button>
       </form>
 

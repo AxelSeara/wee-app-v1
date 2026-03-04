@@ -14,7 +14,7 @@ const json = (status: number, body: Record<string, unknown>, extraHeaders?: Head
     headers: {
       "Content-Type": "application/json",
       "Access-Control-Allow-Origin": "*",
-      "Access-Control-Allow-Headers": "content-type,x-wee-session",
+      "Access-Control-Allow-Headers": "content-type,authorization,apikey,x-client-info,x-wee-session",
       "Access-Control-Allow-Methods": "POST,OPTIONS",
       ...extraHeaders
     }

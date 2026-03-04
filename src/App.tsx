@@ -1236,7 +1236,7 @@ const AppRoutes = () => {
 
 export default function App() {
   return (
-    <HashRouter>
+    <HashRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
       <AppRoutes />
     </HashRouter>
   );

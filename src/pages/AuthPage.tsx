@@ -13,18 +13,19 @@ export const AuthPage = ({ onLogin, onRegister, onChangeLanguage }: AuthPageProp
   const { language } = useI18n();
   const location = useLocation();
   const navigate = useNavigate();
-  const [mode, setMode] = useState<"landing" | "login" | "register">("landing");
+  const [mode, setMode] = useState<"login" | "register">("login");
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [email, setEmail] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
 
   useEffect(() => {
     const query = new URLSearchParams(location.search);
-    if (query.get("invite")) {
-      setMode("login");
-    }
+    if (query.get("invite")) setMode("login");
+    const remembered = localStorage.getItem("wee:last-username");
+    if (remembered) setUsername(remembered);
   }, [location.search]);
 
   const submit = async (event: FormEvent) => {
@@ -41,6 +42,7 @@ export const AuthPage = ({ onLogin, onRegister, onChangeLanguage }: AuthPageProp
       } else {
         await onLogin(username.trim(), password.trim());
       }
+      localStorage.setItem("wee:last-username", username.trim());
       navigate(`/communities${location.search}`);
     } catch (err) {
       setError(err instanceof Error ? err.message : pick(language, "No pudimos entrar.", "Could not sign in.", "Non puidemos entrar."));
@@ -65,52 +67,74 @@ export const AuthPage = ({ onLogin, onRegister, onChangeLanguage }: AuthPageProp
         ))}
       </div>
 
-      {mode === "landing" ? (
-        <section className="auth-card auth-card-entry">
-          <h1 className="auth-hero-title">
-            <span className="auth-hero-brand">Wee</span>
-            <span className="auth-hero-claim">{pick(language, "Tu gente, tus temas, todo en orden", "Your people, your topics, no chaos", "A túa xente, os teus temas, todo en orde")}</span>
-          </h1>
-          <p>{pick(language, "Entra con tu cuenta global y luego eliges comunidad.", "Sign in once with your global account, then choose your community.", "Entra coa túa conta global e logo escolles comunidade.")}</p>
-          <div className="auth-entry-actions">
-            <button type="button" className="btn btn-primary" onClick={() => setMode("login")}>
-              <Icon name="user" /> {pick(language, "Entrar", "Log in", "Entrar")}
-            </button>
-            <button type="button" className="btn" onClick={() => setMode("register")}>
-              <Icon name="spark" /> {pick(language, "Crear cuenta", "Create account", "Crear conta")}
-            </button>
-          </div>
-        </section>
-      ) : (
-        <section className="auth-card auth-card-main">
-          <div className="section-head">
-            <h2>{mode === "login" ? pick(language, "Entrar", "Log in", "Entrar") : pick(language, "Crear cuenta", "Create account", "Crear conta")}</h2>
-            <button type="button" className="btn" onClick={() => setMode("landing")}>
-              <Icon name="arrowLeft" /> {pick(language, "Volver", "Back", "Volver")}
-            </button>
-          </div>
-          <form className="stack" onSubmit={submit}>
+      <section className="auth-card auth-card-main auth-card-access">
+        <h1 className="auth-hero-title">
+          <span className="auth-hero-brand">Wee</span>
+          <span className="auth-hero-claim">{pick(language, "Entra y sigue tus comunidades", "Sign in and jump to your communities", "Entra e segue as túas comunidades")}</span>
+        </h1>
+        <p className="hint">{pick(language, "Una cuenta global. Dentro eliges dónde entrar.", "One global account. Then pick where to enter.", "Unha conta global. Dentro escolles onde entrar.")}</p>
+
+        <div className="auth-mode-tabs" role="tablist" aria-label={pick(language, "Modo de acceso", "Access mode", "Modo de acceso")}>
+          <button type="button" role="tab" aria-selected={mode === "login"} className={mode === "login" ? "auth-mode-tab active" : "auth-mode-tab"} onClick={() => setMode("login")}>
+            {pick(language, "Entrar", "Log in", "Entrar")}
+          </button>
+          <button type="button" role="tab" aria-selected={mode === "register"} className={mode === "register" ? "auth-mode-tab active" : "auth-mode-tab"} onClick={() => setMode("register")}>
+            {pick(language, "Crear cuenta", "Create account", "Crear conta")}
+          </button>
+        </div>
+
+        <form className="stack" onSubmit={submit}>
+          <label className="form-field">
+            {pick(language, "Usuario global", "Global username", "Usuario global")}
+            <input
+              value={username}
+              onChange={(event) => setUsername(event.target.value)}
+              autoComplete="username"
+              placeholder={pick(language, "Ej: paco_wee", "Ex: paco_wee", "Ex: paco_wee")}
+            />
+          </label>
+          {mode === "register" ? (
             <label className="form-field">
-              {pick(language, "Usuario global", "Global username", "Usuario global")}
-              <input value={username} onChange={(event) => setUsername(event.target.value)} />
+              Email ({pick(language, "opcional", "optional", "opcional")})
+              <input type="email" value={email} onChange={(event) => setEmail(event.target.value)} autoComplete="email" />
             </label>
-            {mode === "register" ? (
-              <label className="form-field">
-                Email ({pick(language, "opcional", "optional", "opcional")})
-                <input type="email" value={email} onChange={(event) => setEmail(event.target.value)} />
-              </label>
-            ) : null}
-            <label className="form-field">
-              {pick(language, "Contraseña", "Password", "Contrasinal")}
-              <input type="password" value={password} onChange={(event) => setPassword(event.target.value)} />
-            </label>
-            {error ? <p className="error">{error}</p> : null}
-            <button type="submit" className="btn btn-primary" disabled={loading}>
-              <Icon name="check" /> {loading ? pick(language, "Entrando...", "Signing in...", "Entrando...") : mode === "login" ? pick(language, "Entrar", "Log in", "Entrar") : pick(language, "Crear cuenta", "Create account", "Crear conta")}
-            </button>
-          </form>
-        </section>
-      )}
+          ) : null}
+          <label className="form-field">
+            {pick(language, "Contraseña", "Password", "Contrasinal")}
+            <div className="alias-row">
+              <input
+                type={showPassword ? "text" : "password"}
+                value={password}
+                onChange={(event) => setPassword(event.target.value)}
+                autoComplete={mode === "register" ? "new-password" : "current-password"}
+                placeholder={pick(language, "Mínimo 6 caracteres", "Minimum 6 characters", "Mínimo 6 caracteres")}
+              />
+              <button type="button" className="btn dice-btn" onClick={() => setShowPassword((prev) => !prev)} title={pick(language, "Mostrar u ocultar contraseña", "Show or hide password", "Mostrar ou ocultar contrasinal")}>
+                <Icon name={showPassword ? "eyeOff" : "eye"} size={14} />
+              </button>
+            </div>
+          </label>
+          {error ? <p className="error">{error}</p> : null}
+          <button type="submit" className="btn btn-primary auth-submit-btn" disabled={loading}>
+            <Icon name="check" /> {loading
+              ? pick(language, "Entrando...", "Signing in...", "Entrando...")
+              : mode === "login"
+                ? pick(language, "Entrar", "Log in", "Entrar")
+                : pick(language, "Crear y entrar", "Create and enter", "Crear e entrar")}
+          </button>
+        </form>
+
+        <p className="auth-switch-inline">
+          {mode === "login"
+            ? pick(language, "¿Aún no tienes cuenta?", "No account yet?", "Aínda non tes conta?")
+            : pick(language, "¿Ya tienes cuenta?", "Already have an account?", "Xa tes conta?")}{" "}
+          <button type="button" className="auth-link-btn" onClick={() => setMode((prev) => (prev === "login" ? "register" : "login"))}>
+            {mode === "login"
+              ? pick(language, "Crear cuenta", "Create account", "Crear conta")
+              : pick(language, "Entrar", "Log in", "Entrar")}
+          </button>
+        </p>
+      </section>
     </main>
   );
 };

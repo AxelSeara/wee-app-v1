@@ -29,6 +29,13 @@ const normalizeAlias = (alias: string): string =>
     .trim();
 
 const normalizeCode = (code: string): string => code.trim().toUpperCase();
+const normalizeCommunityName = (value: string): string =>
+  value
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .replace(/\s+/g, " ")
+    .trim();
 
 const randomCode = (): string =>
   Array.from(crypto.getRandomValues(new Uint8Array(6)))
@@ -291,6 +298,17 @@ const postToRow = (postRaw: Record<string, any>, auth: { user: { id: string }; c
     rationale: post.rationale,
     normalized_text: post.normalizedText ?? ""
   };
+};
+
+const communityNameExists = async (name: string, excludeCommunityId?: string): Promise<boolean> => {
+  const normalized = normalizeCommunityName(name);
+  if (!normalized) return false;
+  const res = await db.from("communities").select("id,name");
+  if (res.error) throw new Error(res.error.message);
+  return (res.data ?? []).some((entry: any) => {
+    if (excludeCommunityId && String(entry.id) === excludeCommunityId) return false;
+    return normalizeCommunityName(String(entry.name ?? "")) === normalized;
+  });
 };
 
 const syncOwnInteractions = async (auth: { user: { id: string }; community: { id: string } }, post: Record<string, any>) => {
@@ -614,10 +632,59 @@ const handlers = {
 
     const membershipsRes = await db
       .from("community_members")
-      .select("community_id,status,communities(name,description),community_profiles(display_name),community_user_roles(role)")
+      .select("community_id,status")
       .eq("user_id", globalAuth.user.id)
       .eq("status", "active");
     if (membershipsRes.error) return json(500, { message: membershipsRes.error.message });
+
+    const communityIds = (membershipsRes.data ?? []).map((entry: any) => String(entry.community_id));
+    let communityById = new Map<string, { name: string; description?: string }>();
+    let roleByCommunityId = new Map<string, Role>();
+    let displayNameByCommunityId = new Map<string, string>();
+
+    if (communityIds.length > 0) {
+      const [communitiesRes, profilesRes] = await Promise.all([
+        db
+          .from("communities")
+          .select("id,name,description")
+          .in("id", communityIds),
+        db
+          .from("community_profiles")
+          .select("community_id,display_name,community_user_id")
+          .eq("user_id", globalAuth.user.id)
+          .in("community_id", communityIds)
+      ]);
+      if (communitiesRes.error) return json(500, { message: communitiesRes.error.message });
+      if (profilesRes.error) return json(500, { message: profilesRes.error.message });
+
+      communityById = new Map(
+        (communitiesRes.data ?? []).map((entry: any) => [
+          String(entry.id),
+          { name: String(entry.name ?? "community"), description: entry.description ?? undefined }
+        ])
+      );
+
+      const communityUserIds = (profilesRes.data ?? [])
+        .map((entry: any) => String(entry.community_user_id))
+        .filter(Boolean);
+
+      displayNameByCommunityId = new Map(
+        (profilesRes.data ?? []).map((entry: any) => [String(entry.community_id), String(entry.display_name ?? globalAuth.user.username)])
+      );
+
+      if (communityUserIds.length > 0) {
+        const rolesRes = await db
+          .from("community_user_roles")
+          .select("community_id,user_id,role")
+          .in("community_id", communityIds)
+          .in("user_id", communityUserIds);
+        if (rolesRes.error) return json(500, { message: rolesRes.error.message });
+        roleByCommunityId = new Map(
+          (rolesRes.data ?? []).map((entry: any) => [String(entry.community_id), (entry.role ?? "member") as Role])
+        );
+      }
+    }
+
     const settingsRes = await db
       .from("user_settings")
       .select("default_community_id,skip_picker")
@@ -625,13 +692,17 @@ const handlers = {
       .maybeSingle();
 
     return json(200, {
-      communities: (membershipsRes.data ?? []).map((entry: any) => ({
-        community_id: entry.community_id,
-        name: entry.communities?.name ?? "community",
-        description: entry.communities?.description ?? undefined,
-        role: (entry.community_user_roles?.[0]?.role ?? "member") as Role,
-        display_name: entry.community_profiles?.[0]?.display_name ?? globalAuth.user.username
-      })),
+      communities: (membershipsRes.data ?? []).map((entry: any) => {
+        const communityId = String(entry.community_id);
+        const base = communityById.get(communityId);
+        return {
+          community_id: communityId,
+          name: base?.name ?? "community",
+          description: base?.description ?? undefined,
+          role: roleByCommunityId.get(communityId) ?? "member",
+          display_name: displayNameByCommunityId.get(communityId) ?? globalAuth.user.username
+        };
+      }),
       settings: settingsRes.data ?? { skip_picker: false }
     });
   },
@@ -701,6 +772,14 @@ const handlers = {
     const code = normalizeCode(String(body.code ?? randomCode()));
     const expiresAt = body.invite_expires_at ? new Date(String(body.invite_expires_at)).toISOString() : null;
 
+    try {
+      if (await communityNameExists(name)) {
+        return json(409, { message: "COMMUNITY_NAME_EXISTS" });
+      }
+    } catch (error) {
+      return json(500, { message: error instanceof Error ? error.message : "Could not validate community name" });
+    }
+
     const { data: community, error: cErr } = await db
       .from("communities")
       .insert({ name, description, rules_text: rulesText, invite_policy: invitePolicy })
@@ -738,6 +817,14 @@ const handlers = {
     const invitePolicy: InvitePolicy = body.invite_policy === "members_allowed" ? "members_allowed" : "admins_only";
     const code = normalizeCode(String(body.code ?? randomCode()));
     const expiresAt = body.invite_expires_at ? new Date(String(body.invite_expires_at)).toISOString() : null;
+
+    try {
+      if (await communityNameExists(name)) {
+        return json(409, { message: "COMMUNITY_NAME_EXISTS" });
+      }
+    } catch (error) {
+      return json(500, { message: error instanceof Error ? error.message : "Could not validate community name" });
+    }
 
     const createCommunityRes = await db
       .from("communities")
@@ -1090,6 +1177,15 @@ const handlers = {
     const rulesText = body.rules_text !== undefined ? String(body.rules_text).trim().slice(0, 4000) : undefined;
 
     if (name !== undefined && name.length < 2) return bad("Community name too short");
+    if (name !== undefined) {
+      try {
+        if (await communityNameExists(name, auth.community.id)) {
+          return json(409, { message: "COMMUNITY_NAME_EXISTS" });
+        }
+      } catch (error) {
+        return json(500, { message: error instanceof Error ? error.message : "Could not validate community name" });
+      }
+    }
 
     const payload: Record<string, unknown> = {};
     if (name !== undefined) payload.name = name;

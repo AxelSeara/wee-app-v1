@@ -37,6 +37,13 @@ export const CommunitiesPickerPage = ({
   const { language } = useI18n();
   const navigate = useNavigate();
   const location = useLocation();
+  const toFriendlyError = (raw: unknown, fallbackEs: string, fallbackEn: string, fallbackGl: string) => {
+    const message = raw instanceof Error ? raw.message : "";
+    if (message.includes("COMMUNITY_NAME_EXISTS")) {
+      return pick(language, "Ya existe una comunidad con ese nombre.", "A community with that name already exists.", "Xa existe unha comunidade con ese nome.");
+    }
+    return raw instanceof Error ? raw.message : pick(language, fallbackEs, fallbackEn, fallbackGl);
+  };
   const [loadingId, setLoadingId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [createOpen, setCreateOpen] = useState(false);
@@ -47,6 +54,9 @@ export const CommunitiesPickerPage = ({
   const [joinCode, setJoinCode] = useState("");
   const [joinPreview, setJoinPreview] = useState<CommunitySelection | null>(null);
   const [persistChoice, setPersistChoice] = useState(Boolean(skipPicker));
+  const [creatingCommunity, setCreatingCommunity] = useState(false);
+  const [previewingJoin, setPreviewingJoin] = useState(false);
+  const [confirmingJoin, setConfirmingJoin] = useState(false);
 
   useEffect(() => {
     setPersistChoice(Boolean(skipPicker));
@@ -86,7 +96,7 @@ export const CommunitiesPickerPage = ({
       }
       navigate("/home");
     } catch (err) {
-      setError(err instanceof Error ? err.message : pick(language, "No pudimos abrir la comunidad.", "Could not open community.", "Non puidemos abrir a comunidade."));
+      setError(toFriendlyError(err, "No pudimos abrir la comunidad.", "Could not open community.", "Non puidemos abrir a comunidade."));
     } finally {
       setLoadingId(null);
     }
@@ -94,7 +104,9 @@ export const CommunitiesPickerPage = ({
 
   const submitCreate = async (event: FormEvent) => {
     event.preventDefault();
-    if (!communityName.trim()) return;
+    if (!communityName.trim() || creatingCommunity) return;
+    setCreatingCommunity(true);
+    setError(null);
     try {
       const created = await onCreateCommunity({
         name: communityName.trim(),
@@ -105,29 +117,40 @@ export const CommunitiesPickerPage = ({
       await onReload();
       await enter(created.id);
     } catch (err) {
-      setError(err instanceof Error ? err.message : pick(language, "No pudimos crear la comunidad.", "Could not create community.", "Non puidemos crear a comunidade."));
+      setError(toFriendlyError(err, "No pudimos crear la comunidad.", "Could not create community.", "Non puidemos crear a comunidade."));
+    } finally {
+      setCreatingCommunity(false);
     }
   };
 
   const submitPreview = async (event: FormEvent) => {
     event.preventDefault();
+    if (previewingJoin) return;
     const parsed = parseCommunityJoinInput(joinCode);
     if (!parsed.code && !parsed.token) return;
+    setPreviewingJoin(true);
+    setError(null);
     try {
       setJoinPreview(await onPreviewCommunity(parsed));
     } catch (err) {
-      setError(err instanceof Error ? err.message : pick(language, "Código o link no válido.", "Invalid code or link.", "Código ou ligazón non válido."));
+      setError(toFriendlyError(err, "Código o link no válido.", "Invalid code or link.", "Código ou ligazón non válido."));
+    } finally {
+      setPreviewingJoin(false);
     }
   };
 
   const confirmJoin = async () => {
-    if (!joinPreview) return;
+    if (!joinPreview || confirmingJoin) return;
+    setConfirmingJoin(true);
+    setError(null);
     try {
       await onJoinCommunity(parseCommunityJoinInput(joinCode));
       await onReload();
       await enter(joinPreview.id);
     } catch (err) {
-      setError(err instanceof Error ? err.message : pick(language, "No pudimos unirte.", "Could not join.", "Non puidemos unirte."));
+      setError(toFriendlyError(err, "No pudimos unirte.", "Could not join.", "Non puidemos unirte."));
+    } finally {
+      setConfirmingJoin(false);
     }
   };
 
@@ -179,20 +202,24 @@ export const CommunitiesPickerPage = ({
               <option value="members_allowed">{pick(language, "Todos", "Everyone", "Todos")}</option>
             </select>
           </label>
-          <button type="submit" className="btn btn-primary"><Icon name="check" /> {pick(language, "Crear y entrar", "Create and enter", "Crear e entrar")}</button>
+          <button type="submit" className="btn btn-primary" disabled={creatingCommunity}>
+            <Icon name="check" /> {creatingCommunity ? pick(language, "Creando...", "Creating...", "Creando...") : pick(language, "Crear y entrar", "Create and enter", "Crear e entrar")}
+          </button>
         </form>
       ) : null}
 
       {joinOpen ? (
         <form className="stack" style={{ marginTop: "0.8rem" }} onSubmit={submitPreview}>
           <label className="form-field">{pick(language, "Código o link", "Code or link", "Código ou ligazón")}<input value={joinCode} onChange={(event) => setJoinCode(event.target.value)} /></label>
-          <button type="submit" className="btn"><Icon name="eye" /> {pick(language, "Previsualizar", "Preview", "Previsualizar")}</button>
+          <button type="submit" className="btn" disabled={previewingJoin}>
+            <Icon name="eye" /> {previewingJoin ? pick(language, "Mirando...", "Checking...", "Mirando...") : pick(language, "Previsualizar", "Preview", "Previsualizar")}
+          </button>
           {joinPreview ? (
             <article className="invite-preview-card">
               <h3>{joinPreview.name}</h3>
               {joinPreview.description ? <p className="hint">{joinPreview.description}</p> : null}
-              <button type="button" className="btn btn-primary" onClick={() => void confirmJoin()}>
-                <Icon name="check" /> {pick(language, "Confirmar y entrar", "Confirm and enter", "Confirmar e entrar")}
+              <button type="button" className="btn btn-primary" onClick={() => void confirmJoin()} disabled={confirmingJoin}>
+                <Icon name="check" /> {confirmingJoin ? pick(language, "Entrando...", "Entering...", "Entrando...") : pick(language, "Confirmar y entrar", "Confirm and enter", "Confirmar e entrar")}
               </button>
             </article>
           ) : null}

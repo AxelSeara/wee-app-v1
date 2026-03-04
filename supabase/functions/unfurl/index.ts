@@ -27,6 +27,17 @@ interface UnfurlResponse {
   bodyText?: string;
   hasOverlayPopup?: boolean;
   adLikeNodeRatio?: number;
+  articleSection?: string;
+  newsKeywords?: string[];
+  parselySection?: string;
+  sailthruTags?: string[];
+  breadcrumbs?: string[];
+  relTags?: string[];
+  jsonLdSections?: string[];
+  jsonLdKeywords?: string[];
+  jsonLdAbout?: string[];
+  jsonLdGenre?: string[];
+  jsonLdIsPartOf?: string[];
   cached: boolean;
 }
 
@@ -135,6 +146,17 @@ const pickMeta = (html: string, keys: string[]): string | undefined => {
   }
   return undefined;
 };
+
+const splitValues = (value?: string): string[] => {
+  if (!value) return [];
+  return value
+    .split(/[,|]/g)
+    .map((item) => item.trim())
+    .filter(Boolean)
+    .slice(0, 20);
+};
+
+const pickMetaArray = (html: string, keys: string[]): string[] => splitValues(pickMeta(html, keys));
 
 const pickTitle = (html: string): string | undefined => {
   const og = pickMeta(html, ["og:title", "twitter:title"]);
@@ -274,6 +296,55 @@ const extractSchemaTypes = (html: string): string[] => {
   return Array.from(types).slice(0, 8);
 };
 
+const extractBreadcrumbs = (html: string): string[] => {
+  const crumbs: string[] = [];
+  const navPattern = /<[^>]*(?:breadcrumb|breadcrumbs)[^>]*>([\s\S]*?)<\/[^>]+>/gi;
+  let match: RegExpExecArray | null;
+  while ((match = navPattern.exec(html))) {
+    const text = clean(match[1]?.replace(/<[^>]+>/g, " "), 120);
+    if (text) crumbs.push(text);
+  }
+  return Array.from(new Set(crumbs)).slice(0, 8);
+};
+
+const extractRelTags = (html: string): string[] => {
+  const tags: string[] = [];
+  const anchorPattern = /<a\b[^>]*>/gi;
+  let match: RegExpExecArray | null;
+  while ((match = anchorPattern.exec(html))) {
+    const attrs = parseAttributes(match[0]);
+    const rel = (attrs.rel ?? "").toLowerCase();
+    if (!rel.includes("tag")) continue;
+    const href = attrs.href ?? "";
+    if (!href) continue;
+    tags.push(href.split("/").filter(Boolean).at(-1) ?? href);
+  }
+  return Array.from(new Set(tags.map((item) => item.replace(/[-_]/g, " ")))).slice(0, 12);
+};
+
+const extractJsonLdTextArray = (html: string, key: string): string[] => {
+  const entries = collectJsonLdEntries(html);
+  const values: string[] = [];
+  entries.forEach((entry) => {
+    if (!entry || typeof entry !== "object") return;
+    const raw = (entry as Record<string, unknown>)[key];
+    if (!raw) return;
+    if (typeof raw === "string") values.push(raw);
+    if (Array.isArray(raw)) {
+      raw.forEach((item) => {
+        if (typeof item === "string") values.push(item);
+        if (item && typeof item === "object" && typeof (item as Record<string, unknown>).name === "string") {
+          values.push((item as Record<string, unknown>).name as string);
+        }
+      });
+    }
+    if (raw && typeof raw === "object" && typeof (raw as Record<string, unknown>).name === "string") {
+      values.push((raw as Record<string, unknown>).name as string);
+    }
+  });
+  return Array.from(new Set(values.map((item) => item.trim()).filter(Boolean))).slice(0, 20);
+};
+
 const toResponseFromCache = (row: CacheRow): UnfurlResponse => ({
   title: clean(row.title, 140),
   description: clean(row.description, 320),
@@ -356,6 +427,10 @@ Deno.serve(async (req) => {
     const title = clean(pickTitle(html), 140);
     const description = clean(pickMeta(html, ["og:description", "twitter:description", "description"]), 320);
     const siteName = clean(pickMeta(html, ["og:site_name", "application-name"]), 80);
+    const articleSection = clean(pickMeta(html, ["article:section"]), 80);
+    const newsKeywords = pickMetaArray(html, ["news_keywords", "article:tag"]);
+    const parselySection = clean(pickMeta(html, ["parsely-section"]), 80);
+    const sailthruTags = pickMetaArray(html, ["sailthru.tags"]);
     const publishedAt = clean(
       pickMetaOrJsonLd(
         html,
@@ -399,6 +474,13 @@ Deno.serve(async (req) => {
       pickJsonLdImage(html);
     const imageUrl = clean(absoluteUrl(imageCandidate, finalUrl), 1000);
     const schemaTypes = extractSchemaTypes(html);
+    const breadcrumbs = extractBreadcrumbs(html);
+    const relTags = extractRelTags(html);
+    const jsonLdSections = extractJsonLdTextArray(html, "articleSection");
+    const jsonLdKeywords = extractJsonLdTextArray(html, "keywords");
+    const jsonLdAbout = extractJsonLdTextArray(html, "about");
+    const jsonLdGenre = extractJsonLdTextArray(html, "genre");
+    const jsonLdIsPartOf = extractJsonLdTextArray(html, "isPartOf");
     const bodyText = clean(extractBodyText(html), 5000);
     const outboundUrls = extractOutboundUrls(html, finalUrl);
     const { hasOverlayPopup, adLikeNodeRatio } = detectOverlaySignals(html);
@@ -438,6 +520,17 @@ Deno.serve(async (req) => {
       bodyText,
       hasOverlayPopup,
       adLikeNodeRatio,
+      articleSection,
+      newsKeywords,
+      parselySection,
+      sailthruTags,
+      breadcrumbs,
+      relTags,
+      jsonLdSections,
+      jsonLdKeywords,
+      jsonLdAbout,
+      jsonLdGenre,
+      jsonLdIsPartOf,
       cached: false
     };
 

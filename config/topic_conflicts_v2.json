@@ -1,0 +1,34 @@
+{
+  "rules": [
+    {
+      "id": "madrid_sports",
+      "when_all": ["madrid", "real", "liga"],
+      "boost": { "sports": 12 },
+      "penalize": { "politics": 5, "local": 4 },
+      "reason": "Madrid + Real + Liga suele referirse a deportes"
+    },
+    {
+      "id": "madrid_politics",
+      "when_all": ["madrid", "congreso"],
+      "boost": { "politics": 11 },
+      "penalize": { "sports": 4 },
+      "reason": "Madrid + Congreso suele referirse a política"
+    },
+    {
+      "id": "apple_tech",
+      "when_all": ["apple"],
+      "when_any": ["iphone", "mac", "ios", "ipad"],
+      "boost": { "tech": 10 },
+      "penalize": { "economy": 3 },
+      "reason": "Apple con dispositivos apunta a tecnología"
+    },
+    {
+      "id": "apple_economy",
+      "when_all": ["apple"],
+      "when_any": ["earnings", "stock", "shares", "revenue", "results"],
+      "boost": { "economy": 10 },
+      "penalize": { "tech": 3 },
+      "reason": "Apple con métricas financieras apunta a economía"
+    }
+  ]
+}

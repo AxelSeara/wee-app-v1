@@ -1,5 +1,13 @@
-import type { ClassifyInput, ClassifyOutput, QualityLabel, RuleAdjustment, ScoreBreakdown } from "./types";
+import type {
+  ClassifyInput,
+  ClassifyOutput,
+  QualityLabel,
+  RuleAdjustment,
+  ScoreBreakdown,
+  TopicRulesetVersion
+} from "./types";
 import { clamp, normalizeSpace, safeDomainFromUrl } from "./utils";
+import { runTopicEngineV2 } from "./topicEngineV2";
 
 export type AuraRulesetVersion = "v1" | "v2";
 
@@ -271,6 +279,11 @@ const rulesetFromEnv = (): AuraRulesetVersion => {
   return value === "v2" ? "v2" : "v1";
 };
 
+const topicRulesetFromEnv = (): TopicRulesetVersion => {
+  const value = (typeof import.meta !== "undefined" ? import.meta.env?.VITE_TOPIC_RULESET_VERSION : undefined) ?? "v1";
+  return value === "v2" ? "v2" : "v1";
+};
+
 const base64Encode = (value: string): string => {
   if (typeof btoa === "function") {
     return btoa(unescape(encodeURIComponent(value)));
@@ -282,6 +295,8 @@ const serialiseBreakdownFlag = (kind: "quality" | "aura", breakdown: ScoreBreakd
   const payload = JSON.stringify(breakdown);
   return `${kind}_breakdown:${base64Encode(payload)}`;
 };
+
+const serialiseTopicFlag = (value: unknown): string => `topic_breakdown_v2:${base64Encode(JSON.stringify(value))}`;
 
 export const normalizeInputText = (input: ClassifyInput): string => {
   const merged = `${input.title ?? ""} ${input.text ?? ""} ${input.url ?? ""}`;
@@ -936,10 +951,25 @@ const qualityLabelFromScore = (score: number, clickbaitStrong: boolean): Quality
 
 export const classifyPost = (input: ClassifyInput, createdAt?: number): ClassifyOutput => {
   const version: AuraRulesetVersion = input.rulesetVersion ?? rulesetFromEnv();
+  const topicVersion: TopicRulesetVersion = input.topicRulesetVersion ?? topicRulesetFromEnv();
   const normalizedText = normalizeInputText(input);
   const sourceDomain = safeDomainFromUrl(input.url);
   const extractedHosts = extractHosts(normalizedText, input.url);
-  const topics = detectTopicsFromInput(input, sourceDomain);
+  const topicsV1 = detectTopicsFromInput(input, sourceDomain);
+
+  let topics = topicsV1;
+  let topicV2: string | undefined;
+  let topicCandidatesV2: ClassifyOutput["topicCandidatesV2"];
+  let topicExplanationV2: ClassifyOutput["topicExplanationV2"];
+
+  if (topicVersion === "v2") {
+    const topicResult = runTopicEngineV2(input);
+    topicV2 = topicResult.topic;
+    topicCandidatesV2 = topicResult.candidates;
+    topicExplanationV2 = topicResult.explanation;
+    topics = topicResult.selectedTopics.map((topic) => (topic === "general" ? "misc" : topic));
+  }
+
   const subtopics = detectSubtopics(normalizedText, topics);
 
   const quality = version === "v2"
@@ -960,13 +990,21 @@ export const classifyPost = (input: ClassifyInput, createdAt?: number): Classify
   const outputFlags = [...quality.flags];
   if (input.persistBreakdown !== false) {
     outputFlags.push(`aura_ruleset:${version}`);
+    outputFlags.push(`topic_ruleset:${topicVersion}`);
     outputFlags.push(serialiseBreakdownFlag("quality", quality.breakdown));
     outputFlags.push(serialiseBreakdownFlag("aura", interest.breakdown));
+    if (topicExplanationV2) {
+      outputFlags.push(serialiseTopicFlag(topicExplanationV2));
+    }
   }
 
   return {
     topics,
     subtopics,
+    topicV2,
+    topicCandidatesV2,
+    topicExplanationV2,
+    topicVersion,
     qualityLabel,
     qualityScore: quality.score,
     interestScore: interest.score,

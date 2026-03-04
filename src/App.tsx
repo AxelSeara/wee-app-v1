@@ -223,6 +223,7 @@ const AppRoutes = () => {
 
   const rulesetVersion: AuraRulesetVersion =
     import.meta.env.VITE_AURA_RULESET_VERSION === "v2" ? "v2" : "v1";
+  const topicRulesetVersion = import.meta.env.VITE_TOPIC_RULESET_VERSION === "v2" ? "v2" : "v1";
 
   const getDuplicatePreview = (
     url: string
@@ -242,7 +243,7 @@ const AppRoutes = () => {
   const onShareUrl = async (
     url: string,
     options?: { forceTopic?: string }
-  ): Promise<{ mode: "created" | "merged" | "penalized"; message: string; debugBreakdown?: unknown }> => {
+  ): Promise<{ mode: "created" | "merged" | "penalized"; message: string; debugBreakdown?: unknown; topicDebug?: unknown }> => {
     if (!activeUser) return { mode: "created", message: pick(language, "Inicia sesión para compartir enlaces.", "Sign in to share links.") };
 
     const canonical = canonicalizeUrl(url);
@@ -344,6 +345,7 @@ const AppRoutes = () => {
         title: derivedTitle,
         text: description,
         rulesetVersion,
+        topicRulesetVersion,
         debug: debugMode,
         metadata: {
           publisher: metadata.publisher,
@@ -355,6 +357,17 @@ const AppRoutes = () => {
           hasOverlayPopup: metadata.hasOverlayPopup,
           adLikeNodeRatio: metadata.adLikeNodeRatio,
           publishedAt: metadata.publishedAt,
+          articleSection: metadata.articleSection,
+          newsKeywords: metadata.newsKeywords,
+          parselySection: metadata.parselySection,
+          sailthruTags: metadata.sailthruTags,
+          breadcrumbs: metadata.breadcrumbs,
+          relTags: metadata.relTags,
+          jsonLdSections: metadata.jsonLdSections,
+          jsonLdKeywords: metadata.jsonLdKeywords,
+          jsonLdAbout: metadata.jsonLdAbout,
+          jsonLdGenre: metadata.jsonLdGenre,
+          jsonLdIsPartOf: metadata.jsonLdIsPartOf,
           duplicateSignals: {
             canonicalExists: Boolean(existing),
             contentHashExists: Boolean(duplicateByContent)
@@ -389,6 +402,10 @@ const AppRoutes = () => {
       feedbacks: [{ userId: activeUser.id, vote: 1 as const, votedAt: createdAt }],
       topics: finalTopics,
       subtopics: classified.subtopics,
+      topicV2: classified.topicV2,
+      topicCandidatesV2: classified.topicCandidatesV2,
+      topicExplanationV2: classified.topicExplanationV2,
+      topicVersion: classified.topicVersion,
       qualityLabel: classified.qualityLabel,
       qualityScore: classified.qualityScore,
       interestScore: classified.interestScore,
@@ -407,6 +424,19 @@ const AppRoutes = () => {
       console.info("aura_index_debug", payload);
       (window as Window & { __WEE_LAST_AURA_DEBUG__?: unknown }).__WEE_LAST_AURA_DEBUG__ = classified.debugBreakdown;
     }
+    if (classified.topicExplanationV2) {
+      const topicPayload = {
+        url,
+        domain: classified.sourceDomain ?? "unknown",
+        topic_v2: classified.topicV2 ?? "general",
+        candidates_top3: (classified.topicCandidatesV2 ?? []).slice(0, 3),
+        fired_signals: classified.topicExplanationV2.reasons.slice(0, 8).map((reason) => reason.signal)
+      };
+      console.info("topic_classification_v2", topicPayload);
+      if (debugMode) {
+        (window as Window & { __WEE_LAST_TOPIC_DEBUG__?: unknown }).__WEE_LAST_TOPIC_DEBUG__ = classified.topicExplanationV2;
+      }
+    }
 
     trackShare({
       mode: "created",
@@ -422,7 +452,14 @@ const AppRoutes = () => {
         `Posted in ${finalTopics[0] ?? "misc"} · quality ${qualityLabelText(classified.qualityLabel, language)}.`,
         `Publicado en ${finalTopics[0] ?? "misc"} · calidade ${qualityLabelText(classified.qualityLabel, "gl")}.`
       ),
-      debugBreakdown: debugMode ? classified.debugBreakdown : undefined
+      debugBreakdown: debugMode ? classified.debugBreakdown : undefined,
+      topicDebug: debugMode
+        ? {
+            topic_v2: classified.topicV2,
+            topic_candidates_v2: classified.topicCandidatesV2,
+            topic_explanation_v2: classified.topicExplanationV2
+          }
+        : undefined
     };
   };
 

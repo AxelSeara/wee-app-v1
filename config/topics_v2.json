@@ -1,0 +1,98 @@
+{
+  "taxonomy": [
+    "politics",
+    "economy",
+    "tech",
+    "science",
+    "health",
+    "climate",
+    "sports",
+    "culture",
+    "education",
+    "local",
+    "geopolitics",
+    "war",
+    "general"
+  ],
+  "thresholds": {
+    "min_score": 12,
+    "delta": 5,
+    "max_topics": 2
+  },
+  "weights": {
+    "structured": {
+      "jsonld_article_section": 28,
+      "jsonld_keywords": 20,
+      "jsonld_about": 18,
+      "jsonld_genre": 14,
+      "jsonld_ispartof": 12,
+      "meta_article_section": 26,
+      "meta_news_keywords": 22,
+      "meta_parsely_section": 20,
+      "meta_sailthru_tags": 18
+    },
+    "site_structure": {
+      "url_pattern": 14,
+      "breadcrumb": 13,
+      "rel_tag": 12,
+      "site_profile_hint": 11
+    },
+    "keywords": {
+      "title_keyword": 9,
+      "body_keyword": 6,
+      "domain_hint": 4,
+      "gazetteer_local": 8
+    }
+  },
+  "url_patterns": {
+    "politics": ["/(politics|politica|elecciones|election|congreso|parliament|senate)(/|$)"],
+    "economy": ["/(economy|economia|business|mercados|markets|finanzas|finance|bolsa)(/|$)"],
+    "tech": ["/(tech|technology|tecnologia|ai|ia|software|gadgets|cybersecurity)(/|$)"],
+    "science": ["/(science|ciencia|research|investigacion|space)(/|$)"],
+    "health": ["/(health|salud|medical|medicina|hospital)(/|$)"],
+    "climate": ["/(climate|clima|medio-ambiente|environment)(/|$)"],
+    "sports": ["/(sports|deportes|futbol|football|nba|tennis|motor)(/|$)"],
+    "culture": ["/(culture|cultura|cine|music|musica|art|arte|series)(/|$)"],
+    "education": ["/(education|educacion|school|escuela|universidad|university)(/|$)"],
+    "local": ["/(local|ourense|galicia|city|municipal|concello)(/|$)"],
+    "geopolitics": ["/(world|international|geopolitics|diplomacy|foreign-policy)(/|$)"],
+    "war": ["/(war|guerra|conflict|military|defense|defensa)(/|$)"]
+  },
+  "meta_mappings": {
+    "politics": ["politics", "politica", "election", "elecciones", "government", "gobierno"],
+    "economy": ["economy", "business", "economia", "finance", "mercados", "markets"],
+    "tech": ["tech", "technology", "tecnologia", "ai", "ia", "software"],
+    "science": ["science", "ciencia", "research", "investigacion"],
+    "health": ["health", "salud", "medical", "medicina"],
+    "climate": ["climate", "clima", "environment", "medio ambiente"],
+    "sports": ["sports", "deportes", "football", "futbol", "nba", "tennis"],
+    "culture": ["culture", "cultura", "cine", "music", "musica", "art", "arte"],
+    "education": ["education", "educacion", "school", "escuela", "university", "universidad"],
+    "local": ["local", "ourense", "galicia", "municipal", "city"],
+    "geopolitics": ["geopolitics", "foreign policy", "diplomacy", "international"],
+    "war": ["war", "guerra", "military", "defense", "conflict"]
+  },
+  "keyword_mappings": {
+    "politics": ["election", "elecciones", "parliament", "congreso", "senate", "president", "campaign", "coalition"],
+    "economy": ["inflation", "inflacion", "gdp", "stocks", "mercado", "budget", "interest rates", "earnings"],
+    "tech": ["ai", "ia", "software", "open source", "chip", "semiconductor", "iphone", "mac", "android"],
+    "science": ["study", "estudio", "research", "paper", "laboratory", "peer reviewed", "nasa"],
+    "health": ["hospital", "vaccine", "vacuna", "clinical trial", "public health", "virus"],
+    "climate": ["co2", "emissions", "wildfire", "drought", "flood", "renewables", "temperatures"],
+    "sports": ["liga", "champions", "goal", "match", "coach", "real madrid", "barcelona", "nba"],
+    "culture": ["film", "movie", "cinema", "festival", "album", "concert", "museum"],
+    "education": ["students", "curriculum", "scholarship", "exam", "school"],
+    "local": ["ourense", "orense", "galicia", "concello", "ayuntamiento", "municipal", "neighborhood"],
+    "geopolitics": ["sanctions", "nato", "united nations", "embassy", "summit", "diplomacy"],
+    "war": ["ceasefire", "drone strike", "invasion", "artillery", "troops", "battlefront"]
+  },
+  "domain_hints": {
+    "tech": ["techcrunch.com", "theverge.com", "wired.com", "github.blog"],
+    "economy": ["ft.com", "bloomberg.com", "wsj.com", "expansion.com"],
+    "sports": ["espn.com", "marca.com", "as.com"],
+    "science": ["nature.com", "science.org"],
+    "health": ["who.int", "cdc.gov"],
+    "local": ["lavozdegalicia.es", "farodevigo.es"]
+  },
+  "gazetteer_local": ["ourense", "orense", "galicia", "vigo", "a coruna", "berlin", "madrid"]
+}

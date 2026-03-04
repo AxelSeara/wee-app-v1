@@ -94,6 +94,19 @@ Para mejorar el scraping en producción, Wee usa una Edge Function de Supabase (
   - [docs/aura_audit.md](docs/aura_audit.md)
   - [docs/aura_rules_v2.md](docs/aura_rules_v2.md)
 
+## Topic ruleset v2 (feature flag)
+
+- `VITE_TOPIC_RULESET_VERSION=v1|v2` (default `v1`)
+- Config versionable:
+  - `config/topics_v2.json`
+  - `config/topic_conflicts_v2.json`
+  - `config/site_profiles_v2.json`
+- Auditoría y reglas:
+  - [docs/topic_audit.md](docs/topic_audit.md)
+  - [docs/topic_rules_v2.md](docs/topic_rules_v2.md)
+- Migración SQL (campos topic v2):
+  - [supabase/sql/topic_v3.sql](supabase/sql/topic_v3.sql)
+
 ## Supabase (backend de pruebas reales)
 
 Variables de entorno esperadas:

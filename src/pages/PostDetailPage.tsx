@@ -209,6 +209,26 @@ export const PostDetailPage = ({
                       </div>
                     </div>
                   ) : null}
+
+                  {isAdmin && current.topicExplanationV2 ? (
+                    <div className="detail-settings-admin">
+                      <h3>{pick(language, "Topic explain v2", "Topic explain v2")}</h3>
+                      <p className="hint">
+                        {pick(
+                          language,
+                          `topic_v2: ${current.topicV2 ?? "general"} · ${current.topicExplanationV2.ambiguous ? "ambiguous" : "resolved"}`,
+                          `topic_v2: ${current.topicV2 ?? "general"} · ${current.topicExplanationV2.ambiguous ? "ambiguous" : "resolved"}`
+                        )}
+                      </p>
+                      <p className="hint">
+                        {pick(language, "Top candidates", "Top candidates")}:{" "}
+                        {(current.topicCandidatesV2 ?? [])
+                          .slice(0, 3)
+                          .map((candidate) => `${candidate.topic} (${candidate.score})`)
+                          .join(" · ")}
+                      </p>
+                    </div>
+                  ) : null}
                 </div>
               </details>
             </div>

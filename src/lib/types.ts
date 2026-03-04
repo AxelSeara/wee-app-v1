@@ -1,6 +1,7 @@
 export type QualityLabel = "high" | "medium" | "low" | "clickbait";
 export type AppLanguage = "es" | "en" | "gl";
 export type AuraRulesetVersion = "v1" | "v2";
+export type TopicRulesetVersion = "v1" | "v2";
 
 export interface RuleAdjustment {
   ruleId: string;
@@ -21,6 +22,29 @@ export interface ClassificationDebugBreakdown {
   quality: ScoreBreakdown;
   aura: ScoreBreakdown;
   firedRules: string[];
+}
+
+export interface TopicCandidate {
+  topic: string;
+  score: number;
+}
+
+export interface TopicReasonV2 {
+  signal: string;
+  topic: string;
+  weight: number;
+  evidence: string;
+}
+
+export interface TopicExplanationV2 {
+  version: TopicRulesetVersion;
+  selectedTopics: string[];
+  ambiguous: boolean;
+  thresholds: {
+    minScore: number;
+    delta: number;
+  };
+  reasons: TopicReasonV2[];
 }
 
 export interface User {
@@ -70,6 +94,10 @@ export interface Post {
   }>;
   topics: string[];
   subtopics?: string[];
+  topicV2?: string;
+  topicCandidatesV2?: TopicCandidate[];
+  topicExplanationV2?: TopicExplanationV2;
+  topicVersion?: TopicRulesetVersion;
   qualityLabel: QualityLabel;
   qualityScore: number;
   interestScore: number;
@@ -107,6 +135,7 @@ export interface ClassifyInput {
   text?: string;
   publishedAt?: string;
   rulesetVersion?: AuraRulesetVersion;
+  topicRulesetVersion?: TopicRulesetVersion;
   debug?: boolean;
   persistBreakdown?: boolean;
   metadata?: {
@@ -123,12 +152,27 @@ export interface ClassifyInput {
       contentHashExists?: boolean;
     };
     publishedAt?: string;
+    articleSection?: string;
+    newsKeywords?: string[];
+    parselySection?: string;
+    sailthruTags?: string[];
+    breadcrumbs?: string[];
+    relTags?: string[];
+    jsonLdSections?: string[];
+    jsonLdKeywords?: string[];
+    jsonLdAbout?: string[];
+    jsonLdGenre?: string[];
+    jsonLdIsPartOf?: string[];
   };
 }
 
 export interface ClassifyOutput {
   topics: string[];
   subtopics: string[];
+  topicV2?: string;
+  topicCandidatesV2?: TopicCandidate[];
+  topicExplanationV2?: TopicExplanationV2;
+  topicVersion?: TopicRulesetVersion;
   qualityLabel: QualityLabel;
   qualityScore: number;
   interestScore: number;

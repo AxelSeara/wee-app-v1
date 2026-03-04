@@ -33,6 +33,10 @@ interface PostRow {
   source_domain: string | null;
   topics: string[] | null;
   subtopics: string[] | null;
+  topic_v2?: string | null;
+  topic_candidates_v2?: unknown | null;
+  topic_explanation_v2?: unknown | null;
+  topic_version?: "v1" | "v2" | null;
   quality_label: "high" | "medium" | "low" | "clickbait";
   quality_score: number;
   interest_score: number;
@@ -154,6 +158,10 @@ const postRowToPost = (
     sourceDomain: row.source_domain ?? undefined,
     topics: row.topics && row.topics.length > 0 ? row.topics : ["misc"],
     subtopics: row.subtopics ?? [],
+    topicV2: row.topic_v2 ?? undefined,
+    topicCandidatesV2: Array.isArray(row.topic_candidates_v2) ? (row.topic_candidates_v2 as unknown as Post["topicCandidatesV2"]) : undefined,
+    topicExplanationV2: row.topic_explanation_v2 ? (row.topic_explanation_v2 as unknown as Post["topicExplanationV2"]) : undefined,
+    topicVersion: row.topic_version ?? undefined,
     qualityLabel: row.quality_label,
     qualityScore: row.quality_score,
     interestScore: row.interest_score,
@@ -201,6 +209,10 @@ const postToRow = (post: Post): Omit<PostRow, "id" | "created_at"> & { created_a
   source_domain: post.sourceDomain ?? null,
   topics: post.topics,
   subtopics: post.subtopics ?? [],
+  topic_v2: post.topicV2 ?? null,
+  topic_candidates_v2: post.topicCandidatesV2 ?? null,
+  topic_explanation_v2: post.topicExplanationV2 ?? null,
+  topic_version: post.topicVersion ?? null,
   quality_label: post.qualityLabel,
   quality_score: post.qualityScore,
   interest_score: post.interestScore,
@@ -216,6 +228,21 @@ const getAuthUserId = async (): Promise<string | null> => {
 };
 
 const isMissingTable = (error: { code?: string } | null | undefined): boolean => error?.code === "42P01";
+const isMissingColumn = (error: { code?: string } | null | undefined): boolean => error?.code === "42703";
+
+const stripTopicV2Columns = <T extends Record<string, unknown>>(row: T): T => {
+  const clone = { ...row };
+  delete clone.topic_v2;
+  delete clone.topic_candidates_v2;
+  delete clone.topic_explanation_v2;
+  delete clone.topic_version;
+  return clone;
+};
+
+const POSTS_SELECT_V3 =
+  "id,user_id,created_at,url,canonical_url,title,text,preview_title,preview_description,preview_image_url,preview_site_name,source_domain,topics,subtopics,topic_v2,topic_candidates_v2,topic_explanation_v2,topic_version,quality_label,quality_score,interest_score,flags,rationale,normalized_text";
+const POSTS_SELECT_V1 =
+  "id,user_id,created_at,url,canonical_url,title,text,preview_title,preview_description,preview_image_url,preview_site_name,source_domain,topics,subtopics,quality_label,quality_score,interest_score,flags,rationale,normalized_text";
 
 const upsertOwnVoteAndComments = async (post: Post): Promise<void> => {
   const client = ensureRemote();
@@ -400,6 +427,13 @@ const mergeDuplicatePosts = (baseRaw: Post, incomingRaw: Post): Post => {
     comments: mergeComments(base.comments, incoming.comments),
     topics: Array.from(new Set([...(base.topics ?? []), ...(incoming.topics ?? [])])),
     subtopics: Array.from(new Set([...(base.subtopics ?? []), ...(incoming.subtopics ?? [])])),
+    topicV2: incoming.topicV2 ?? base.topicV2,
+    topicCandidatesV2:
+      (incoming.topicCandidatesV2?.[0]?.score ?? 0) > (base.topicCandidatesV2?.[0]?.score ?? 0)
+        ? incoming.topicCandidatesV2
+        : base.topicCandidatesV2,
+    topicExplanationV2: incoming.topicExplanationV2 ?? base.topicExplanationV2,
+    topicVersion: incoming.topicVersion ?? base.topicVersion,
     qualityLabel: base.qualityScore >= incoming.qualityScore ? base.qualityLabel : incoming.qualityLabel,
     qualityScore: Math.max(base.qualityScore, incoming.qualityScore),
     interestScore: Math.max(base.interestScore, incoming.interestScore),
@@ -487,10 +521,15 @@ export const deleteUserById = async (userId: string): Promise<void> => {
 export const addPost = async (post: Post): Promise<void> => {
   const client = ensureRemote();
   const normalized = normalizePost(post);
-  const { error } = await client.from("posts").insert({
+  const row = {
     id: normalized.id,
     ...postToRow(normalized)
-  });
+  };
+  let { error } = await client.from("posts").insert(row);
+  if (error && isMissingColumn(error as { code?: string })) {
+    const fallback = stripTopicV2Columns(row);
+    ({ error } = await client.from("posts").insert(fallback));
+  }
   if (error) throw new Error(`Remote post create failed: ${error.message}`);
 
   const sharerVote = normalized.feedbacks?.find((entry) => entry.userId === normalized.userId);
@@ -524,10 +563,16 @@ export const addPost = async (post: Post): Promise<void> => {
 export const updatePost = async (post: Post): Promise<void> => {
   const client = ensureRemote();
   const normalized = normalizePost(post);
-  const result = await client
+  let result = await client
     .from("posts")
     .update(postToRow(normalized))
     .eq("id", normalized.id);
+  if (result.error && isMissingColumn(result.error as { code?: string })) {
+    result = await client
+      .from("posts")
+      .update(stripTopicV2Columns(postToRow(normalized)))
+      .eq("id", normalized.id);
+  }
   if (result.error && (result.error as { code?: string }).code !== "42501") {
     throw new Error(`Remote post update failed: ${result.error.message}`);
   }
@@ -536,12 +581,24 @@ export const updatePost = async (post: Post): Promise<void> => {
 
 export const listPosts = async (): Promise<Post[]> => {
   const client = ensureRemote();
-  const { data: posts, error: postsError } = await client
+  let posts: PostRow[] | null = null;
+  let postsError: { message: string; code?: string } | null = null;
+
+  const primary = await client
     .from("posts")
-    .select(
-      "id,user_id,created_at,url,canonical_url,title,text,preview_title,preview_description,preview_image_url,preview_site_name,source_domain,topics,subtopics,quality_label,quality_score,interest_score,flags,rationale,normalized_text"
-    )
+    .select(POSTS_SELECT_V3)
     .order("created_at", { ascending: false });
+  posts = (primary.data ?? null) as PostRow[] | null;
+  postsError = primary.error as { message: string; code?: string } | null;
+
+  if (postsError && isMissingColumn(postsError)) {
+    const fallback = await client
+      .from("posts")
+      .select(POSTS_SELECT_V1)
+      .order("created_at", { ascending: false });
+    posts = (fallback.data ?? null) as PostRow[] | null;
+    postsError = fallback.error as { message: string; code?: string } | null;
+  }
   if (postsError) throw new Error(`Remote posts read failed: ${postsError.message}`);
 
   const postRows = (posts ?? []) as PostRow[];

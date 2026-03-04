@@ -16,6 +16,17 @@ export interface UrlMetadata {
   bodyText?: string;
   hasOverlayPopup?: boolean;
   adLikeNodeRatio?: number;
+  articleSection?: string;
+  newsKeywords?: string[];
+  parselySection?: string;
+  sailthruTags?: string[];
+  breadcrumbs?: string[];
+  relTags?: string[];
+  jsonLdSections?: string[];
+  jsonLdKeywords?: string[];
+  jsonLdAbout?: string[];
+  jsonLdGenre?: string[];
+  jsonLdIsPartOf?: string[];
 }
 
 const withTimeout = async <T>(promise: Promise<T>, timeoutMs: number): Promise<T> => {
@@ -164,6 +175,17 @@ const edgeUnfurl = async (url: string): Promise<UrlMetadata | null> => {
       bodyText?: string;
       hasOverlayPopup?: boolean;
       adLikeNodeRatio?: number;
+      articleSection?: string;
+      newsKeywords?: string[];
+      parselySection?: string;
+      sailthruTags?: string[];
+      breadcrumbs?: string[];
+      relTags?: string[];
+      jsonLdSections?: string[];
+      jsonLdKeywords?: string[];
+      jsonLdAbout?: string[];
+      jsonLdGenre?: string[];
+      jsonLdIsPartOf?: string[];
     };
     const title = clean(payload.title, 140);
     const description = clean(payload.description, 320);
@@ -183,7 +205,18 @@ const edgeUnfurl = async (url: string): Promise<UrlMetadata | null> => {
       outboundUrls: payload.outboundUrls,
       bodyText: clean(payload.bodyText, 5000),
       hasOverlayPopup: payload.hasOverlayPopup,
-      adLikeNodeRatio: payload.adLikeNodeRatio
+      adLikeNodeRatio: payload.adLikeNodeRatio,
+      articleSection: clean(payload.articleSection, 80),
+      newsKeywords: payload.newsKeywords,
+      parselySection: clean(payload.parselySection, 80),
+      sailthruTags: payload.sailthruTags,
+      breadcrumbs: payload.breadcrumbs,
+      relTags: payload.relTags,
+      jsonLdSections: payload.jsonLdSections,
+      jsonLdKeywords: payload.jsonLdKeywords,
+      jsonLdAbout: payload.jsonLdAbout,
+      jsonLdGenre: payload.jsonLdGenre,
+      jsonLdIsPartOf: payload.jsonLdIsPartOf
     };
   } catch {
     return null;

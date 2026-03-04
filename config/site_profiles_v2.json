@@ -1,0 +1,34 @@
+{
+  "profiles": {
+    "theguardian.com": {
+      "url_topic_hints": {
+        "politics": ["/politics"],
+        "tech": ["/technology"],
+        "economy": ["/business"],
+        "culture": ["/culture"],
+        "sports": ["/sport"]
+      },
+      "breadcrumb_hints": ["politics", "business", "technology", "culture", "sport"]
+    },
+    "elpais.com": {
+      "url_topic_hints": {
+        "politics": ["/politica"],
+        "economy": ["/economia"],
+        "sports": ["/deportes"],
+        "culture": ["/cultura"],
+        "tech": ["/tecnologia"]
+      },
+      "breadcrumb_hints": ["politica", "economia", "deportes", "cultura", "tecnologia"]
+    },
+    "reuters.com": {
+      "url_topic_hints": {
+        "economy": ["/markets"],
+        "politics": ["/world"],
+        "tech": ["/technology"],
+        "health": ["/world/health"],
+        "climate": ["/world/climate"]
+      },
+      "breadcrumb_hints": ["markets", "world", "technology", "health", "climate"]
+    }
+  }
+}

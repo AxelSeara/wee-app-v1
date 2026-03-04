@@ -20,6 +20,10 @@ interface TopicPageProps {
   onVoteCommentAura: (postId: string, commentId: string) => Promise<{ ok: boolean; message: string; post?: Post }>;
   onAdminDeleteComment: (postId: string, commentId: string) => Promise<{ ok: boolean; message: string }>;
   onAdminRenameTopic: (fromTopic: string, toTopic: string) => Promise<{ ok: boolean; message: string }>;
+  onShareUrl: (
+    url: string,
+    options?: { forceTopic?: string }
+  ) => Promise<{ mode: "created" | "merged" | "penalized"; message: string }>;
   onToast: (message: string) => void;
 }
 
@@ -34,6 +38,7 @@ export const TopicPage = ({
   onVoteCommentAura,
   onAdminDeleteComment,
   onAdminRenameTopic,
+  onShareUrl,
   onToast
 }: TopicPageProps) => {
   const { language } = useI18n();
@@ -44,6 +49,9 @@ export const TopicPage = ({
   const [selectedPostId, setSelectedPostId] = useState<string | null>(null);
   const [chatDraft, setChatDraft] = useState("");
   const [chatBusy, setChatBusy] = useState(false);
+  const [shareUrl, setShareUrl] = useState("");
+  const [sharing, setSharing] = useState(false);
+  const [topicSettingsOpen, setTopicSettingsOpen] = useState(false);
   const isAdmin = activeUser.role === "admin";
   useEffect(() => {
     setRenameTopic(topic);
@@ -108,6 +116,17 @@ export const TopicPage = ({
     setChatBusy(false);
   };
 
+  const submitShareInTopic = async (event: FormEvent) => {
+    event.preventDefault();
+    const clean = shareUrl.trim();
+    if (!clean || sharing) return;
+    setSharing(true);
+    const result = await onShareUrl(clean, { forceTopic: topic });
+    onToast(result.message);
+    setShareUrl("");
+    setSharing(false);
+  };
+
   return (
     <main>
       <TopBar user={activeUser} onOpenShare={onOpenShareModal} onLogout={onLogout} />
@@ -117,31 +136,52 @@ export const TopicPage = ({
           <div className="topic-head-meta">
             <span className="badge">{topicPosts.length} {pick(language, "noticias", "posts", "novas")}</span>
             <span className="badge">{totalComments} {pick(language, "comentarios", "comments", "comentarios")}</span>
+            <button type="button" className="btn" onClick={() => setTopicSettingsOpen((prev) => !prev)}>
+              <Icon name="settings" /> {pick(language, "Ajustes", "Settings", "Axustes")}
+            </button>
             <Link to="/home" className="link-btn">
               <Icon name="arrowLeft" /> {pick(language, "Volver", "Back")}
             </Link>
           </div>
         </div>
-        {isAdmin ? (
+        <form className="detail-actions" onSubmit={submitShareInTopic}>
+          <input
+            type="url"
+            value={shareUrl}
+            onChange={(event) => setShareUrl(event.target.value)}
+            placeholder={pick(language, "Añadir noticia a este tema (pega URL)", "Add post to this topic (paste URL)")}
+            required
+          />
+          <button type="submit" className="btn btn-primary" disabled={sharing}>
+            <Icon name="plus" /> {sharing ? pick(language, "Publicando...", "Posting...") : pick(language, "Añadir a este tema", "Add to this topic")}
+          </button>
+        </form>
+        {topicSettingsOpen ? (
           <div className="detail-actions">
-            <input
-              value={renameTopic}
-              onChange={(event) => setRenameTopic(event.target.value)}
-              placeholder={pick(language, "Renombrar tema", "Rename topic")}
-            />
-            <button
-              type="button"
-              className="btn"
-              onClick={async () => {
-                const result = await onAdminRenameTopic(topic, renameTopic);
-                onToast(result.message);
-                if (result.ok) {
-                  navigate(`/topic/${renameTopic.trim().toLowerCase().replace(/\s+/g, "-")}`);
-                }
-              }}
-            >
-              {pick(language, "Renombrar tema", "Rename topic")}
-            </button>
+            {isAdmin ? (
+              <>
+                <input
+                  value={renameTopic}
+                  onChange={(event) => setRenameTopic(event.target.value)}
+                  placeholder={pick(language, "Renombrar tema", "Rename topic")}
+                />
+                <button
+                  type="button"
+                  className="btn"
+                  onClick={async () => {
+                    const result = await onAdminRenameTopic(topic, renameTopic);
+                    onToast(result.message);
+                    if (result.ok) {
+                      navigate(`/topic/${renameTopic.trim().toLowerCase().replace(/\s+/g, "-")}`);
+                    }
+                  }}
+                >
+                  {pick(language, "Renombrar tema", "Rename topic")}
+                </button>
+              </>
+            ) : (
+              <p className="hint">{pick(language, "Solo admin puede renombrar temas.", "Only admin can rename topics.")}</p>
+            )}
           </div>
         ) : null}
         {topicPosts.length === 0 ? (

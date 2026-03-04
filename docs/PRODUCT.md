@@ -28,8 +28,8 @@ Wee busca que grupos pequeños compartan noticias en un espacio más útil que u
 
 ## Estado actual (MVP avanzado)
 
-- Auth local por alias + avatar + idioma de perfil.
-- Auth local con contraseña obligatoria y validación mínima de seguridad.
+- Auth en Supabase por alias + contraseña (email sintético interno).
+- Perfil con alias, avatar e idioma de perfil.
 - Primer usuario registrado pasa a rol `admin`.
 - Home con navegación lateral por secciones (`Popular`, `Temas`, `Noticias`, `Comunidad`).
 - Página de noticia (`/post/:postId`) con foco en contexto y acción comunitaria.
@@ -43,12 +43,8 @@ Wee busca que grupos pequeños compartan noticias en un espacio más útil que u
   - puede publicar, comentar, votar y ver perfiles.
   - en perfiles de otros usuarios ve publicaciones y comentarios recientes.
 - `admin`:
-  - puede cambiar tema de una noticia.
-  - puede renombrar temas globalmente.
-  - puede eliminar noticias y comentarios.
-  - puede eliminar usuarios.
-  - puede ver métricas de perfil de otros usuarios.
-  - puede nombrar o retirar admins (sin dejar la comunidad sin admins).
+  - con SQL v2: acciones mayoritariamente sobre recursos propios (por RLS).
+  - con SQL v3: moderación global real (borrar contenido ajeno, gestionar usuarios y roles).
 
 ## Norte del producto
 
@@ -57,3 +53,7 @@ Crear microcomunidades activas que prefieran compartir primero en Wee para:
 - mantener el contexto vivo,
 - curar mejor la información,
 - detectar calidad de forma colectiva y explicable.
+
+## Nota operativa
+
+El producto ya no es local-first. Wee funciona en modo backend-first y necesita Supabase configurado.

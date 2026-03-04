@@ -8,9 +8,11 @@
 interface User {
   id: string;
   alias: string;
-  passwordHash?: string;
+  authEmail?: string;
   role?: "admin" | "member";
   language?: "es" | "en" | "gl";
+  privacyConsentAt?: number;
+  privacyPolicyVersion?: string;
   avatarDataUrl?: string;
   avatarColor?: string;
   initials?: string;
@@ -19,9 +21,8 @@ interface User {
 ```
 
 Notas:
-- `avatarDataUrl` guarda imagen en base64 (local-only).
+- `avatarDataUrl` guarda imagen de perfil.
 - Si no hay imagen, se usa `avatarColor` + `initials`.
-- `passwordHash` se guarda con hash local (PBKDF2-SHA256, con fallback en entornos sin WebCrypto).
 - `role` controla permisos de moderación (`admin` o `member`).
 
 ### Post
@@ -107,18 +108,21 @@ interface ExportBundle {
 
 ## Persistencia
 
-Implementada en `src/lib/store.ts`.
+Implementada en `src/lib/store.ts`, backend-first con Supabase.
 
-IndexedDB (primario):
-- `users` (keyPath `id`, index `by-createdAt`)
-- `posts` (keyPath `id`, indexes `by-createdAt`, `by-userId`)
-- `preferences` (keyPath `userId`)
+Tablas utilizadas (v2):
+- `profiles`
+- `profile_private`
+- `posts`
+- `comments`
+- `post_votes`
+- `post_shares`
+- `post_opens`
+- `comment_aura`
+- `user_preferences` (opcional recomendada)
 
-Fallback localStorage:
-- `news-curation-ls-users`
-- `news-curation-ls-posts`
-- `news-curation-ls-preferences`
-- sesión activa: `news-curation-active-user-id`
+Cliente:
+- sesión activa: `news-curation-active-user-id` en `localStorage`.
 
 ## Reglas de deduplicación
 
@@ -131,12 +135,15 @@ Fallback localStorage:
 - se mergea en el post existente
 - se suman contribuyentes y contador
 - se fusionan feedbacks/comentarios/rationale/topics/subtopics
+- en backend, contribución y aperturas se persisten en `post_shares` y `post_opens`.
 
 ## Integridad y límites
 
 - `interestScore` se redondea y clampa a `1..100`.
 - `qualityScore` se clampa a `0..100`.
 - import JSON evita duplicados por `id` y por URL canónica.
+- con SQL v2 base, algunas acciones de moderación global (admin sobre recursos ajenos) no están habilitadas.
+- con SQL v3 (opcional) se habilitan esas capacidades admin.
 
 ## Derivados en memoria (no persistidos como entidad propia)
 

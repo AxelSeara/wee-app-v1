@@ -14,11 +14,15 @@ Esta app es SPA estática (Vite + HashRouter), así que encaja directo en Vercel
 - Output directory: `dist`
 4. Variable de entorno:
 - No definir `VITE_BASE_PATH` (o dejarla vacía) para base `/`.
-5. Deploy.
+5. Variables Supabase obligatorias:
+- `VITE_SUPABASE_URL`
+- `VITE_SUPABASE_PUBLISHABLE_KEY` (o `VITE_SUPABASE_ANON_KEY`)
+6. Deploy.
 
 Notas:
 - Al usar `HashRouter`, no necesitas reglas especiales de rewrites para refresh.
-- Datos son locales por navegador/dispositivo (no compartidos entre usuarios).
+- Datos de comunidad se guardan en Supabase (compartidos entre usuarios).
+- Si falta configuración Supabase, la app muestra error de backend.
 
 ## Opción alternativa: GitHub Pages
 
@@ -69,18 +73,16 @@ En GitHub -> Settings -> Pages:
 
 ## Validación post-deploy
 
-- Login funciona y persiste sesión local.
+- Login/registro funcionan con Supabase Auth.
 - Compartir enlace crea post o mergea duplicado.
 - Voto bloqueado hasta abrir fuente.
 - Perfil permite editar avatar/alias.
 - “Mis publicaciones” permite eliminar post propio.
-- Settings export/import JSON funciona.
+- Settings guarda preferencias (si existe `user_preferences`).
 - Cambio de idioma (ES/EN/GL) persiste por usuario.
 
-## Limitación importante (para tests de comunidad)
+## Limitación importante
 
-Aunque esté online en Vercel o Pages, sigue siendo local-first:
-- cada usuario guarda datos en su navegador
-- no hay sincronización entre personas sin backend compartido
-
-Para comunidad real multiusuario compartida necesitas backend free (por ejemplo Supabase/Firestore free tier).
+El frontend es estático, pero depende totalmente de backend Supabase:
+- sin tablas SQL v2 no funciona correctamente.
+- capacidades admin globales requieren SQL v3 adicional.

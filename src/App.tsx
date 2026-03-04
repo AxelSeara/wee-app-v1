@@ -33,6 +33,7 @@ const AppRoutes = () => {
     activeUser,
     preferences,
     loading,
+    backendError,
     createOrLogin,
     loginWithUserId,
     logout,
@@ -44,9 +45,7 @@ const AppRoutes = () => {
     updateUserAvatar,
     updateUserAlias,
     updateUserLanguage,
-    updateUserRole,
     updatePostPrimaryTopic,
-    renameTopicAcrossPosts,
     filterPosts,
     updatePreferences,
     exportJson,
@@ -120,7 +119,7 @@ const AppRoutes = () => {
     const userId = activeUser.id;
     await removeUser(userId);
     logout();
-    showToast(pick(language, "Tus datos locales se han eliminado.", "Your local data has been deleted.", "Elimináronse os teus datos locais."));
+    showToast(pick(language, "Tus datos se han eliminado.", "Your data has been deleted.", "Elimináronse os teus datos."));
   };
 
   const findDuplicatePost = (url: string) => {
@@ -148,7 +147,10 @@ const AppRoutes = () => {
     };
   };
 
-  const onShareUrl = async (url: string): Promise<{ mode: "created" | "merged" | "penalized"; message: string }> => {
+  const onShareUrl = async (
+    url: string,
+    options?: { forceTopic?: string }
+  ): Promise<{ mode: "created" | "merged" | "penalized"; message: string }> => {
     if (!activeUser) return { mode: "created", message: pick(language, "Inicia sesión para compartir enlaces.", "Sign in to share links.") };
 
     const canonical = canonicalizeUrl(url);
@@ -166,6 +168,11 @@ const AppRoutes = () => {
         ? feedbacks
         : [...feedbacks, { userId: activeUser.id, vote: 1 as const, votedAt: Date.now() }];
 
+      const forcedTopic = options?.forceTopic?.trim().toLowerCase().replace(/\s+/g, "-");
+      const nextTopics =
+        forcedTopic && !existing.topics.includes(forcedTopic)
+          ? [forcedTopic, ...existing.topics].slice(0, 6)
+          : existing.topics;
       await savePost({
         ...existing,
         canonicalUrl: canonical ?? existing.canonicalUrl,
@@ -173,6 +180,7 @@ const AppRoutes = () => {
         contributorUserIds,
         shareCount,
         feedbacks: nextFeedbacks,
+        topics: nextTopics,
         rationale: sameUserDuplicate
           ? existing.rationale.includes("Enlace repetido por el mismo usuario; se aplica penalización interna")
             ? existing.rationale
@@ -200,6 +208,11 @@ const AppRoutes = () => {
     const derivedTitle = safeMetadataTitle ?? deriveTitleFromUrl(url) ?? pick(language, "Noticia compartida", "Shared post");
     const description = metadata.description;
     const classified = classifyPost({ url, title: derivedTitle, text: description }, createdAt);
+    const forcedTopic = options?.forceTopic?.trim().toLowerCase().replace(/\s+/g, "-");
+    const finalTopics =
+      forcedTopic && !classified.topics.includes(forcedTopic)
+        ? [forcedTopic, ...classified.topics].slice(0, 6)
+        : classified.topics;
 
     await createPost({
       id: generateId(),
@@ -219,7 +232,7 @@ const AppRoutes = () => {
       contributorUserIds: [activeUser.id],
       contributorCounts: { [activeUser.id]: 1 },
       feedbacks: [{ userId: activeUser.id, vote: 1 as const, votedAt: createdAt }],
-      topics: classified.topics,
+      topics: finalTopics,
       subtopics: classified.subtopics,
       qualityLabel: classified.qualityLabel,
       qualityScore: classified.qualityScore,
@@ -239,9 +252,9 @@ const AppRoutes = () => {
       mode: "created",
       message: pick(
         language,
-        `Publicado en ${classified.topics[0] ?? "misc"} · calidad ${qualityLabelText(classified.qualityLabel, language)}.`,
-        `Posted in ${classified.topics[0] ?? "misc"} · quality ${qualityLabelText(classified.qualityLabel, language)}.`,
-        `Publicado en ${classified.topics[0] ?? "misc"} · calidade ${qualityLabelText(classified.qualityLabel, "gl")}.`
+        `Publicado en ${finalTopics[0] ?? "misc"} · calidad ${qualityLabelText(classified.qualityLabel, language)}.`,
+        `Posted in ${finalTopics[0] ?? "misc"} · quality ${qualityLabelText(classified.qualityLabel, language)}.`,
+        `Publicado en ${finalTopics[0] ?? "misc"} · calidade ${qualityLabelText(classified.qualityLabel, "gl")}.`
       )
     };
   };
@@ -362,6 +375,21 @@ const AppRoutes = () => {
     if (!activeUser || activeUser.role !== "admin") {
       return { ok: false, message: pick(language, "Acción solo para admin.", "Admin-only action.") };
     }
+    const post = posts.find((entry) => entry.id === postId);
+    const target = post?.comments?.find((comment) => comment.id === commentId);
+    if (!target) {
+      return { ok: false, message: pick(language, "No encontramos ese comentario.", "We could not find that comment.") };
+    }
+    if (target.userId !== activeUser.id) {
+      return {
+        ok: false,
+        message: pick(
+          language,
+          "Con el SQL v2 actual, solo puedes eliminar tus propios comentarios.",
+          "With current SQL v2, you can only delete your own comments."
+        )
+      };
+    }
     await removeComment(postId, commentId);
     return { ok: true, message: pick(language, "Comentario eliminado.", "Comment deleted.") };
   };
@@ -369,6 +397,18 @@ const AppRoutes = () => {
   const onAdminDeletePost = async (postId: string): Promise<{ ok: boolean; message: string }> => {
     if (!activeUser || activeUser.role !== "admin") {
       return { ok: false, message: pick(language, "Acción solo para admin.", "Admin-only action.") };
+    }
+    const post = posts.find((entry) => entry.id === postId);
+    if (!post) return { ok: false, message: pick(language, "No encontramos esta noticia.", "We could not find this post.") };
+    if (post.userId !== activeUser.id) {
+      return {
+        ok: false,
+        message: pick(
+          language,
+          "Con el SQL v2 actual, solo puedes eliminar noticias propias.",
+          "With current SQL v2, you can only delete your own posts."
+        )
+      };
     }
     await removePost(postId);
     return { ok: true, message: pick(language, "Noticia eliminada.", "Post deleted.") };
@@ -383,6 +423,18 @@ const AppRoutes = () => {
     }
     if (!nextTopic.trim()) {
       return { ok: false, message: pick(language, "Tema no válido.", "Invalid topic.") };
+    }
+    const post = posts.find((entry) => entry.id === postId);
+    if (!post) return { ok: false, message: pick(language, "No encontramos esta noticia.", "We could not find this post.") };
+    if (post.userId !== activeUser.id) {
+      return {
+        ok: false,
+        message: pick(
+          language,
+          "Con el SQL v2 actual, solo puedes editar temas de noticias propias.",
+          "With current SQL v2, you can only edit topics on your own posts."
+        )
+      };
     }
     await updatePostPrimaryTopic(postId, nextTopic);
     return { ok: true, message: pick(language, "Tema de noticia actualizado.", "Post topic updated.") };
@@ -406,6 +458,16 @@ const AppRoutes = () => {
     if (post.topics.includes(nextTopic)) {
       return { ok: false, message: pick(language, "Ese tema ya está añadido.", "That topic is already added.") };
     }
+    if (post.userId !== activeUser.id) {
+      return {
+        ok: false,
+        message: pick(
+          language,
+          "Con el SQL v2 actual, solo puedes añadir temas en noticias propias.",
+          "With current SQL v2, you can only add topics on your own posts."
+        )
+      };
+    }
     const nextTopics = [nextTopic, ...post.topics].slice(0, 6);
     await savePost({
       ...post,
@@ -427,8 +489,14 @@ const AppRoutes = () => {
     if (!fromTopic.trim() || !toTopic.trim() || fromTopic.trim() === toTopic.trim()) {
       return { ok: false, message: pick(language, "Tema no válido.", "Invalid topic.") };
     }
-    await renameTopicAcrossPosts(fromTopic, toTopic);
-    return { ok: true, message: pick(language, "Tema renombrado en el foro.", "Topic renamed in the forum.") };
+    return {
+      ok: false,
+      message: pick(
+        language,
+        "Renombrar temas globalmente requiere permisos backend adicionales (admin SQL v3).",
+        "Global topic rename requires additional backend permissions (admin SQL v3)."
+      )
+    };
   };
 
   const onAdminDeleteUser = async (userId: string): Promise<{ ok: boolean; message: string }> => {
@@ -438,15 +506,14 @@ const AppRoutes = () => {
     if (userId === activeUser.id) {
       return { ok: false, message: pick(language, "No puedes eliminar tu propio usuario admin.", "You cannot delete your own admin user.") };
     }
-    const target = users.find((entry) => entry.id === userId);
-    if (target?.role === "admin") {
-      const adminCount = users.filter((entry) => entry.role === "admin").length;
-      if (adminCount <= 1) {
-        return { ok: false, message: pick(language, "Debe existir al menos un admin activo.", "At least one active admin must remain.") };
-      }
-    }
-    await removeUser(userId);
-    return { ok: true, message: pick(language, "Usuario eliminado.", "User deleted.") };
+    return {
+      ok: false,
+      message: pick(
+        language,
+        "Eliminar otros usuarios requiere permisos backend adicionales (admin SQL v3).",
+        "Deleting other users requires additional backend permissions (admin SQL v3)."
+      )
+    };
   };
 
   const onAdminSetUserRole = async (
@@ -456,17 +523,14 @@ const AppRoutes = () => {
     if (!activeUser || activeUser.role !== "admin") {
       return { ok: false, message: pick(language, "Acción solo para admin.", "Admin-only action.") };
     }
-    try {
-      await updateUserRole(userId, role);
-      return {
-        ok: true,
-        message: role === "admin"
-          ? pick(language, "Usuario nombrado admin.", "User promoted to admin.")
-          : pick(language, "Usuario cambiado a miembro.", "User changed to member.")
-      };
-    } catch {
-      return { ok: false, message: pick(language, "Debe existir al menos un admin activo.", "At least one active admin must remain.") };
-    }
+    return {
+      ok: false,
+      message: pick(
+        language,
+        "Cambiar roles requiere permisos backend adicionales (admin SQL v3).",
+        "Changing roles requires additional backend permissions (admin SQL v3)."
+      )
+    };
   };
 
   const showToast = (message: string): void => {
@@ -478,7 +542,26 @@ const AppRoutes = () => {
     return (
       <I18nContext.Provider value={{ language }}>
         <AppSkeleton />
-        <p className="loading-caption">{pick(language, "Cargando tu espacio local...", "Loading your local space...")}</p>
+        <p className="loading-caption">{pick(language, "Cargando tu comunidad...", "Loading your community...")}</p>
+      </I18nContext.Provider>
+    );
+  }
+
+  if (backendError) {
+    return (
+      <I18nContext.Provider value={{ language }}>
+        <main className="page-section narrow">
+          <h2>{pick(language, "Error de conexión de backend", "Backend connection error")}</h2>
+          <p className="warning">
+            {backendError === "REMOTE_REQUIRED_MISSING_CONFIG"
+              ? pick(
+                  language,
+                  "Este despliegue exige backend remoto y no tiene configuración de Supabase. Revisa variables VITE_SUPABASE_* en Vercel.",
+                  "This deployment requires remote backend but Supabase is not configured. Check VITE_SUPABASE_* variables in Vercel."
+                )
+              : backendError}
+          </p>
+        </main>
       </I18nContext.Provider>
     );
   }
@@ -534,6 +617,7 @@ const AppRoutes = () => {
                   onVoteCommentAura={onVoteCommentAura}
                   onAdminDeleteComment={onAdminDeleteComment}
                   onAdminRenameTopic={onAdminRenameTopic}
+                  onShareUrl={onShareUrl}
                   onToast={showToast}
                 />
               </PageTransition>

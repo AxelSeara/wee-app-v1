@@ -4,6 +4,7 @@ import { Avatar } from "../components/Avatar";
 import { Icon } from "../components/Icon";
 import { generateAlias } from "../lib/aliasGenerator";
 import { isStrongPassword } from "../lib/auth";
+import { remoteModeEnabled } from "../lib/backend/supabase";
 import { pick, useI18n } from "../lib/i18n";
 import type { AppLanguage, User } from "../lib/types";
 
@@ -136,9 +137,15 @@ export const LoginPage = ({ users, onCreateOrLogin }: LoginPageProps) => {
       setError(
         pick(
           language,
-          "Debes aceptar la política de privacidad local para crear tu cuenta.",
-          "You must accept the local privacy policy to create your account.",
-          "Debes aceptar a política de privacidade local para crear a túa conta."
+          remoteModeEnabled
+            ? "Debes aceptar la política de privacidad para crear tu cuenta."
+            : "Debes aceptar la política de privacidad local para crear tu cuenta.",
+          remoteModeEnabled
+            ? "You must accept the privacy policy to create your account."
+            : "You must accept the local privacy policy to create your account.",
+          remoteModeEnabled
+            ? "Debes aceptar a política de privacidade para crear a túa conta."
+            : "Debes aceptar a política de privacidade local para crear a túa conta."
         )
       );
       return;
@@ -167,9 +174,15 @@ export const LoginPage = ({ users, onCreateOrLogin }: LoginPageProps) => {
         setError(
           pick(
             language,
-            "Debes aceptar la política de privacidad local para crear tu cuenta.",
-            "You must accept the local privacy policy to create your account.",
-            "Debes aceptar a política de privacidade local para crear a túa conta."
+            remoteModeEnabled
+              ? "Debes aceptar la política de privacidad para crear tu cuenta."
+              : "Debes aceptar la política de privacidad local para crear tu cuenta.",
+            remoteModeEnabled
+              ? "You must accept the privacy policy to create your account."
+              : "You must accept the local privacy policy to create your account.",
+            remoteModeEnabled
+              ? "Debes aceptar a política de privacidade para crear a túa conta."
+              : "Debes aceptar a política de privacidade local para crear a túa conta."
           )
         );
         return;
@@ -409,9 +422,15 @@ export const LoginPage = ({ users, onCreateOrLogin }: LoginPageProps) => {
                 <span>
                   {pick(
                     language,
-                    "Acepto la política de privacidad local (datos guardados solo en este dispositivo).",
-                    "I accept the local privacy policy (data is stored only on this device).",
-                    "Acepto a política de privacidade local (datos gardados só neste dispositivo)."
+                    remoteModeEnabled
+                      ? "Acepto la política de privacidad (datos compartidos con tu comunidad en este backend de pruebas)."
+                      : "Acepto la política de privacidad local (datos guardados solo en este dispositivo).",
+                    remoteModeEnabled
+                      ? "I accept the privacy policy (data is shared with your community in this testing backend)."
+                      : "I accept the local privacy policy (data is stored only on this device).",
+                    remoteModeEnabled
+                      ? "Acepto a política de privacidade (datos compartidos coa túa comunidade neste backend de probas)."
+                      : "Acepto a política de privacidade local (datos gardados só neste dispositivo)."
                   )}
                 </span>
               </label>
@@ -426,7 +445,7 @@ export const LoginPage = ({ users, onCreateOrLogin }: LoginPageProps) => {
 
           <section className="auth-card auth-card-community">
             <h2><Icon name="users" /> {pick(language, "Personas que ya están dentro", "People already inside", "Persoas que xa están dentro")}</h2>
-            {sortedUsers.length === 0 ? <p>{pick(language, "Aún no hay usuarios creados en este navegador.", "There are no profiles created in this browser yet.", "Aínda non hai usuarios creados neste navegador.")}</p> : null}
+            {sortedUsers.length === 0 ? <p>{pick(language, "Aún no hay usuarios registrados.", "There are no registered users yet.", "Aínda non hai usuarios rexistrados.")}</p> : null}
             <ul className="user-list">
               {sortedUsers.map((user) => (
                 <li key={user.id}>

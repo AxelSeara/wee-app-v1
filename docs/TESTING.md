@@ -45,7 +45,7 @@ Valida:
 ## Qué no está cubierto todavía
 
 - tests E2E de flujos UI (`login` -> `share` -> `post detail` -> `vote`).
-- tests de persistencia IndexedDB/localStorage en navegador real.
+- tests de integración FE/BE contra Supabase (RLS, permisos y errores).
 - tests de integración de `enrichUrl` con respuestas remotas.
 - tests i18n de copy crítico (ES/EN/GL) en componentes principales.
 

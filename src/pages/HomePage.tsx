@@ -461,9 +461,6 @@ export const HomePage = ({
           <section className="page-section section-topics" id="topics-section">
             <div className="section-head">
               <h2><Icon name="book" /> {pick(language, "Temas activos", "Active topics")}</h2>
-              <Link to="/settings" className="link-btn">
-                <Icon name="settings" /> {pick(language, "Preferencias", "Preferences", "Preferencias")}
-              </Link>
             </div>
             <p className="section-intro">{pick(language, "Cada tema funciona como un hilo: misma conversación, mismo contexto y menos duplicados.", "Each topic works as a thread: same conversation, same context and fewer duplicates.")}</p>
             <div className="topic-grid">

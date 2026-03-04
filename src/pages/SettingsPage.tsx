@@ -63,19 +63,50 @@ export const SettingsPage = ({
   }, [preferences]);
 
   const save = async () => {
-    await onSave({
-      userId: activeUser.id,
-      preferredTopics: uniq(preferredTopics),
-      blockedDomains: uniq(blockedDomains),
-      blockedKeywords: uniq(blockedKeywords)
-    });
-
-    setMessage(pick(language, "Preferencias guardadas.", "Preferences saved."));
+    try {
+      await onSave({
+        userId: activeUser.id,
+        preferredTopics: uniq(preferredTopics),
+        blockedDomains: uniq(blockedDomains),
+        blockedKeywords: uniq(blockedKeywords)
+      });
+      setMessage(pick(language, "Preferencias guardadas.", "Preferences saved."));
+    } catch (error) {
+      const detail = error instanceof Error ? error.message : "unknown_error";
+      if (detail === "MISSING_USER_PREFERENCES_TABLE") {
+        setMessage(
+          pick(
+            language,
+            "Falta la tabla user_preferences en Supabase. Ejecuta el SQL v2 para guardar ajustes.",
+            "Missing user_preferences table in Supabase. Run SQL v2 to save settings."
+          )
+        );
+        return;
+      }
+      setMessage(
+        pick(
+          language,
+          `No pudimos guardar ajustes: ${detail}`,
+          `Could not save settings: ${detail}`
+        )
+      );
+    }
   };
 
   const saveLanguage = async () => {
-    await onUpdateLanguage(activeUser.id, selectedLanguage);
-    setMessage(pick(language, "Idioma actualizado.", "Language updated."));
+    try {
+      await onUpdateLanguage(activeUser.id, selectedLanguage);
+      setMessage(pick(language, "Idioma actualizado.", "Language updated."));
+    } catch (error) {
+      const detail = error instanceof Error ? error.message : "unknown_error";
+      setMessage(
+        pick(
+          language,
+          `No pudimos actualizar el idioma: ${detail}`,
+          `Could not update language: ${detail}`
+        )
+      );
+    }
   };
 
   const quickDomains = ["x.com", "twitter.com", "tiktok.com", "instagram.com"];
@@ -340,7 +371,7 @@ export const SettingsPage = ({
 
         <article className="settings-card">
           <h3><Icon name="book" /> {pick(language, "Respaldo de tus datos", "Data backup")}</h3>
-          <p className="hint">{pick(language, "Exporta o importa tu contenido local cuando quieras.", "Export or import your local content anytime.")}</p>
+          <p className="hint">{pick(language, "Exporta o importa una copia de seguridad cuando quieras.", "Export or import a backup anytime.")}</p>
           <div className="settings-known-topics">
             <button type="button" className="btn" onClick={() => void onExport()}>
               <Icon name="download" /> {pick(language, "Exportar copia", "Export backup")}
@@ -367,15 +398,15 @@ export const SettingsPage = ({
           <p className="hint">
             {pick(
               language,
-              "Wee guarda tus datos solo en este dispositivo (IndexedDB/localStorage). No enviamos datos a servidores externos.",
-              "Wee stores your data only on this device (IndexedDB/localStorage). No data is sent to external servers.",
-              "Wee garda os teus datos só neste dispositivo (IndexedDB/localStorage). Non enviamos datos a servidores externos."
+              "Wee guarda perfiles, noticias y votos en Supabase para que toda la comunidad comparta el mismo espacio.",
+              "Wee stores profiles, posts, and votes in Supabase so the whole community shares the same space.",
+              "Wee garda perfís, novas e votos en Supabase para que toda a comunidade comparta o mesmo espazo."
             )}
           </p>
           <ul className="rules-list">
             <li>{pick(language, "Acceso/portabilidad: exporta tu copia JSON.", "Access/portability: export your JSON copy.", "Acceso/portabilidade: exporta a túa copia JSON.")}</li>
             <li>{pick(language, "Rectificación: edita alias/foto y publicaciones.", "Rectification: edit alias/photo and posts.", "Rectificación: edita alias/foto e publicacións.")}</li>
-            <li>{pick(language, "Supresión: elimina tu cuenta y tus datos locales.", "Erasure: delete your account and local data.", "Supresión: elimina a túa conta e os teus datos locais.")}</li>
+            <li>{pick(language, "Supresión: elimina tu cuenta y tus datos de comunidad.", "Erasure: delete your account and community data.", "Supresión: elimina a túa conta e os teus datos da comunidade.")}</li>
           </ul>
           <button
             type="button"
@@ -384,9 +415,9 @@ export const SettingsPage = ({
               const okDelete = window.confirm(
                 pick(
                   language,
-                  "Esto eliminará tu cuenta y tus datos en este dispositivo. ¿Continuar?",
-                  "This will delete your account and your data on this device. Continue?",
-                  "Isto eliminará a túa conta e os teus datos neste dispositivo. Continuar?"
+                  "Esto eliminará tu cuenta y tus datos asociados en la comunidad. ¿Continuar?",
+                  "This will delete your account and your related community data. Continue?",
+                  "Isto eliminará a túa conta e os teus datos asociados na comunidade. Continuar?"
                 )
               );
               if (!okDelete) return;

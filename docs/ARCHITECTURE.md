@@ -13,7 +13,7 @@
 2. `lib/enrich.ts` intenta extraer metadata (título, descripción, imagen, sitio).
 3. `lib/classify.ts` ejecuta clasificación heurística (tema/subtema, calidad, Aura).
 4. `lib/utils.ts` canonicaliza URL y detecta duplicados.
-5. `lib/store.ts` persiste en IndexedDB (o localStorage fallback).
+5. `lib/store.ts` persiste en Supabase (tablas relacionales).
 6. `lib/appData.ts` recalcula métricas de comunidad y ranking.
 
 ## Router y navegación
@@ -35,22 +35,20 @@
 - valor interno de influencia (`userInfluenceAuraById`),
 - control de roles y moderación (`admin/member`).
 
-## Seguridad (modelo local)
+## Seguridad (modelo backend)
 
-- Contraseñas:
-  - política mínima: 8+ caracteres, mayúscula, minúscula, número y símbolo.
-  - hash local con PBKDF2-SHA256 + salt por usuario.
+- Auth: Supabase Auth (email sintético por alias + contraseña).
+- Autorización: RLS en tablas `profiles`, `posts`, `comments`, `post_votes`, `post_shares`, `post_opens`, `comment_aura`, `user_preferences`.
 - Roles:
-  - primer usuario registrado pasa a `admin`.
-  - nunca se permite dejar el sistema sin al menos un admin.
-- Limitación estructural:
-  - al ser SPA local-first sin backend, la seguridad es de cliente; para seguridad multiusuario fuerte se necesita auth/autorización en servidor.
+  - `member` por defecto.
+  - `admin` gestionable con policies/SQL v3 (opcional).
+- En SQL v2, la mayoría de escrituras de moderación quedan acotadas a recursos propios.
+- En SQL v3, se habilitan capacidades admin globales (borrar/editar de terceros, roles).
 
 ## Persistencia
 
-- Primario: IndexedDB vía `idb`.
-- Fallback: localStorage.
-- Almacenamiento local por navegador/dispositivo.
+- Primario: Supabase Postgres (backend compartido).
+- `localStorage` solo para sesión activa en cliente (`news-curation-active-user-id`) y estado visual menor.
 
 ## Módulos clave
 
@@ -58,10 +56,10 @@
 - `lib/topicForum.ts`: ranking específico para timeline de tema.
 - `lib/enrich.ts`: extracción de metadata de enlaces.
 - `lib/i18n.ts`: traducciones ES/EN/GL.
-- `lib/store.ts`: acceso a datos local-first.
+- `lib/store.ts`: acceso a datos backend-first (Supabase).
 
 ## Extensibilidad
 
 - Clasificador desacoplado: se puede sustituir por API futura.
-- Estructura de tipos estable para migrar a backend compartido.
+- Estructura de tipos estable para extender SQL (RPC, moderation logs, analytics, etc.).
 - UI basada en componentes con props tipadas (sin `any`).

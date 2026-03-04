@@ -117,21 +117,28 @@ export const useAppData = () => {
   const [activeUserId, setActiveUserIdState] = useState<string | null>(getActiveUserId());
   const [preferences, setPreferences] = useState<UserPreferences | null>(null);
   const [loading, setLoading] = useState(true);
+  const [backendError, setBackendError] = useState<string | null>(null);
 
   const reload = useCallback(async (options?: { showSkeleton?: boolean }) => {
     const showSkeleton = options?.showSkeleton ?? false;
     if (showSkeleton) {
       setLoading(true);
     }
-    const [fetchedUsers, fetchedPosts] = await Promise.all([getUsers(), listPosts()]);
-    setUsers(fetchedUsers);
-    setPosts(fetchedPosts);
+    try {
+      const [fetchedUsers, fetchedPosts] = await Promise.all([getUsers(), listPosts()]);
+      setUsers(fetchedUsers);
+      setPosts(fetchedPosts);
 
-    if (activeUserId) {
-      const prefs = await getPreferences(activeUserId);
-      setPreferences(prefs);
-    } else {
-      setPreferences(null);
+      if (activeUserId) {
+        const prefs = await getPreferences(activeUserId);
+        setPreferences(prefs);
+      } else {
+        setPreferences(null);
+      }
+      setBackendError(null);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Unknown backend error";
+      setBackendError(message);
     }
 
     if (showSkeleton) {
@@ -142,6 +149,30 @@ export const useAppData = () => {
   useEffect(() => {
     void reload({ showSkeleton: true });
   }, [reload]);
+
+  useEffect(() => {
+    if (!remoteModeEnabled || !supabase) return;
+    let cancelled = false;
+
+    void (async () => {
+      const { data } = await supabase.auth.getSession();
+      const sessionUserId = data.session?.user.id ?? null;
+      if (cancelled) return;
+      setActiveUserId(sessionUserId);
+      setActiveUserIdState(sessionUserId);
+    })();
+
+    const { data: listener } = supabase.auth.onAuthStateChange((_event, session) => {
+      const sessionUserId = session?.user.id ?? null;
+      setActiveUserId(sessionUserId);
+      setActiveUserIdState(sessionUserId);
+    });
+
+    return () => {
+      cancelled = true;
+      listener.subscription.unsubscribe();
+    };
+  }, []);
 
   const activeUser = useMemo(
     () => users.find((user) => user.id === activeUserId) ?? null,
@@ -384,60 +415,10 @@ export const useAppData = () => {
 
   const removeUser = useCallback(
     async (userId: string) => {
-      const target = users.find((entry) => entry.id === userId);
-      if (!target) return;
-      for (const post of posts) {
-        const nextComments = (post.comments ?? []).filter((comment) => comment.userId !== userId);
-        const nextFeedbacks = (post.feedbacks ?? []).filter((feedback) => feedback.userId !== userId);
-        const nextOpened = (post.openedByUserIds ?? []).filter((id) => id !== userId);
-        const nextContributorCounts = { ...(post.contributorCounts ?? {}) };
-        delete nextContributorCounts[userId];
-        const contributorEntries = Object.entries(nextContributorCounts).filter(([, count]) => count > 0);
-        const nextContributorUserIds = contributorEntries.map(([id]) => id);
-        const nextShareCount = contributorEntries.reduce((acc, [, count]) => acc + count, 0);
-
-        if (post.userId === userId) {
-          if (nextContributorUserIds.length === 0) {
-            await deletePostById(post.id);
-            continue;
-          }
-          const nextOwnerId = contributorEntries
-            .slice()
-            .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))[0][0];
-          await updatePost({
-            ...post,
-            userId: nextOwnerId,
-            comments: nextComments,
-            feedbacks: nextFeedbacks,
-            openedByUserIds: nextOpened,
-            contributorUserIds: nextContributorUserIds,
-            contributorCounts: nextContributorCounts,
-            shareCount: nextShareCount
-          });
-          continue;
-        }
-
-        const touched =
-          nextComments.length !== (post.comments ?? []).length ||
-          nextFeedbacks.length !== (post.feedbacks ?? []).length ||
-          nextOpened.length !== (post.openedByUserIds ?? []).length ||
-          nextContributorUserIds.length !== (post.contributorUserIds ?? [post.userId]).length ||
-          Boolean(post.contributorCounts?.[userId]);
-        if (!touched) continue;
-        await updatePost({
-          ...post,
-          comments: nextComments,
-          feedbacks: nextFeedbacks,
-          openedByUserIds: nextOpened,
-          contributorUserIds: nextContributorUserIds,
-          contributorCounts: nextContributorCounts,
-          shareCount: nextShareCount
-        });
-      }
       await deleteUserById(userId);
       await reload();
     },
-    [users, posts, reload]
+    [reload]
   );
 
   const updateUserAvatar = useCallback(
@@ -737,6 +718,7 @@ export const useAppData = () => {
     activeUser,
     activeUserId,
     loading,
+    backendError,
     preferences,
     reload,
     loginWithUserId,

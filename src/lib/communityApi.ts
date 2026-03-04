@@ -1,4 +1,17 @@
-import { getCommunitySession, type CommunityAuthSession, type CommunitySelection, setCommunitySession, setSelectedCommunity } from "./communitySession";
+import {
+  clearCommunitySession,
+  clearGlobalSession,
+  getCommunitySession,
+  getGlobalSession,
+  getGlobalSettings,
+  setCommunitySession,
+  setSelectedCommunity,
+  setGlobalSession,
+  setGlobalSettings,
+  type CommunityAuthSession,
+  type CommunitySelection,
+  type GlobalAuthSession
+} from "./communitySession";
 import type { Post, User, UserPreferences } from "./types";
 
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL as string | undefined;
@@ -12,6 +25,7 @@ interface ApiError {
 
 const headers = (): HeadersInit => {
   const session = getCommunitySession();
+  const globalSession = getGlobalSession();
   const apikey = supabasePublishableKey || supabaseAnonKey;
   return {
     "Content-Type": "application/json",
@@ -25,7 +39,8 @@ const headers = (): HeadersInit => {
           Authorization: `Bearer ${supabaseAnonKey}`
         }
       : {}),
-    ...(session ? { "x-wee-session": session.sessionToken } : {})
+    ...(session ? { "x-wee-session": session.sessionToken } : {}),
+    ...(globalSession ? { "x-wee-global-session": globalSession.sessionToken } : {})
   };
 };
 
@@ -64,6 +79,25 @@ export interface CommunityPreviewResponse {
   };
 }
 
+export interface CommunityListItem {
+  community_id: string;
+  name: string;
+  description?: string;
+  role: "admin" | "member";
+}
+
+export interface GlobalAuthResponse {
+  session_token: string;
+  user: {
+    id: string;
+    username: string;
+  };
+  settings?: {
+    default_community_id?: string;
+    skip_picker?: boolean;
+  };
+}
+
 export interface CommunityAuthResponse {
   session_token: string;
   user: {
@@ -93,6 +127,60 @@ const toSession = (payload: CommunityAuthResponse): CommunityAuthSession => ({
   }
 });
 
+const toGlobalSession = (payload: GlobalAuthResponse): GlobalAuthSession => ({
+  sessionToken: payload.session_token,
+  userId: payload.user.id,
+  username: payload.user.username
+});
+
+export const registerGlobalUser = async (input: { username: string; password: string; email?: string }): Promise<GlobalAuthSession> => {
+  const data = await request<GlobalAuthResponse>("/auth/register_global", input);
+  const session = toGlobalSession(data);
+  setGlobalSession(session);
+  setGlobalSettings({
+    defaultCommunityId: data.settings?.default_community_id,
+    skipPicker: Boolean(data.settings?.skip_picker)
+  });
+  return session;
+};
+
+export const loginGlobalUser = async (input: { username: string; password: string }): Promise<GlobalAuthSession> => {
+  const data = await request<GlobalAuthResponse>("/auth/login_global", input);
+  const session = toGlobalSession(data);
+  setGlobalSession(session);
+  setGlobalSettings({
+    defaultCommunityId: data.settings?.default_community_id,
+    skipPicker: Boolean(data.settings?.skip_picker)
+  });
+  return session;
+};
+
+export const logoutGlobalUser = async (): Promise<void> => {
+  await request<{ ok: true }>("/auth/logout_global", {});
+  clearCommunitySession();
+  clearGlobalSession();
+};
+
+export const listMyCommunities = async (): Promise<{ communities: CommunityListItem[]; settings: { default_community_id?: string; skip_picker?: boolean } }> =>
+  request<{ communities: CommunityListItem[]; settings: { default_community_id?: string; skip_picker?: boolean } }>("/communities/list", {});
+
+export const enterCommunity = async (input: { community_id: string }): Promise<CommunityAuthSession> => {
+  const data = await request<CommunityAuthResponse>("/community/enter", input);
+  const session = toSession(data);
+  setCommunitySession(session);
+  return session;
+};
+
+export const updateGlobalSettings = async (input: { default_community_id?: string | null; skip_picker?: boolean }): Promise<void> => {
+  const data = await request<{ settings: { default_community_id?: string; skip_picker?: boolean } }>("/user/settings/update", input);
+  setGlobalSettings({
+    defaultCommunityId: data.settings.default_community_id,
+    skipPicker: Boolean(data.settings.skip_picker)
+  });
+};
+
+export const getCachedGlobalSettings = () => getGlobalSettings();
+
 export const createCommunity = async (input: {
   name: string;
   description?: string;
@@ -100,15 +188,24 @@ export const createCommunity = async (input: {
   invite_policy: "admins_only" | "members_allowed";
   code?: string;
   invite_expires_at?: string;
-}): Promise<CommunityPreviewResponse> => request<CommunityPreviewResponse>("/community/create", input);
+}): Promise<CommunityPreviewResponse> => {
+  const globalSession = getGlobalSession();
+  if (globalSession) {
+    return request<CommunityPreviewResponse>("/community/create_global", input);
+  }
+  return request<CommunityPreviewResponse>("/community/create", input);
+};
 
 export const previewCommunity = async (input: { code?: string; token?: string }): Promise<CommunityPreviewResponse> =>
   request<CommunityPreviewResponse>("/community/preview", input);
 
 export const confirmJoinCommunity = async (input: { code?: string; token?: string }): Promise<CommunitySelection> => {
-  const data = await request<{ community_id: string; name: string; description?: string }>("/community/join/confirm", input);
+  const globalSession = getGlobalSession();
+  const data = await request<{ community_id: string; name: string; description?: string }>(
+    globalSession ? "/community/join/by_invite" : "/community/join/confirm",
+    input
+  );
   const community: CommunitySelection = { id: data.community_id, name: data.name, description: data.description };
-  setSelectedCommunity(community);
   return community;
 };
 

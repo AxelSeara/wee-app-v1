@@ -1,5 +1,5 @@
 import { AnimatePresence } from "framer-motion";
-import { useEffect, useLayoutEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useState } from "react";
 import { HashRouter, Navigate, Route, Routes, useLocation } from "react-router-dom";
 import { AppFooter } from "./components/AppFooter";
 import { AppSkeleton } from "./components/AppSkeleton";
@@ -17,17 +17,19 @@ import { listPosts as listPostsFromStore, reportPostById } from "./lib/store";
 import { consumeRateLimit } from "./lib/rateLimit";
 import type { AppLanguage, AuraRulesetVersion, ExportBundle } from "./lib/types";
 import { canonicalizeUrl, duplicateUrlKeys, generateId, normalizeSpace, sha256Hex } from "./lib/utils";
+import { resolveRootRoute } from "./lib/communityNavigation";
 import { HomePage } from "./pages/HomePage";
-import { LoginPage } from "./pages/LoginPage";
+import { AuthPage } from "./pages/AuthPage";
 import { PostDetailPage } from "./pages/PostDetailPage";
 import { ProfilePage } from "./pages/ProfilePage";
 import { RequireAuth } from "./pages/RequireAuth";
-import { InvitePage } from "./pages/InvitePage";
+import { CommunitiesPickerPage } from "./pages/CommunitiesPickerPage";
 import { SettingsPage } from "./pages/SettingsPage";
 import { SharePage } from "./pages/SharePage";
 import { TopicPage } from "./pages/TopicPage";
 import { UserPostsPage } from "./pages/UserPostsPage";
 import { CommunityPage } from "./pages/CommunityPage";
+import { InviteRedirectPage } from "./pages/InviteRedirectPage";
 
 const AppRoutes = () => {
   const location = useLocation();
@@ -35,6 +37,8 @@ const AppRoutes = () => {
     users,
     posts,
     activeUser,
+    globalSession,
+    globalSettings,
     selectedCommunity,
     communityRulesText,
     communityMembers,
@@ -42,6 +46,12 @@ const AppRoutes = () => {
     loading,
     backendError,
     createOrLogin,
+    loginGlobal,
+    registerGlobal,
+    logoutGlobal,
+    fetchCommunities,
+    setCommunityAsActive,
+    saveGlobalSettings,
     createCommunityFlow,
     previewCommunityInvite,
     confirmCommunityInvite,
@@ -72,6 +82,7 @@ const AppRoutes = () => {
   const [toast, setToast] = useState<string | null>(null);
   const [shareModalOpen, setShareModalOpen] = useState(false);
   const [notificationsReadAt, setNotificationsReadAt] = useState(0);
+  const [myCommunities, setMyCommunities] = useState<Array<{ community_id: string; name: string; description?: string; role: "admin" | "member" }>>([]);
   const [guestLanguage, setGuestLanguage] = useState<AppLanguage>(() => {
     try {
       return normalizeLanguage(localStorage.getItem("wee:guest-language") ?? undefined);
@@ -97,6 +108,23 @@ const AppRoutes = () => {
     if (!activeUser) return;
     void loadCommunityOverview().catch(() => undefined);
   }, [activeUser, loadCommunityOverview]);
+
+  const reloadMyCommunities = useCallback(async () => {
+    if (!globalSession) {
+      setMyCommunities([]);
+      return;
+    }
+    try {
+      const data = await fetchCommunities();
+      setMyCommunities(data.communities);
+    } catch {
+      setMyCommunities([]);
+    }
+  }, [fetchCommunities, globalSession]);
+
+  useEffect(() => {
+    void reloadMyCommunities();
+  }, [reloadMyCommunities]);
 
   useLayoutEffect(() => {
     window.scrollTo({ top: 0, left: 0, behavior: "auto" });
@@ -963,37 +991,56 @@ const AppRoutes = () => {
         <Route
           path="/login"
           element={
-            <PageTransition>
-              <LoginPage
-                users={users}
-                selectedCommunity={selectedCommunity}
-                onCreateCommunity={createCommunityFlow}
-                onPreviewCommunity={previewCommunityInvite}
-                onConfirmCommunity={confirmCommunityInvite}
-                onCreateOrLogin={createOrLogin}
-                onChangeLanguage={setGuestLanguage}
-              />
-            </PageTransition>
+            globalSession ? (
+              <Navigate to={activeUser ? "/home" : "/communities"} replace />
+            ) : (
+              <PageTransition>
+                <AuthPage
+                  onLogin={async (username, password) => {
+                    await loginGlobal(username, password);
+                  }}
+                  onRegister={async (username, password, email) => {
+                    await registerGlobal(username, password, email);
+                  }}
+                  onChangeLanguage={setGuestLanguage}
+                />
+              </PageTransition>
+            )
           }
         />
 
         <Route
           path="/invite/:token"
           element={
-            <PageTransition>
-              <InvitePage
-                onPreviewCommunity={previewCommunityInvite}
-                onConfirmCommunity={confirmCommunityInvite}
-                onCreateOrLogin={createOrLogin}
-              />
-            </PageTransition>
+            <InviteRedirectPage />
+          }
+        />
+
+        <Route
+          path="/communities"
+          element={
+            globalSession ? (
+              <PageTransition>
+                <CommunitiesPickerPage
+                  communities={myCommunities}
+                  defaultCommunityId={globalSettings.defaultCommunityId}
+                  skipPicker={globalSettings.skipPicker}
+                  onReload={reloadMyCommunities}
+                  onEnterCommunity={setCommunityAsActive}
+                  onCreateCommunity={createCommunityFlow}
+                  onPreviewCommunity={previewCommunityInvite}
+                  onJoinCommunity={confirmCommunityInvite}
+                  onSaveSettings={saveGlobalSettings}
+                />
+              </PageTransition>
+            ) : <Navigate to="/login" replace />
           }
         />
 
         <Route
           path="/home"
           element={
-            <RequireAuth activeUser={activeUser}>
+            <RequireAuth activeUser={activeUser} redirectPath={globalSession ? "/communities" : "/login"}>
               <PageTransition>
                 <HomePage
                   activeUser={activeUser as NonNullable<typeof activeUser>}
@@ -1015,7 +1062,7 @@ const AppRoutes = () => {
         <Route
           path="/topic/:topic"
           element={
-            <RequireAuth activeUser={activeUser}>
+            <RequireAuth activeUser={activeUser} redirectPath={globalSession ? "/communities" : "/login"}>
               <PageTransition>
                 <TopicPage
                   activeUser={activeUser as NonNullable<typeof activeUser>}
@@ -1040,7 +1087,7 @@ const AppRoutes = () => {
         <Route
           path="/post/:postId"
           element={
-            <RequireAuth activeUser={activeUser}>
+            <RequireAuth activeUser={activeUser} redirectPath={globalSession ? "/communities" : "/login"}>
               <PageTransition>
                 <PostDetailPage
                   activeUser={activeUser as NonNullable<typeof activeUser>}
@@ -1069,7 +1116,7 @@ const AppRoutes = () => {
         <Route
           path="/share"
           element={
-            <RequireAuth activeUser={activeUser}>
+            <RequireAuth activeUser={activeUser} redirectPath={globalSession ? "/communities" : "/login"}>
               <PageTransition>
                 <SharePage
                   activeUser={activeUser as NonNullable<typeof activeUser>}
@@ -1086,7 +1133,7 @@ const AppRoutes = () => {
         <Route
           path="/profile/:userId"
           element={
-            <RequireAuth activeUser={activeUser}>
+            <RequireAuth activeUser={activeUser} redirectPath={globalSession ? "/communities" : "/login"}>
               <PageTransition>
                 <ProfilePage
                   activeUser={activeUser as NonNullable<typeof activeUser>}
@@ -1109,7 +1156,7 @@ const AppRoutes = () => {
         <Route
           path="/profile/:userId/posts"
           element={
-            <RequireAuth activeUser={activeUser}>
+            <RequireAuth activeUser={activeUser} redirectPath={globalSession ? "/communities" : "/login"}>
               <PageTransition>
                 <UserPostsPage
                   activeUser={activeUser as NonNullable<typeof activeUser>}
@@ -1128,7 +1175,7 @@ const AppRoutes = () => {
         <Route
           path="/settings"
           element={
-            <RequireAuth activeUser={activeUser}>
+            <RequireAuth activeUser={activeUser} redirectPath={globalSession ? "/communities" : "/login"}>
               <PageTransition>
                 <SettingsPage
                   activeUser={activeUser as NonNullable<typeof activeUser>}
@@ -1150,7 +1197,7 @@ const AppRoutes = () => {
         <Route
           path="/community"
           element={
-            <RequireAuth activeUser={activeUser}>
+            <RequireAuth activeUser={activeUser} redirectPath={globalSession ? "/communities" : "/login"}>
               <PageTransition>
                 <CommunityPage
                   activeUser={activeUser as NonNullable<typeof activeUser>}
@@ -1169,8 +1216,8 @@ const AppRoutes = () => {
           }
         />
 
-        <Route path="/" element={<Navigate to={activeUser ? "/home" : "/login"} replace />} />
-        <Route path="*" element={<Navigate to={activeUser ? "/home" : "/login"} replace />} />
+        <Route path="/" element={<Navigate to={resolveRootRoute({ hasGlobalSession: Boolean(globalSession), hasActiveCommunitySession: Boolean(activeUser) })} replace />} />
+        <Route path="*" element={<Navigate to={resolveRootRoute({ hasGlobalSession: Boolean(globalSession), hasActiveCommunitySession: Boolean(activeUser) })} replace />} />
         </Routes>
         </AnimatePresence>
         <Toast message={toast} />

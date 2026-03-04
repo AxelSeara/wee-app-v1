@@ -5,11 +5,12 @@ import type { User } from "../lib/types";
 interface RequireAuthProps {
   activeUser: User | null;
   children: ReactNode;
+  redirectPath?: string;
 }
 
-export const RequireAuth = ({ activeUser, children }: RequireAuthProps) => {
+export const RequireAuth = ({ activeUser, children, redirectPath = "/login" }: RequireAuthProps) => {
   if (!activeUser) {
-    return <Navigate to="/login" replace />;
+    return <Navigate to={redirectPath} replace />;
   }
   return <>{children}</>;
 };

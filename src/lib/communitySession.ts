@@ -13,9 +13,22 @@ export interface CommunityAuthSession {
   community: CommunitySelection;
 }
 
+export interface GlobalAuthSession {
+  sessionToken: string;
+  userId: string;
+  username: string;
+}
+
+export interface GlobalUserSettings {
+  defaultCommunityId?: string;
+  skipPicker?: boolean;
+}
+
 const KEYS = {
   selected: "wee:community:selected",
-  session: "wee:community:session"
+  session: "wee:community:session",
+  globalSession: "wee:global:session",
+  globalSettings: "wee:global:settings"
 } as const;
 
 const readJson = <T,>(key: string): T | null => {
@@ -49,4 +62,27 @@ export const setCommunitySession = (session: CommunityAuthSession | null): void 
 
 export const clearCommunitySession = (): void => {
   localStorage.removeItem(KEYS.session);
+};
+
+export const getGlobalSession = (): GlobalAuthSession | null => readJson<GlobalAuthSession>(KEYS.globalSession);
+export const setGlobalSession = (session: GlobalAuthSession | null): void => {
+  if (!session) {
+    localStorage.removeItem(KEYS.globalSession);
+    return;
+  }
+  localStorage.setItem(KEYS.globalSession, JSON.stringify(session));
+};
+
+export const getGlobalSettings = (): GlobalUserSettings | null => readJson<GlobalUserSettings>(KEYS.globalSettings);
+export const setGlobalSettings = (settings: GlobalUserSettings | null): void => {
+  if (!settings) {
+    localStorage.removeItem(KEYS.globalSettings);
+    return;
+  }
+  localStorage.setItem(KEYS.globalSettings, JSON.stringify(settings));
+};
+
+export const clearGlobalSession = (): void => {
+  localStorage.removeItem(KEYS.globalSession);
+  localStorage.removeItem(KEYS.globalSettings);
 };

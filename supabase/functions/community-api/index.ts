@@ -14,7 +14,7 @@ const json = (status: number, body: Record<string, unknown>, extraHeaders?: Head
     headers: {
       "Content-Type": "application/json",
       "Access-Control-Allow-Origin": "*",
-      "Access-Control-Allow-Headers": "content-type,authorization,apikey,x-client-info,x-wee-session",
+      "Access-Control-Allow-Headers": "content-type,authorization,apikey,x-client-info,x-wee-session,x-wee-global-session",
       "Access-Control-Allow-Methods": "POST,OPTIONS",
       ...extraHeaders
     }
@@ -54,6 +54,40 @@ const extractSessionToken = (req: Request): string | null => {
   const cookie = req.headers.get("cookie") ?? "";
   const m = cookie.match(/wee_session=([^;]+)/);
   return m?.[1] ?? null;
+};
+
+const extractGlobalSessionToken = (req: Request): string | null => {
+  const header = req.headers.get("x-wee-global-session");
+  if (header?.trim()) return header.trim();
+  const cookie = req.headers.get("cookie") ?? "";
+  const m = cookie.match(/wee_global_session=([^;]+)/);
+  return m?.[1] ?? null;
+};
+
+const requireGlobalSession = async (req: Request): Promise<{
+  session: { id: string; user_id: string; expires_at: string; revoked_at: string | null };
+  user: { id: string; username: string; email: string | null };
+} | Response> => {
+  const token = extractGlobalSessionToken(req);
+  if (!token) return json(401, { message: "Missing global session" });
+  const tokenHash = await sha256Hex(token);
+  const { data: session, error } = await db
+    .from("global_sessions")
+    .select("id,user_id,expires_at,revoked_at")
+    .eq("session_token_hash", tokenHash)
+    .is("revoked_at", null)
+    .maybeSingle();
+  if (error || !session) return json(401, { message: "Invalid global session" });
+  if (Date.parse(session.expires_at) <= Date.now()) return json(401, { message: "Global session expired" });
+
+  const { data: user, error: uErr } = await db
+    .from("global_users")
+    .select("id,username,email")
+    .eq("id", session.user_id)
+    .maybeSingle();
+  if (uErr || !user) return json(401, { message: "Global user not found" });
+
+  return { session, user };
 };
 
 const requireSession = async (req: Request): Promise<{
@@ -371,7 +405,291 @@ const syncOwnInteractions = async (auth: { user: { id: string }; community: { id
   }
 };
 
+const ensureCommunityProfileForGlobalUser = async (
+  communityId: string,
+  globalUser: { id: string; username: string }
+): Promise<{ communityUserId: string; alias: string; role: Role }> => {
+  const profileRes = await db
+    .from("community_profiles")
+    .select("community_user_id,display_name")
+    .eq("community_id", communityId)
+    .eq("user_id", globalUser.id)
+    .maybeSingle();
+  if (profileRes.error) throw new Error(profileRes.error.message);
+
+  let communityUserId = profileRes.data?.community_user_id as string | undefined;
+  let alias = (profileRes.data?.display_name as string | undefined) ?? globalUser.username;
+
+  if (!communityUserId) {
+    const normalizedAlias = normalizeAlias(alias);
+    const insertedUser = await db
+      .from("community_users")
+      .insert({
+        community_id: communityId,
+        alias,
+        normalized_alias: normalizedAlias,
+        password_hash: "",
+        language: "es",
+        status: "active",
+        global_user_id: globalUser.id
+      })
+      .select("id,alias")
+      .single();
+    if (insertedUser.error || !insertedUser.data) {
+      throw new Error(insertedUser.error?.message ?? "Could not create community profile user");
+    }
+    communityUserId = insertedUser.data.id as string;
+    alias = insertedUser.data.alias as string;
+
+    const profileInsert = await db.from("community_profiles").insert({
+      community_id: communityId,
+      user_id: globalUser.id,
+      community_user_id: communityUserId,
+      display_name: alias,
+      display_name_norm: normalizeAlias(alias),
+      language: "es"
+    });
+    if (profileInsert.error) throw new Error(profileInsert.error.message);
+  }
+
+  const memberUpsert = await db.from("community_members").upsert(
+    {
+      community_id: communityId,
+      user_id: globalUser.id,
+      status: "active"
+    },
+    { onConflict: "community_id,user_id" }
+  );
+  if (memberUpsert.error) throw new Error(memberUpsert.error.message);
+
+  const roleRes = await db
+    .from("community_user_roles")
+    .select("role")
+    .eq("community_id", communityId)
+    .eq("user_id", communityUserId)
+    .maybeSingle();
+  if (roleRes.error) throw new Error(roleRes.error.message);
+  const role: Role = (roleRes.data?.role as Role | undefined) ?? "member";
+  if (!roleRes.data) {
+    const insertRole = await db
+      .from("community_user_roles")
+      .insert({ community_id: communityId, user_id: communityUserId, role: "member" });
+    if (insertRole.error) throw new Error(insertRole.error.message);
+  }
+
+  return { communityUserId, alias, role };
+};
+
+const createCommunitySession = async (
+  communityId: string,
+  communityUserId: string
+): Promise<{ token: string; expiresAt: string }> => {
+  const token = randomToken();
+  const tokenHash = await sha256Hex(token);
+  const expiresAt = new Date(Date.now() + 1000 * 60 * 60 * 24 * 30).toISOString();
+  const { error } = await db.from("sessions").insert({
+    community_id: communityId,
+    user_id: communityUserId,
+    session_token_hash: tokenHash,
+    created_at: nowIso(),
+    expires_at: expiresAt
+  });
+  if (error) throw new Error(error.message);
+  return { token, expiresAt };
+};
+
 const handlers = {
+  "/auth/register_global": async (req: Request) => {
+    const body = await parseBody(req);
+    const username = String(body.username ?? "").trim();
+    const email = body.email ? String(body.email).trim().toLowerCase() : null;
+    const password = String(body.password ?? "");
+    if (username.length < 2) return bad("username too short");
+    if (password.length < 4) return bad("password too short");
+
+    const usernameNorm = normalizeAlias(username);
+    const passwordHash = await sha256Hex(password);
+    const exists = await db
+      .from("global_users")
+      .select("id")
+      .eq("username_norm", usernameNorm)
+      .maybeSingle();
+    if (exists.error) return json(400, { message: exists.error.message });
+    if (exists.data) return json(409, { message: "USERNAME_EXISTS" });
+
+    const inserted = await db
+      .from("global_users")
+      .insert({
+        username,
+        username_norm: usernameNorm,
+        email,
+        password_hash: passwordHash
+      })
+      .select("id,username")
+      .single();
+    if (inserted.error || !inserted.data) return json(400, { message: inserted.error?.message ?? "Register failed" });
+
+    const token = randomToken();
+    const tokenHash = await sha256Hex(token);
+    const expiresAt = new Date(Date.now() + 1000 * 60 * 60 * 24 * 30).toISOString();
+    const sErr = await db.from("global_sessions").insert({
+      user_id: inserted.data.id,
+      session_token_hash: tokenHash,
+      created_at: nowIso(),
+      expires_at: expiresAt
+    });
+    if (sErr.error) return json(500, { message: sErr.error.message });
+
+    return json(
+      200,
+      {
+        session_token: token,
+        user: { id: inserted.data.id, username: inserted.data.username },
+        settings: { skip_picker: false }
+      },
+      {
+        "Set-Cookie": `wee_global_session=${token}; Path=/; HttpOnly; SameSite=Lax; Max-Age=${60 * 60 * 24 * 30}`
+      }
+    );
+  },
+
+  "/auth/login_global": async (req: Request) => {
+    const body = await parseBody(req);
+    const username = String(body.username ?? "").trim();
+    const password = String(body.password ?? "");
+    if (!username || !password) return bad("username and password required");
+
+    const usernameNorm = normalizeAlias(username);
+    const passwordHash = await sha256Hex(password);
+    const userRes = await db
+      .from("global_users")
+      .select("id,username,password_hash")
+      .eq("username_norm", usernameNorm)
+      .maybeSingle();
+    if (userRes.error || !userRes.data) return json(401, { message: "Invalid credentials" });
+    if (userRes.data.password_hash !== passwordHash) return json(401, { message: "Invalid credentials" });
+
+    const token = randomToken();
+    const tokenHash = await sha256Hex(token);
+    const expiresAt = new Date(Date.now() + 1000 * 60 * 60 * 24 * 30).toISOString();
+    const sErr = await db.from("global_sessions").insert({
+      user_id: userRes.data.id,
+      session_token_hash: tokenHash,
+      created_at: nowIso(),
+      expires_at: expiresAt
+    });
+    if (sErr.error) return json(500, { message: sErr.error.message });
+
+    const settingsRes = await db
+      .from("user_settings")
+      .select("default_community_id,skip_picker")
+      .eq("user_id", userRes.data.id)
+      .maybeSingle();
+
+    return json(
+      200,
+      {
+        session_token: token,
+        user: { id: userRes.data.id, username: userRes.data.username },
+        settings: settingsRes.data ?? { skip_picker: false }
+      },
+      {
+        "Set-Cookie": `wee_global_session=${token}; Path=/; HttpOnly; SameSite=Lax; Max-Age=${60 * 60 * 24 * 30}`
+      }
+    );
+  },
+
+  "/auth/logout_global": async (req: Request) => {
+    const token = extractGlobalSessionToken(req);
+    if (token) {
+      const tokenHash = await sha256Hex(token);
+      await db.from("global_sessions").update({ revoked_at: nowIso() }).eq("session_token_hash", tokenHash).is("revoked_at", null);
+    }
+    return json(200, { ok: true }, { "Set-Cookie": "wee_global_session=; Path=/; HttpOnly; Max-Age=0; SameSite=Lax" });
+  },
+
+  "/communities/list": async (req: Request) => {
+    const globalAuth = await requireGlobalSession(req);
+    if (globalAuth instanceof Response) return globalAuth;
+
+    const membershipsRes = await db
+      .from("community_members")
+      .select("community_id,status,communities(name,description),community_profiles(display_name),community_user_roles(role)")
+      .eq("user_id", globalAuth.user.id)
+      .eq("status", "active");
+    if (membershipsRes.error) return json(500, { message: membershipsRes.error.message });
+    const settingsRes = await db
+      .from("user_settings")
+      .select("default_community_id,skip_picker")
+      .eq("user_id", globalAuth.user.id)
+      .maybeSingle();
+
+    return json(200, {
+      communities: (membershipsRes.data ?? []).map((entry: any) => ({
+        community_id: entry.community_id,
+        name: entry.communities?.name ?? "community",
+        description: entry.communities?.description ?? undefined,
+        role: (entry.community_user_roles?.[0]?.role ?? "member") as Role,
+        display_name: entry.community_profiles?.[0]?.display_name ?? globalAuth.user.username
+      })),
+      settings: settingsRes.data ?? { skip_picker: false }
+    });
+  },
+
+  "/user/settings/update": async (req: Request) => {
+    const globalAuth = await requireGlobalSession(req);
+    if (globalAuth instanceof Response) return globalAuth;
+    const body = await parseBody(req);
+    const payload = {
+      user_id: globalAuth.user.id,
+      default_community_id: body.default_community_id ? String(body.default_community_id) : null,
+      skip_picker: Boolean(body.skip_picker),
+      updated_at: nowIso()
+    };
+    const result = await db.from("user_settings").upsert(payload, { onConflict: "user_id" });
+    if (result.error) return json(400, { message: result.error.message });
+    return json(200, { settings: { default_community_id: payload.default_community_id ?? undefined, skip_picker: payload.skip_picker } });
+  },
+
+  "/community/enter": async (req: Request) => {
+    const globalAuth = await requireGlobalSession(req);
+    if (globalAuth instanceof Response) return globalAuth;
+    const body = await parseBody(req);
+    const communityId = String(body.community_id ?? "").trim();
+    if (!communityId) return bad("community_id required");
+
+    const membership = await db
+      .from("community_members")
+      .select("community_id,status")
+      .eq("community_id", communityId)
+      .eq("user_id", globalAuth.user.id)
+      .maybeSingle();
+    if (membership.error || !membership.data || membership.data.status !== "active") {
+      return json(403, { message: "Membership required" });
+    }
+
+    const profile = await ensureCommunityProfileForGlobalUser(communityId, globalAuth.user);
+    const session = await createCommunitySession(communityId, profile.communityUserId);
+    const communityRes = await db
+      .from("communities")
+      .select("id,name,description,rules_text,invite_policy")
+      .eq("id", communityId)
+      .single();
+    if (communityRes.error || !communityRes.data) return json(404, { message: "Community not found" });
+
+    return json(
+      200,
+      {
+        session_token: session.token,
+        user: { id: profile.communityUserId, alias: profile.alias, language: "es" },
+        community: communityRes.data
+      },
+      {
+        "Set-Cookie": `wee_session=${session.token}; Path=/; HttpOnly; SameSite=Lax; Max-Age=${60 * 60 * 24 * 30}`
+      }
+    );
+  },
+
   "/community/create": async (req: Request) => {
     const body = await parseBody(req);
     const name = String(body.name ?? "").trim();
@@ -406,6 +724,60 @@ const handlers = {
       name: community.name,
       description: community.description,
       invite: { code, token, link: buildInviteUrl(token) }
+    });
+  },
+
+  "/community/create_global": async (req: Request) => {
+    const globalAuth = await requireGlobalSession(req);
+    if (globalAuth instanceof Response) return globalAuth;
+    const body = await parseBody(req);
+    const name = String(body.name ?? "").trim();
+    if (name.length < 2) return bad("Community name is required");
+    const description = String(body.description ?? "").trim() || null;
+    const rulesText = String(body.rules_text ?? "").trim() || null;
+    const invitePolicy: InvitePolicy = body.invite_policy === "members_allowed" ? "members_allowed" : "admins_only";
+    const code = normalizeCode(String(body.code ?? randomCode()));
+    const expiresAt = body.invite_expires_at ? new Date(String(body.invite_expires_at)).toISOString() : null;
+
+    const createCommunityRes = await db
+      .from("communities")
+      .insert({ name, description, rules_text: rulesText, invite_policy: invitePolicy })
+      .select("id,name,description")
+      .single();
+    if (createCommunityRes.error || !createCommunityRes.data) {
+      return json(500, { message: createCommunityRes.error?.message ?? "Create community failed" });
+    }
+    const communityId = createCommunityRes.data.id as string;
+
+    await ensureCommunityProfileForGlobalUser(communityId, globalAuth.user);
+    const profileRes = await db
+      .from("community_profiles")
+      .select("community_user_id")
+      .eq("community_id", communityId)
+      .eq("user_id", globalAuth.user.id)
+      .single();
+    if (profileRes.error || !profileRes.data) return json(500, { message: profileRes.error?.message ?? "Profile create failed" });
+
+    const roleUpsert = await db.from("community_user_roles").upsert(
+      { community_id: communityId, user_id: profileRes.data.community_user_id, role: "admin" },
+      { onConflict: "community_id,user_id" }
+    );
+    if (roleUpsert.error) return json(500, { message: roleUpsert.error.message });
+
+    const inviteInsert = await db.from("community_invites").insert({
+      community_id: communityId,
+      code,
+      token: randomToken(),
+      created_by: profileRes.data.community_user_id,
+      created_at: nowIso(),
+      expires_at: expiresAt
+    });
+    if (inviteInsert.error) return json(500, { message: inviteInsert.error.message });
+
+    return json(200, {
+      community_id: communityId,
+      name: createCommunityRes.data.name,
+      description: createCommunityRes.data.description ?? undefined
     });
   },
 
@@ -487,6 +859,45 @@ const handlers = {
           }
         : undefined,
       confirmed: true
+    });
+  },
+
+  "/community/join/by_invite": async (req: Request) => {
+    const globalAuth = await requireGlobalSession(req);
+    if (globalAuth instanceof Response) return globalAuth;
+    const body = await parseBody(req);
+    const code = body.code ? normalizeCode(String(body.code)) : null;
+    const token = body.token ? String(body.token).trim() : null;
+    if (!code && !token) return bad("code or token required");
+
+    const query = db
+      .from("community_invites")
+      .select("community_id,expires_at,revoked_at,communities(name,description)")
+      .is("revoked_at", null)
+      .limit(1);
+    const inviteRes = code ? await query.eq("code", code).maybeSingle() : await query.eq("token", token).maybeSingle();
+    if (inviteRes.error || !inviteRes.data) return json(404, { message: "Invite not found" });
+    if (inviteRes.data.expires_at && Date.parse(inviteRes.data.expires_at) < Date.now()) return json(410, { message: "Invite expired" });
+
+    const communityId = inviteRes.data.community_id as string;
+    const memberUpsert = await db.from("community_members").upsert(
+      {
+        community_id: communityId,
+        user_id: globalAuth.user.id,
+        status: "active"
+      },
+      { onConflict: "community_id,user_id" }
+    );
+    if (memberUpsert.error) return json(400, { message: memberUpsert.error.message });
+
+    await ensureCommunityProfileForGlobalUser(communityId, globalAuth.user);
+
+    const community = inviteRes.data.communities as { name: string; description: string | null };
+    return json(200, {
+      community_id: communityId,
+      name: community.name,
+      description: community.description ?? undefined,
+      joined: true
     });
   },
 

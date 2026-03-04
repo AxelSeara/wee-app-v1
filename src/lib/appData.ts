@@ -18,6 +18,13 @@ import {
   upsertPreferences
 } from "./store";
 import {
+  enterCommunity,
+  getCachedGlobalSettings,
+  listMyCommunities,
+  loginGlobalUser,
+  logoutGlobalUser,
+  registerGlobalUser,
+  updateGlobalSettings,
   confirmJoinCommunity,
   createInvite,
   createCommunity,
@@ -29,10 +36,19 @@ import {
   registerCommunityUser,
   updateCommunity
 } from "./communityApi";
-import { clearCommunitySession, getCommunitySession, getSelectedCommunity, setSelectedCommunity, type CommunitySelection } from "./communitySession";
+import {
+  clearCommunitySession,
+  getCommunitySession,
+  getGlobalSession,
+  getSelectedCommunity,
+  setSelectedCommunity,
+  type CommunitySelection,
+  type GlobalAuthSession
+} from "./communitySession";
 import type { AppLanguage, ExportBundle, Post, SearchFilters, User, UserCommunityStats, UserPreferences } from "./types";
 import { isStrongPassword } from "./auth";
 import { auraRuntimeConfig, computeUserInfluenceScore, computeUserQualityScore } from "./auraEngine";
+import { isCommunitySessionAccessError } from "./communityNavigation";
 import { clamp, colorFromString, getInitials, normalizeSpace } from "./utils";
 
 interface CreateOrLoginResult {
@@ -108,7 +124,11 @@ export const useAppData = () => {
   const [users, setUsers] = useState<User[]>([]);
   const [posts, setPosts] = useState<Post[]>([]);
   const [activeUserId, setActiveUserIdState] = useState<string | null>(getActiveUserId());
+  const [globalSession, setGlobalSessionState] = useState<GlobalAuthSession | null>(getGlobalSession());
   const [selectedCommunity, setSelectedCommunityState] = useState<CommunitySelection | null>(getSelectedCommunity());
+  const [globalSettings, setGlobalSettingsState] = useState<{ defaultCommunityId?: string; skipPicker?: boolean }>(
+    () => getCachedGlobalSettings() ?? {}
+  );
   const [communityRulesText, setCommunityRulesText] = useState("");
   const [communityMembers, setCommunityMembers] = useState<Array<{ id: string; alias: string; role: "admin" | "member" }>>([]);
   const [preferences, setPreferences] = useState<UserPreferences | null>(null);
@@ -122,6 +142,7 @@ export const useAppData = () => {
     }
     try {
       const session = getCommunitySession();
+      setGlobalSessionState(getGlobalSession());
       if (!session) {
         setUsers([]);
         setPosts([]);
@@ -145,6 +166,10 @@ export const useAppData = () => {
       setBackendError(null);
     } catch (error) {
       const message = error instanceof Error ? error.message : "Unknown backend error";
+      if (isCommunitySessionAccessError(message)) {
+        clearCommunitySession();
+        setSelectedCommunityState(null);
+      }
       setBackendError(toPublicBackendError(message));
     }
 
@@ -160,6 +185,7 @@ export const useAppData = () => {
   useEffect(() => {
     const session = getCommunitySession();
     const userId = session?.userId ?? null;
+    setGlobalSessionState(getGlobalSession());
     setActiveUserId(userId);
     setActiveUserIdState(userId);
     setSelectedCommunityState(session?.community ?? getSelectedCommunity());
@@ -183,6 +209,57 @@ export const useAppData = () => {
     setUsers([]);
     setPosts([]);
     setPreferences(null);
+  }, []);
+
+  const logoutGlobal = useCallback(async () => {
+    await logoutGlobalUser();
+    setGlobalSessionState(null);
+    setGlobalSettingsState({});
+    setSelectedCommunityState(null);
+    setActiveUserId(null);
+    setActiveUserIdState(null);
+    setUsers([]);
+    setPosts([]);
+    setPreferences(null);
+  }, []);
+
+  const loginGlobal = useCallback(async (username: string, password: string) => {
+    const session = await loginGlobalUser({ username, password });
+    setGlobalSessionState(session);
+    setGlobalSettingsState(getCachedGlobalSettings() ?? {});
+    return session;
+  }, []);
+
+  const registerGlobal = useCallback(async (username: string, password: string, email?: string) => {
+    const session = await registerGlobalUser({ username, password, email });
+    setGlobalSessionState(session);
+    setGlobalSettingsState(getCachedGlobalSettings() ?? {});
+    return session;
+  }, []);
+
+  const fetchCommunities = useCallback(async () => {
+    const data = await listMyCommunities();
+    setGlobalSettingsState({
+      defaultCommunityId: data.settings.default_community_id,
+      skipPicker: Boolean(data.settings.skip_picker)
+    });
+    return data;
+  }, []);
+
+  const setCommunityAsActive = useCallback(async (communityId: string) => {
+    const session = await enterCommunity({ community_id: communityId });
+    setSelectedCommunityState(session.community);
+    setActiveUserId(session.userId);
+    setActiveUserIdState(session.userId);
+    await reload();
+  }, [reload]);
+
+  const saveGlobalSettings = useCallback(async (input: { defaultCommunityId?: string | null; skipPicker?: boolean }) => {
+    await updateGlobalSettings({
+      default_community_id: input.defaultCommunityId ?? null,
+      skip_picker: input.skipPicker
+    });
+    setGlobalSettingsState(getCachedGlobalSettings() ?? {});
   }, []);
 
   const createOrLogin = useCallback(
@@ -657,6 +734,8 @@ export const useAppData = () => {
     posts,
     activeUser,
     activeUserId,
+    globalSession,
+    globalSettings,
     selectedCommunity,
     communityRulesText,
     communityMembers,
@@ -665,6 +744,12 @@ export const useAppData = () => {
     preferences,
     reload,
     loginWithUserId,
+    loginGlobal,
+    registerGlobal,
+    logoutGlobal,
+    fetchCommunities,
+    setCommunityAsActive,
+    saveGlobalSettings,
     createOrLogin,
     createCommunityFlow,
     previewCommunityInvite,

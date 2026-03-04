@@ -117,6 +117,9 @@ const TopBarInner = ({ user, communityName, onLeaveCommunity, searchValue, onSea
               <Link to="/community" role="menuitem" className="user-menu-item" onClick={() => setProfileOpen(false)}>
                 <Icon name="users" size={13} /> {pick(language, "Comunidad", "Community", "Comunidade")}
               </Link>
+              <Link to="/communities" role="menuitem" className="user-menu-item" onClick={() => setProfileOpen(false)}>
+                <Icon name="users" size={13} /> {pick(language, "Mis comunidades", "My communities", "As miñas comunidades")}
+              </Link>
               <Link
                 to={`/profile/${user.id}/posts`}
                 role="menuitem"

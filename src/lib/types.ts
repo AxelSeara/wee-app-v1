@@ -2,6 +2,7 @@ export type QualityLabel = "high" | "medium" | "low" | "clickbait";
 export type AppLanguage = "es" | "en" | "gl";
 export type AuraRulesetVersion = "v1" | "v2";
 export type TopicRulesetVersion = "v1" | "v2";
+export type PostStatus = "active" | "collapsed" | "removed";
 
 export interface RuleAdjustment {
   ruleId: string;
@@ -66,6 +67,10 @@ export interface Post {
   id: string;
   userId: string;
   createdAt: number;
+  status?: PostStatus;
+  removedBy?: string;
+  removedAt?: number;
+  removedReason?: string;
   canonicalUrl?: string;
   url?: string;
   title?: string;

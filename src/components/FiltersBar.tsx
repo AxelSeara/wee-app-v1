@@ -20,7 +20,7 @@ export const FiltersBar = ({ filters, onChange, availableTopics, availableDomain
       value={filters.qualityLabel}
       onChange={(event) => onChange({ ...filters, qualityLabel: event.target.value as SearchFilters["qualityLabel"] })}
     >
-      <option value="all">Toda la calidad</option>
+      <option value="all">Todo Aura</option>
       <option value="high">Alta</option>
       <option value="medium">Media</option>
       <option value="low">Baja</option>

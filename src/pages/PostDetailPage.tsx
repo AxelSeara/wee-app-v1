@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { CommentsPanel } from "../components/CommentsPanel";
 import { Icon } from "../components/Icon";
@@ -11,7 +11,6 @@ import {
   formatAuraScore,
   formatNewsDate,
   previewImage,
-  qualityLabelText,
   sourceLabel,
   topicIntro
 } from "../lib/presentation";
@@ -33,6 +32,12 @@ interface PostDetailPageProps {
   onAdminDeletePost: (postId: string) => Promise<{ ok: boolean; message: string }>;
   onAdminUpdatePostTopic: (postId: string, nextTopic: string) => Promise<{ ok: boolean; message: string }>;
   onAddPostTopic: (postId: string, nextTopic: string) => Promise<{ ok: boolean; message: string }>;
+  onReportPost: (postId: string, reason: string) => Promise<{ ok: boolean; message: string }>;
+  onAdminModeratePost: (
+    postId: string,
+    status: "active" | "collapsed" | "removed",
+    reason: string
+  ) => Promise<{ ok: boolean; message: string }>;
   onToast: (message: string) => void;
 }
 
@@ -59,6 +64,8 @@ export const PostDetailPage = ({
   onAdminDeletePost,
   onAdminUpdatePostTopic,
   onAddPostTopic,
+  onReportPost,
+  onAdminModeratePost,
   onToast
 }: PostDetailPageProps) => {
   const { language } = useI18n();
@@ -74,6 +81,9 @@ export const PostDetailPage = ({
   const [manualTopic, setManualTopic] = useState("");
   const [topicBusy, setTopicBusy] = useState(false);
   const [adminTopic, setAdminTopic] = useState("");
+  const [reportReason, setReportReason] = useState("");
+  const [moderationReason, setModerationReason] = useState("");
+  const settingsRef = useRef<HTMLDetailsElement | null>(null);
   const isAdmin = activeUser.role === "admin";
 
   useEffect(() => {
@@ -83,7 +93,30 @@ export const PostDetailPage = ({
     setThumbUpPulse(false);
     setManualTopic("");
     setAdminTopic(postFromState?.topics?.[0] ?? "");
+    setReportReason("");
+    setModerationReason("");
   }, [postFromState]);
+
+  useEffect(() => {
+    const onDocPointerDown = (event: MouseEvent) => {
+      const details = settingsRef.current;
+      if (!details?.open) return;
+      if (details.contains(event.target as Node)) return;
+      details.open = false;
+    };
+    const onEsc = (event: KeyboardEvent) => {
+      if (event.key !== "Escape") return;
+      const details = settingsRef.current;
+      if (!details?.open) return;
+      details.open = false;
+    };
+    document.addEventListener("mousedown", onDocPointerDown);
+    document.addEventListener("keydown", onEsc);
+    return () => {
+      document.removeEventListener("mousedown", onDocPointerDown);
+      document.removeEventListener("keydown", onEsc);
+    };
+  }, []);
 
   const related = useMemo(() => {
     if (!current) return [];
@@ -129,84 +162,163 @@ export const PostDetailPage = ({
         <article className="detail-main">
           <div className="section-head">
             <h2>{displayTitle(current)}</h2>
-            <div className="detail-head-actions">
+            <div className="detail-head-actions page-head-actions">
               {current.url ? <span className="badge">{sourceLabel(current)}</span> : null}
-              <button type="button" className="btn" onClick={() => navigate(-1)}>
+              <button type="button" className="btn btn-nav" onClick={() => navigate(-1)}>
                 <Icon name="arrowLeft" /> {pick(language, "Volver", "Back")}
               </button>
-              <details className="detail-settings-menu">
-                <summary className="btn">
+              <details className="detail-settings-menu" ref={settingsRef}>
+                <summary className="btn btn-nav">
                   <Icon name="settings" /> {pick(language, "Ajustes", "Settings")}
                 </summary>
                 <div className="detail-settings-panel">
-                  <h3>{pick(language, "Ajustar temas", "Adjust topics")}</h3>
-                  <div className="detail-actions">
-                    <input
-                      value={manualTopic}
-                      onChange={(event) => setManualTopic(event.target.value)}
-                      placeholder={pick(language, "Ejemplo: energia", "Example: energy")}
-                    />
+                  <div className="detail-settings-head">
+                    <h3>{pick(language, "Ajustes rápidos", "Quick settings")}</h3>
                     <button
                       type="button"
-                      className="btn"
-                      disabled={!manualTopic.trim() || topicBusy}
-                      onClick={async () => {
-                        setTopicBusy(true);
-                        const result = await onAddPostTopic(current.id, manualTopic);
-                        onToast(result.message);
-                        if (result.ok) {
-                          const nextTopic = manualTopic
-                            .trim()
-                            .toLowerCase()
-                            .replace(/\s+/g, "-")
-                            .replace(/[^a-z0-9-]/g, "")
-                            .slice(0, 36);
-                          setCurrent((prev) => {
-                            if (!prev || prev.topics.includes(nextTopic)) return prev;
-                            return { ...prev, topics: [nextTopic, ...prev.topics].slice(0, 6) };
-                          });
-                          setManualTopic("");
-                        }
-                        setTopicBusy(false);
+                      className="btn btn-nav detail-settings-close"
+                      onClick={() => {
+                        if (settingsRef.current) settingsRef.current.open = false;
                       }}
                     >
-                      <Icon name="tag" /> {pick(language, "Añadir tema", "Add topic")}
+                      {pick(language, "Cerrar", "Close")}
                     </button>
+                  </div>
+                  <div className="detail-actions detail-actions-compact">
+                    <div className="detail-inline-action">
+                      <input
+                        value={manualTopic}
+                        onChange={(event) => setManualTopic(event.target.value)}
+                        placeholder={pick(language, "Ejemplo: energia", "Example: energy")}
+                      />
+                      <button
+                        type="button"
+                        className="btn detail-inline-icon-btn"
+                        disabled={!manualTopic.trim() || topicBusy}
+                        title={pick(language, "Añadir tema", "Add topic")}
+                        aria-label={pick(language, "Añadir tema", "Add topic")}
+                        onClick={async () => {
+                          setTopicBusy(true);
+                          const result = await onAddPostTopic(current.id, manualTopic);
+                          onToast(result.message);
+                          if (result.ok) {
+                            const nextTopic = manualTopic
+                              .trim()
+                              .toLowerCase()
+                              .replace(/\s+/g, "-")
+                              .replace(/[^a-z0-9-]/g, "")
+                              .slice(0, 36);
+                            setCurrent((prev) => {
+                              if (!prev || prev.topics.includes(nextTopic)) return prev;
+                              return { ...prev, topics: [nextTopic, ...prev.topics].slice(0, 6) };
+                            });
+                            setManualTopic("");
+                          }
+                          setTopicBusy(false);
+                        }}
+                      >
+                        <Icon name="plus" />
+                      </button>
+                    </div>
                   </div>
 
                   {isAdmin ? (
                     <div className="detail-settings-admin">
-                      <h3>{pick(language, "Moderación admin", "Admin moderation")}</h3>
-                      <div className="detail-actions">
-                        <input
-                          value={adminTopic}
-                          onChange={(event) => setAdminTopic(event.target.value)}
-                          placeholder={pick(language, "Nuevo tema", "New topic")}
-                        />
-                        <button
-                          type="button"
-                          className="btn"
-                          onClick={async () => {
-                            const result = await onAdminUpdatePostTopic(current.id, adminTopic);
-                            onToast(result.message);
-                          }}
-                        >
-                          {pick(language, "Cambiar tema", "Change topic")}
-                        </button>
-                        <button
-                          type="button"
-                          className="btn"
-                          onClick={async () => {
-                            const okDelete = window.confirm(pick(language, "¿Eliminar esta noticia?", "Delete this post?"));
-                            if (!okDelete) return;
-                            const result = await onAdminDeletePost(current.id);
-                            onToast(result.message);
-                            if (result.ok) navigate("/home");
-                          }}
-                        >
-                          {pick(language, "Eliminar noticia", "Delete post")}
-                        </button>
-                      </div>
+                      <details className="detail-subsection">
+                        <summary>{pick(language, "Moderación admin", "Admin moderation")}</summary>
+                        <div className="detail-actions detail-actions-compact">
+                          <div className="detail-inline-action">
+                            <input
+                              value={adminTopic}
+                              onChange={(event) => setAdminTopic(event.target.value)}
+                              placeholder={pick(language, "Nuevo tema", "New topic")}
+                            />
+                            <button
+                              type="button"
+                              className="btn detail-inline-icon-btn"
+                              title={pick(language, "Cambiar tema", "Change topic")}
+                              aria-label={pick(language, "Cambiar tema", "Change topic")}
+                              onClick={async () => {
+                                const result = await onAdminUpdatePostTopic(current.id, adminTopic);
+                                onToast(result.message);
+                              }}
+                            >
+                              <Icon name="pencil" />
+                            </button>
+                          </div>
+                          <input
+                            value={moderationReason}
+                            onChange={(event) => setModerationReason(event.target.value)}
+                            placeholder={pick(language, "Motivo moderación (opcional)", "Moderation reason (optional)")}
+                          />
+                          <div className="detail-actions detail-actions-grid">
+                            <button
+                              type="button"
+                              className="btn"
+                              onClick={async () => {
+                                const result = await onAdminModeratePost(current.id, "collapsed", moderationReason);
+                                onToast(result.message);
+                                if (result.ok) {
+                                  setCurrent((prev) =>
+                                    prev
+                                      ? {
+                                          ...prev,
+                                          status: "collapsed",
+                                          removedBy: activeUser.id,
+                                          removedAt: Date.now(),
+                                          removedReason: moderationReason.trim() || undefined
+                                        }
+                                      : prev
+                                  );
+                                }
+                              }}
+                            >
+                              {pick(language, "Colapsar", "Collapse")}
+                            </button>
+                            <button
+                              type="button"
+                              className="btn"
+                              onClick={async () => {
+                                const result = await onAdminModeratePost(current.id, "removed", moderationReason);
+                                onToast(result.message);
+                                if (result.ok) navigate("/home");
+                              }}
+                            >
+                              {pick(language, "Retirar", "Remove")}
+                            </button>
+                            <button
+                              type="button"
+                              className="btn"
+                              onClick={async () => {
+                                const result = await onAdminModeratePost(current.id, "active", "");
+                                onToast(result.message);
+                                if (result.ok) {
+                                  setCurrent((prev) =>
+                                    prev
+                                      ? { ...prev, status: "active", removedBy: undefined, removedAt: undefined, removedReason: undefined }
+                                      : prev
+                                  );
+                                }
+                              }}
+                            >
+                              {pick(language, "Restaurar", "Restore")}
+                            </button>
+                            <button
+                              type="button"
+                              className="btn"
+                              onClick={async () => {
+                                const okDelete = window.confirm(pick(language, "¿Eliminar esta noticia?", "Delete this post?"));
+                                if (!okDelete) return;
+                                const result = await onAdminDeletePost(current.id);
+                                onToast(result.message);
+                                if (result.ok) navigate("/home");
+                              }}
+                            >
+                              {pick(language, "Eliminar noticia", "Delete post")}
+                            </button>
+                          </div>
+                        </div>
+                      </details>
                     </div>
                   ) : null}
 
@@ -235,7 +347,6 @@ export const PostDetailPage = ({
           </div>
 
           <div className="modal-meta">
-            <span className={`quality quality-${current.qualityLabel}`}>{qualityLabelText(current.qualityLabel, language)}</span>
             <span className="interest-wrap">
               <button
                 type="button"
@@ -255,7 +366,7 @@ export const PostDetailPage = ({
                     ))}
                   </ul>
                 ) : (
-                  <p>{pick(language, "Basado en calidad, señales y contexto del hilo.", "Based on quality, signals and thread context.", "Baseado en calidade, sinais e contexto do fío.")}</p>
+                  <p>{pick(language, "Basado en señales de la comunidad y contexto del hilo.", "Based on community signals and thread context.", "Baseado en sinais da comunidade e contexto do fío.")}</p>
                 )}
               </span>
             </span>
@@ -282,6 +393,26 @@ export const PostDetailPage = ({
           ) : null}
 
           {current.text ? <p className="post-text">{current.text}</p> : <p className="post-text">{pick(language, "No hay resumen disponible.", "No summary available.")}</p>}
+          {!isAdmin ? (
+            <div className="detail-actions">
+              <input
+                value={reportReason}
+                onChange={(event) => setReportReason(event.target.value)}
+                placeholder={pick(language, "Motivo para reportar", "Reason to report")}
+              />
+              <button
+                type="button"
+                className="btn"
+                onClick={async () => {
+                  const result = await onReportPost(current.id, reportReason);
+                  onToast(result.message);
+                  if (result.ok) setReportReason("");
+                }}
+              >
+                <Icon name="shield" /> {pick(language, "Reportar", "Report")}
+              </button>
+            </div>
+          ) : null}
 
           <div className="detail-actions">
             {current.url ? (
@@ -441,7 +572,7 @@ export const PostDetailPage = ({
                             ))}
                           </ul>
                         ) : (
-                          <p>{pick(language, "Basado en calidad, señales y contexto del hilo.", "Based on quality, signals and thread context.", "Baseado en calidade, sinais e contexto do fío.")}</p>
+                          <p>{pick(language, "Basado en señales de la comunidad y contexto del hilo.", "Based on community signals and thread context.", "Baseado en sinais da comunidade e contexto do fío.")}</p>
                         )}
                       </span>
                     </span>

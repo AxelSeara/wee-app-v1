@@ -35,11 +35,11 @@ export const UserPostsPage = ({
   const profileUser = users.find((user) => user.id === userId) ?? activeUser;
   const isOwnProfile = profileUser.id === activeUser.id;
   const canAdminDelete = activeUser.role === "admin";
-  const [tab, setTab] = useState<"shared" | "quality" | "interest">("shared");
+  const [tab, setTab] = useState<"shared" | "interest">("shared");
 
   useEffect(() => {
     const raw = searchParams.get("tab");
-    if (raw === "quality" || raw === "interest" || raw === "shared") {
+    if (raw === "interest" || raw === "shared") {
       setTab(raw);
     }
   }, [searchParams]);
@@ -50,7 +50,6 @@ export const UserPostsPage = ({
   );
 
   const visiblePosts = useMemo(() => {
-    if (tab === "quality") return userPosts.filter((post) => post.qualityScore >= 75);
     if (tab === "interest") return userPosts.filter((post) => post.interestScore >= 75);
     return userPosts;
   }, [tab, userPosts]);
@@ -67,13 +66,13 @@ export const UserPostsPage = ({
               <p>{pick(language, `${userPosts.length} noticias compartidas`, `${userPosts.length} shared posts`)}</p>
             </div>
           </div>
-          <div className="profile-actions">
+          <div className="profile-actions page-head-actions">
             {isOwnProfile ? (
-              <Link to={`/profile/${profileUser.id}`} className="btn">
+              <Link to={`/profile/${profileUser.id}`} className="btn btn-nav">
                 <Icon name="settings" /> {pick(language, "Ajustes de perfil", "Profile settings", "Axustes de perfil")}
               </Link>
             ) : null}
-            <Link to="/home" className="link-btn">
+            <Link to="/home" className="btn btn-nav">
               <Icon name="arrowLeft" /> {pick(language, "Volver al inicio", "Back to home", "Volver ao inicio")}
             </Link>
           </div>
@@ -81,7 +80,6 @@ export const UserPostsPage = ({
 
         <div className="tabs">
           <button type="button" className={tab === "shared" ? "tab active" : "tab"} onClick={() => setTab("shared")}><Icon name="news" /> {pick(language, "Publicadas", "Posted", "Publicadas")}</button>
-          <button type="button" className={tab === "quality" ? "tab active" : "tab"} onClick={() => setTab("quality")}><Icon name="check" /> {pick(language, "Mejor calidad", "Best quality", "Mellor calidade")}</button>
           <button type="button" className={tab === "interest" ? "tab active" : "tab"} onClick={() => setTab("interest")}><Icon name="heart" /> {pick(language, "Más Aura", "More Aura", "Máis Aura")}</button>
         </div>
 

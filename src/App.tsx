@@ -9,11 +9,12 @@ import { Toast } from "./components/Toast";
 import { useAppData } from "./lib/appData";
 import { classifyPost } from "./lib/classify";
 import { I18nContext, normalizeLanguage, pick } from "./lib/i18n";
-import { deriveTitleFromUrl, displayTitle, isUnusableTitle, qualityLabelText } from "./lib/presentation";
+import { deriveTitleFromUrl, displayTitle, isUnusableTitle } from "./lib/presentation";
 import { enrichUrl } from "./lib/enrich";
 import { NotificationsContext, type AppNotification } from "./lib/notifications";
 import { trackComment, trackOpenSource, trackPageView, trackRate, trackShare } from "./lib/usageAnalytics";
-import { listPosts as listPostsFromStore } from "./lib/store";
+import { listPosts as listPostsFromStore, reportPostById } from "./lib/store";
+import { consumeRateLimit } from "./lib/rateLimit";
 import type { AuraRulesetVersion, ExportBundle } from "./lib/types";
 import { canonicalizeUrl, duplicateUrlKeys, generateId, normalizeSpace, sha256Hex } from "./lib/utils";
 import { HomePage } from "./pages/HomePage";
@@ -77,6 +78,28 @@ const AppRoutes = () => {
     () => Array.from(new Set(posts.flatMap((post) => post.topics))).sort(),
     [posts]
   );
+  const memberRemovedMode = import.meta.env.VITE_MEMBER_REMOVED_POSTS_MODE === "collapsed" ? "collapsed" : "hidden";
+  const postsForViewer = useMemo(() => {
+    if (!activeUser) return posts;
+    if (activeUser.role === "admin") return posts;
+    return posts
+      .filter((post) => (memberRemovedMode === "hidden" ? post.status !== "removed" : true))
+      .map((post) => {
+        if (memberRemovedMode === "collapsed" && post.status === "removed") {
+          return {
+            ...post,
+            status: "collapsed" as const,
+            title: pick(language, "Contenido moderado", "Moderated content"),
+            text: pick(language, "Este post fue moderado por administración.", "This post was moderated by admins."),
+            previewTitle: undefined,
+            previewDescription: undefined,
+            previewImageUrl: undefined,
+            url: undefined
+          };
+        }
+        return post;
+      });
+  }, [posts, activeUser, memberRemovedMode, language]);
   const notificationsStorageKey = activeUser ? `wee:notifications:last-read:${activeUser.id}` : "";
   useEffect(() => {
     if (!activeUser) {
@@ -245,6 +268,17 @@ const AppRoutes = () => {
     options?: { forceTopic?: string }
   ): Promise<{ mode: "created" | "merged" | "penalized"; message: string; debugBreakdown?: unknown; topicDebug?: unknown }> => {
     if (!activeUser) return { mode: "created", message: pick(language, "Inicia sesión para compartir enlaces.", "Sign in to share links.") };
+    const postLimit = await consumeRateLimit("create_post", activeUser.id);
+    if (!postLimit.allowed) {
+      return {
+        mode: "created",
+        message: pick(
+          language,
+          `Has alcanzado el límite de publicación. Reintenta en ${postLimit.retryAfterSec}s.`,
+          `Posting rate limit reached. Try again in ${postLimit.retryAfterSec}s.`
+        )
+      };
+    }
 
     const canonical = canonicalizeUrl(url);
     const existing = findDuplicatePost(url);
@@ -448,9 +482,9 @@ const AppRoutes = () => {
       mode: "created",
       message: pick(
         language,
-        `Publicado en ${finalTopics[0] ?? "misc"} · calidad ${qualityLabelText(classified.qualityLabel, language)}.`,
-        `Posted in ${finalTopics[0] ?? "misc"} · quality ${qualityLabelText(classified.qualityLabel, language)}.`,
-        `Publicado en ${finalTopics[0] ?? "misc"} · calidade ${qualityLabelText(classified.qualityLabel, "gl")}.`
+        `Publicado en ${finalTopics[0] ?? "misc"} · Aura ${classified.interestScore}.`,
+        `Posted in ${finalTopics[0] ?? "misc"} · Aura ${classified.interestScore}.`,
+        `Publicado en ${finalTopics[0] ?? "misc"} · Aura ${classified.interestScore}.`
       ),
       debugBreakdown: debugMode ? classified.debugBreakdown : undefined,
       topicDebug: debugMode
@@ -485,6 +519,17 @@ const AppRoutes = () => {
 
   const onRatePost = async (postId: string, vote: 1 | -1): Promise<{ ok: boolean; message: string }> => {
     if (!activeUser) return { ok: false, message: pick(language, "Inicia sesión para votar.", "Sign in to vote.") };
+    const voteLimit = await consumeRateLimit("vote_post", activeUser.id);
+    if (!voteLimit.allowed) {
+      return {
+        ok: false,
+        message: pick(
+          language,
+          `Límite de votos alcanzado. Reintenta en ${voteLimit.retryAfterSec}s.`,
+          `Vote rate limit reached. Try again in ${voteLimit.retryAfterSec}s.`
+        )
+      };
+    }
     let post = posts.find((entry) => entry.id === postId);
     if (!post) return { ok: false, message: pick(language, "No encontramos esta noticia.", "We could not find this post.") };
 
@@ -518,6 +563,17 @@ const AppRoutes = () => {
     text: string
   ): Promise<{ ok: boolean; message: string; post?: (typeof posts)[number] }> => {
     if (!activeUser) return { ok: false, message: pick(language, "Inicia sesión para comentar.", "Sign in to comment.") };
+    const commentLimit = await consumeRateLimit("create_comment", activeUser.id);
+    if (!commentLimit.allowed) {
+      return {
+        ok: false,
+        message: pick(
+          language,
+          `Límite de comentarios alcanzado. Reintenta en ${commentLimit.retryAfterSec}s.`,
+          `Comment rate limit reached. Try again in ${commentLimit.retryAfterSec}s.`
+        )
+      };
+    }
     const post = posts.find((entry) => entry.id === postId);
     if (!post) return { ok: false, message: pick(language, "No encontramos esta noticia.", "We could not find this post.") };
     const clean = text.trim().slice(0, 320);
@@ -620,6 +676,54 @@ const AppRoutes = () => {
     }
     await removePost(postId);
     return { ok: true, message: pick(language, "Noticia eliminada.", "Post deleted.") };
+  };
+
+  const onReportPost = async (postId: string, reason: string): Promise<{ ok: boolean; message: string }> => {
+    if (!activeUser) return { ok: false, message: pick(language, "Inicia sesión para reportar.", "Sign in to report.") };
+    const cleanReason = reason.trim().slice(0, 280);
+    if (!cleanReason) {
+      return { ok: false, message: pick(language, "Indica un motivo breve.", "Please provide a short reason.") };
+    }
+    try {
+      await reportPostById(postId, activeUser.id, cleanReason);
+      return { ok: true, message: pick(language, "Reporte enviado. Gracias por cuidar la comunidad.", "Report sent. Thanks for helping the community.") };
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "";
+      if (message.toLowerCase().includes("duplicate")) {
+        return { ok: false, message: pick(language, "Ya habías reportado esta publicación.", "You already reported this post.") };
+      }
+      return { ok: false, message: pick(language, "No pudimos enviar el reporte ahora.", "Could not send report right now.") };
+    }
+  };
+
+  const onAdminModeratePost = async (
+    postId: string,
+    status: "active" | "collapsed" | "removed",
+    reason: string
+  ): Promise<{ ok: boolean; message: string }> => {
+    if (!activeUser || activeUser.role !== "admin") {
+      return { ok: false, message: pick(language, "Acción solo para admin.", "Admin-only action.") };
+    }
+    const post = posts.find((entry) => entry.id === postId);
+    if (!post) return { ok: false, message: pick(language, "No encontramos esta noticia.", "We could not find this post.") };
+    const trimmedReason = reason.trim().slice(0, 220);
+    const moderated = {
+      ...post,
+      status,
+      removedBy: status === "active" ? undefined : activeUser.id,
+      removedAt: status === "active" ? undefined : Date.now(),
+      removedReason: status === "active" ? undefined : trimmedReason || undefined
+    };
+    await savePost(moderated);
+    return {
+      ok: true,
+      message:
+        status === "active"
+          ? pick(language, "Publicación reactivada.", "Post reactivated.")
+          : status === "collapsed"
+            ? pick(language, "Publicación colapsada.", "Post collapsed.")
+            : pick(language, "Publicación retirada.", "Post removed.")
+    };
   };
 
   const onAdminUpdatePostTopic = async (
@@ -837,7 +941,7 @@ const AppRoutes = () => {
                 <HomePage
                   activeUser={activeUser as NonNullable<typeof activeUser>}
                   users={users}
-                  posts={posts}
+                  posts={postsForViewer}
                   preferences={preferences}
                   filterPosts={filterPosts}
                   userQualityValueById={userQualityValueById}
@@ -859,7 +963,8 @@ const AppRoutes = () => {
                 <TopicPage
                   activeUser={activeUser as NonNullable<typeof activeUser>}
                   users={users}
-                  posts={posts}
+                  posts={postsForViewer}
+                  userInfluenceAuraById={userInfluenceAuraById}
                   onOpenShareModal={() => setShareModalOpen(true)}
                   onLogout={logout}
                   activeUserId={activeUser?.id ?? null}
@@ -883,7 +988,7 @@ const AppRoutes = () => {
                 <PostDetailPage
                   activeUser={activeUser as NonNullable<typeof activeUser>}
                   users={users}
-                  posts={posts}
+                  posts={postsForViewer}
                   onOpenShareModal={() => setShareModalOpen(true)}
                   onLogout={logout}
                   activeUserId={activeUser?.id ?? null}
@@ -895,6 +1000,8 @@ const AppRoutes = () => {
                   onAdminDeletePost={onAdminDeletePost}
                   onAdminUpdatePostTopic={onAdminUpdatePostTopic}
                   onAddPostTopic={onAddPostTopic}
+                  onReportPost={onReportPost}
+                  onAdminModeratePost={onAdminModeratePost}
                   onToast={showToast}
                 />
               </PageTransition>
@@ -927,7 +1034,7 @@ const AppRoutes = () => {
                 <ProfilePage
                   activeUser={activeUser as NonNullable<typeof activeUser>}
                   users={users}
-                  posts={posts}
+                  posts={postsForViewer}
                   userCommunityStatsById={userCommunityStatsById}
                   onLogout={logout}
                   onUpdateAvatar={updateUserAvatar}
@@ -950,7 +1057,7 @@ const AppRoutes = () => {
                 <UserPostsPage
                   activeUser={activeUser as NonNullable<typeof activeUser>}
                   users={users}
-                  posts={posts}
+                  posts={postsForViewer}
                   onDeletePost={removePost}
                   onToast={showToast}
                   onOpenShareModal={() => setShareModalOpen(true)}

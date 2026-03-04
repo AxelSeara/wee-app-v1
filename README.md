@@ -115,10 +115,12 @@ Para mejorar el scraping en producción, Wee usa una Edge Function de Supabase (
 ## AURA ruleset v2 (feature flag)
 
 - `VITE_AURA_RULESET_VERSION=v1|v2` (default `v1`)
+- Runtime config centralizada: `config/aura_runtime_v2.json`
 - Debug de indexado: añade `?debug=1` en la URL para obtener breakdown completo en la respuesta de publicación.
 - Documentación:
   - [docs/aura_audit.md](docs/aura_audit.md)
   - [docs/aura_rules_v2.md](docs/aura_rules_v2.md)
+  - [docs/aura_system_review.md](docs/aura_system_review.md)
 
 ## Topic ruleset v2 (feature flag)
 
@@ -141,6 +143,10 @@ Variables de entorno esperadas:
 - `VITE_SUPABASE_PUBLISHABLE_KEY` (recomendado)
 - `VITE_SUPABASE_ANON_KEY` (compatibilidad)
 - `VITE_REQUIRE_REMOTE=1` (opcional en local para forzar backend remoto; en producción ya se fuerza automáticamente)
+- `VITE_MEMBER_REMOVED_POSTS_MODE=hidden|collapsed` (default `hidden`)
+- `VITE_RATE_LIMIT_POSTS_PER_10M` (default `4`)
+- `VITE_RATE_LIMIT_COMMENTS_PER_5M` (default `8`)
+- `VITE_RATE_LIMIT_VOTES_PER_5M` (default `20`)
 
 La app incluye una comprobación rápida en `Ajustes > Backend (Supabase)`.
 
@@ -154,6 +160,9 @@ La app incluye una comprobación rápida en `Ajustes > Backend (Supabase)`.
 - `post_shares` (v2)
 - `post_opens` (v2)
 - `comment_aura` (v2)
+- `post_reports` (v4)
+- columnas de moderación en `posts` (v4): `status`, `removed_by`, `removed_at`, `removed_reason`
+- `rate_limit_events` + RPC `consume_rate_limit` (v4)
 
 Con este modo, usuarios/noticias/comentarios/votos se comparten entre navegadores/sesiones autenticadas.
 
@@ -238,6 +247,10 @@ create table if not exists comment_aura (
   primary key (comment_id, user_id)
 );
 ```
+
+SQL adicional recomendado para moderación mínima + anti-spam:
+
+- [supabase/sql/moderation_v4.sql](supabase/sql/moderation_v4.sql)
 
 RLS mínimo (lectura abierta de comunidad + escritura solo del usuario autenticado):
 

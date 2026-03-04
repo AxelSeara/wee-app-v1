@@ -34,7 +34,8 @@ export type IconName =
   | "bell"
   | "send"
   | "thumbUp"
-  | "thumbDown";
+  | "thumbDown"
+  | "pencil";
 
 interface IconProps {
   name: IconName;
@@ -98,7 +99,9 @@ const PATHS: Record<IconName, string> = {
   thumbUp:
     "M10 21H6a2 2 0 0 1-2-2v-7.5a2 2 0 0 1 2-2h4V21zm2 0V10.7l3.1-6.8c.4-.9 1.7-1.2 2.5-.6.5.3.8.9.8 1.5v4.2H21a2 2 0 0 1 2 2v1.3l-2.1 6.3A3 3 0 0 1 18.1 21H12z",
   thumbDown:
-    "M14 3h4a2 2 0 0 1 2 2v7.5a2 2 0 0 1-2 2h-4V3zm-2 0v10.3l-3.1 6.8c-.4.9-1.7 1.2-2.5.6a1.8 1.8 0 0 1-.8-1.5V15H3a2 2 0 0 1-2-2v-1.3l2.1-6.3A3 3 0 0 1 5.9 3H12z"
+    "M14 3h4a2 2 0 0 1 2 2v7.5a2 2 0 0 1-2 2h-4V3zm-2 0v10.3l-3.1 6.8c-.4.9-1.7 1.2-2.5.6a1.8 1.8 0 0 1-.8-1.5V15H3a2 2 0 0 1-2-2v-1.3l2.1-6.3A3 3 0 0 1 5.9 3H12z",
+  pencil:
+    "M3 17.2V21h3.8l11-11-3.8-3.8-11 11zM20.6 7.6a1 1 0 0 0 0-1.4l-2.8-2.8a1 1 0 0 0-1.4 0l-1.7 1.7 3.8 3.8 2.1-1.3z"
 };
 
 export const Icon = ({ name, size = 16, className, style }: IconProps) => (

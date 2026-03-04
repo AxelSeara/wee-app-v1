@@ -7,6 +7,7 @@ import { TopBar } from "../components/TopBar";
 import { pick, useI18n } from "../lib/i18n";
 import { TopicBlock } from "../components/TopicBlock";
 import { DEFAULT_FILTERS } from "../lib/appData";
+import { scoreHomeFeedPost } from "../lib/auraEngine";
 import type { Post, SearchFilters, User, UserCommunityStats, UserPreferences } from "../lib/types";
 
 interface HomePageProps {
@@ -57,37 +58,21 @@ export const HomePage = ({
   const navigate = useNavigate();
   const [searchQuery, setSearchQuery] = useState("");
   const [showOnboarding, setShowOnboarding] = useState(false);
-  const [activeSection, setActiveSection] = useState("popular-section");
+  const [activeSection, setActiveSection] = useState("feed-section");
   const [showAllActiveUsers, setShowAllActiveUsers] = useState(false);
   const [compactFeed, setCompactFeed] = useState(false);
-  const visiblePosts = useMemo(
+  const [selectedGroup, setSelectedGroup] = useState("all");
+  const filteredPosts = useMemo(
     () => filterPosts({ ...DEFAULT_FILTERS, query: searchQuery }),
     [filterPosts, searchQuery]
   );
-
-  const weightedFeedback = (post: Post): number => {
-    const feedbacks = post.feedbacks ?? [];
-    if (feedbacks.length === 0) return 0;
-    const totalWeight = feedbacks.reduce((acc, item) => {
-      const score = userInfluenceAuraById.get(item.userId) ?? 1000;
-      const weight = 0.6 + Math.pow(score / 10000, 1.25) * 1.4;
-      return acc + weight;
-    }, 0);
-    if (!totalWeight) return 0;
-    const weightedVote = feedbacks.reduce((acc, item) => {
-      const score = userInfluenceAuraById.get(item.userId) ?? 1000;
-      const weight = 0.6 + Math.pow(score / 10000, 1.25) * 1.4;
-      return acc + item.vote * weight;
-    }, 0);
-    const posterior = weightedVote / (totalWeight + 3.5);
-    const confidence = totalWeight / (totalWeight + 5);
-    return posterior * 22 * confidence;
-  };
-
-  const recencyScore = (createdAt: number): number => {
-    const ageHours = Math.max(0, (Date.now() - createdAt) / (1000 * 60 * 60));
-    return 14 * Math.exp(-ageHours / 26) - 3;
-  };
+  const visiblePosts = useMemo(
+    () =>
+      selectedGroup === "all"
+        ? filteredPosts
+        : filteredPosts.filter((post) => post.topics.includes(selectedGroup)),
+    [filteredPosts, selectedGroup]
+  );
 
   const byCommunityValue = (a: Post, b: Post): number => {
     const byRecent = (first: Post, second: Post): number => {
@@ -96,49 +81,22 @@ export const HomePage = ({
       if (second.interestScore !== first.interestScore) return second.interestScore - first.interestScore;
       return first.id.localeCompare(second.id);
     };
-    const valueA = userQualityValueById.get(a.userId) ?? 40;
-    const valueB = userQualityValueById.get(b.userId) ?? 40;
-    const recencyA = recencyScore(a.createdAt);
-    const recencyB = recencyScore(b.createdAt);
-    const evidenceA = a.flags.includes("no_source") ? -12 : a.flags.includes("unverified_claim") ? -8 : 6;
-    const evidenceB = b.flags.includes("no_source") ? -12 : b.flags.includes("unverified_claim") ? -8 : 6;
-    const clickbaitA = a.qualityLabel === "clickbait" ? -26 : 0;
-    const clickbaitB = b.qualityLabel === "clickbait" ? -26 : 0;
-    const collaborationA = Math.min(8, ((a.contributorUserIds?.length ?? 1) - 1) * 3);
-    const collaborationB = Math.min(8, ((b.contributorUserIds?.length ?? 1) - 1) * 3);
-    const scoreA =
-      a.qualityScore * 0.52 +
-      a.interestScore * 0.24 +
-      valueA * 0.14 +
-      recencyA +
-      evidenceA +
-      collaborationA +
-      clickbaitA +
-      weightedFeedback(a);
-    const scoreB =
-      b.qualityScore * 0.52 +
-      b.interestScore * 0.24 +
-      valueB * 0.14 +
-      recencyB +
-      evidenceB +
-      collaborationB +
-      clickbaitB +
-      weightedFeedback(b);
+    const scoreA = scoreHomeFeedPost(a, userQualityValueById, userInfluenceAuraById);
+    const scoreB = scoreHomeFeedPost(b, userQualityValueById, userInfluenceAuraById);
     const diff = scoreB - scoreA;
     if (Math.abs(diff) > 0.001) return diff;
     return byRecent(a, b);
   };
 
   const feedPosts = [...visiblePosts].sort(byCommunityValue).slice(0, 14);
-  const latestNewsPosts = [...visiblePosts]
-    .sort((a, b) => {
-      if (b.createdAt !== a.createdAt) return b.createdAt - a.createdAt;
-      if (b.qualityScore !== a.qualityScore) return b.qualityScore - a.qualityScore;
-      if (b.interestScore !== a.interestScore) return b.interestScore - a.interestScore;
-      return a.id.localeCompare(b.id);
-    })
-    .slice(0, 8);
   const topicBlocks = groupByTopic(visiblePosts);
+  const groupOptions = useMemo(() => {
+    const topics = Array.from(new Set(posts.flatMap((post) => post.topics))).sort();
+    return ["all", ...topics];
+  }, [posts]);
+  useEffect(() => {
+    if (!groupOptions.includes(selectedGroup)) setSelectedGroup("all");
+  }, [groupOptions, selectedGroup]);
   const usersById = useMemo(() => new Map(users.map((user) => [user.id, user])), [users]);
 
   const topContributors = useMemo(() => {
@@ -203,7 +161,7 @@ export const HomePage = ({
       return {
         healthScore: 0,
         activeAuthors: 0,
-        qualityRatio: 0,
+        auraAverage: 0,
         collaborationRatio: 0,
         commentedRatio: 0,
         ratedRatio: 0
@@ -211,17 +169,18 @@ export const HomePage = ({
     }
 
     const activeAuthors = new Set(visiblePosts.map((post) => post.userId)).size;
-    const qualityCount = visiblePosts.filter((post) => post.qualityScore >= 75 && post.qualityLabel !== "clickbait").length;
+    const auraAverage = Math.round(
+      visiblePosts.reduce((acc, post) => acc + post.interestScore, 0) / Math.max(1, visiblePosts.length)
+    );
     const collaborativeCount = visiblePosts.filter((post) => (post.contributorUserIds?.length ?? 1) > 1).length;
     const commentedCount = visiblePosts.filter((post) => (post.comments?.length ?? 0) > 0).length;
     const ratedCount = visiblePosts.filter((post) => (post.feedbacks?.length ?? 0) > 0).length;
 
-    const qualityRatio = Math.round((qualityCount / total) * 100);
     const collaborationRatio = Math.round((collaborativeCount / total) * 100);
     const commentedRatio = Math.round((commentedCount / total) * 100);
     const ratedRatio = Math.round((ratedCount / total) * 100);
     const healthScore = Math.round(
-      qualityRatio * 0.42 +
+      auraAverage * 0.42 +
       collaborationRatio * 0.2 +
       commentedRatio * 0.2 +
       ratedRatio * 0.18
@@ -230,7 +189,7 @@ export const HomePage = ({
     return {
       healthScore,
       activeAuthors,
-      qualityRatio,
+      auraAverage,
       collaborationRatio,
       commentedRatio,
       ratedRatio
@@ -246,7 +205,7 @@ export const HomePage = ({
   }, [activeUser.id]);
 
   useEffect(() => {
-    const sectionIds = ["popular-section", "topics-section", "news-section", "community-section"];
+    const sectionIds = ["feed-section", "topics-section", "community-section"];
     if (typeof IntersectionObserver !== "undefined") {
       const sections = sectionIds
         .map((id) => document.getElementById(id))
@@ -352,10 +311,10 @@ export const HomePage = ({
             <nav className="home-side-nav" aria-label={pick(language, "Navegación del foro", "Forum navigation", "Navegación do foro")}>
               <button
                 type="button"
-                className={activeSection === "popular-section" ? "side-nav-btn active" : "side-nav-btn"}
-                onClick={() => scrollToSection("popular-section")}
+                className={activeSection === "feed-section" ? "side-nav-btn active" : "side-nav-btn"}
+                onClick={() => scrollToSection("feed-section")}
               >
-                <Icon name="chili" /> {pick(language, "Popular", "Popular", "Popular")}
+                <Icon name="chili" /> {pick(language, "Feed", "Feed", "Feed")}
               </button>
               <button
                 type="button"
@@ -364,21 +323,26 @@ export const HomePage = ({
               >
                 <Icon name="book" /> {pick(language, "Temas", "Topics", "Temas")}
               </button>
-              <button
-                type="button"
-                className={activeSection === "news-section" ? "side-nav-btn active" : "side-nav-btn"}
-                onClick={() => scrollToSection("news-section")}
-              >
-                <Icon name="news" /> {pick(language, "Noticias", "News", "Novas")}
-              </button>
-              <button
-                type="button"
-                className={activeSection === "community-section" ? "side-nav-btn active" : "side-nav-btn"}
-                onClick={() => scrollToSection("community-section")}
-              >
-                <Icon name="users" /> {pick(language, "Comunidad", "Community", "Comunidade")}
-              </button>
+              <Link to={`/profile/${activeUser.id}/posts`} className="side-nav-btn">
+                <Icon name="user" /> {pick(language, "Perfil", "Profile", "Perfil")}
+              </Link>
             </nav>
+            <label className="home-sidebar-search" aria-label={pick(language, "Tema actual", "Current topic", "Tema actual")}>
+              <Icon name="book" size={13} />
+              <select
+                value={selectedGroup}
+                onChange={(event) => setSelectedGroup(event.target.value)}
+                className="settings-select"
+              >
+                {groupOptions.map((group) => (
+                  <option key={group} value={group}>
+                    {group === "all"
+                      ? pick(language, "Tema: Todos", "Topic: All", "Tema: Todos")
+                      : `${pick(language, "Tema", "Topic", "Tema")}: ${group}`}
+                  </option>
+                ))}
+              </select>
+            </label>
 
             <section className="home-users-block">
               <div className="home-users-head">
@@ -425,9 +389,14 @@ export const HomePage = ({
         </aside>
 
         <div className="home-main">
-          <section className="page-section section-latest" id="popular-section">
+          <section className="page-section section-latest" id="feed-section">
             <div className="section-head">
-              <h2><Icon name="chili" /> {pick(language, "Popular ahora", "Popular now", "Popular agora")}</h2>
+              <h2>
+                <Icon name="chili" />{" "}
+                {selectedGroup === "all"
+                  ? pick(language, "Popular del grupo", "Popular in group", "Popular do grupo")
+                  : `${pick(language, "Popular en", "Popular in", "Popular en")} ${selectedGroup}`}
+              </h2>
               <button type="button" className="btn" onClick={toggleCompactFeed}>
                 <Icon name="news" size={13} /> {compactFeed
                   ? pick(language, "Vista completa", "Expanded view", "Vista completa")
@@ -470,30 +439,6 @@ export const HomePage = ({
             </div>
           </section>
 
-          <section className="page-section section-latest" id="news-section">
-            <h2><Icon name="news" /> {pick(language, "Noticias recientes", "Latest news", "Novas recentes")}</h2>
-            <p className="section-intro">
-              {pick(language, "Publicaciones por orden temporal para no perder contexto.", "Posts in chronological order to keep context.", "Publicacións por orde temporal para non perder contexto.")}
-            </p>
-            <div className={compactFeed ? "post-grid post-grid-compact" : "post-grid"}>
-              {latestNewsPosts.length > 0 ? (
-                latestNewsPosts.map((post) => (
-                  <PostCard
-                    key={post.id}
-                    post={post}
-                    author={usersById.get(post.userId)}
-                    compact={compactFeed}
-                    onOpenDetail={(entry) => navigate(`/post/${entry.id}`)}
-                  />
-                ))
-              ) : (
-                <article className="empty-state">
-                  <h3>{pick(language, "Aún no hay noticias", "No news yet", "Aínda non hai novas")}</h3>
-                </article>
-              )}
-            </div>
-          </section>
-
           <section className="page-section section-collab" id="community-section">
             <div className="section-head">
               <h2><Icon name="users" /> {pick(language, "Comunidad", "Community", "Comunidade")}</h2>
@@ -515,8 +460,8 @@ export const HomePage = ({
 
               <div className="health-kpis">
                 <article className="health-kpi">
-                  <h4>{pick(language, "Calidad útil", "Useful quality")}</h4>
-                  <p>{communityPulse.qualityRatio}%</p>
+                  <h4>{pick(language, "Aura media", "Average Aura")}</h4>
+                  <p>{communityPulse.auraAverage}</p>
                 </article>
                 <article className="health-kpi">
                   <h4>{pick(language, "Colaboración", "Collaboration")}</h4>
@@ -540,9 +485,6 @@ export const HomePage = ({
               <button type="button" className="btn" onClick={() => scrollToSection("topics-section")}>
                 <Icon name="book" /> {pick(language, "Revisar temas", "Review topics")}
               </button>
-              <button type="button" className="btn" onClick={() => scrollToSection("news-section")}>
-                <Icon name="news" /> {pick(language, "Revisar noticias", "Review news")}
-              </button>
             </div>
 
             <div className="collab-grid">
@@ -553,7 +495,7 @@ export const HomePage = ({
                   <Link key={entry.userId} to={`/profile/${entry.userId}/posts`} className="collab-card">
                     <h3>{user.alias}</h3>
                     <p>
-                      {entry.count} {pick(language, "aportes", "contributions")} · {entry.highQuality} {pick(language, "de alta calidad", "high quality")} ·
+                      {entry.count} {pick(language, "aportes", "contributions")} ·
                       aura {userCommunityStatsById.get(entry.userId)?.aura ?? 0} ·
                       {pick(language, "nivel", "level")} {userCommunityStatsById.get(entry.userId)?.level ?? 1}
                     </p>

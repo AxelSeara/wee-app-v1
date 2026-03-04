@@ -269,7 +269,7 @@ export const ProfilePage = ({
                 <Icon name="trash" /> {pick(language, "Eliminar usuario", "Delete user")}
               </button>
             ) : null}
-            <Link to="/home" className="link-btn">
+            <Link to="/home" className="btn btn-nav">
               <Icon name="arrowLeft" /> {pick(language, "Volver al inicio", "Back to home")}
             </Link>
           </div>

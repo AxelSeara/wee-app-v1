@@ -1,5 +1,5 @@
 import { supabase } from "./backend/supabase";
-import type { ExportBundle, Post, User, UserPreferences } from "./types";
+import type { ExportBundle, Post, PostStatus, User, UserPreferences } from "./types";
 import { canonicalizeUrl, duplicateUrlKeys } from "./utils";
 
 const ACTIVE_USER_KEY = "news-curation-active-user-id";
@@ -22,6 +22,10 @@ interface PostRow {
   id: string;
   user_id: string;
   created_at: string;
+  status?: PostStatus | null;
+  removed_by?: string | null;
+  removed_at?: string | null;
+  removed_reason?: string | null;
   url: string | null;
   canonical_url: string | null;
   title: string | null;
@@ -76,6 +80,13 @@ interface CommentAuraRow {
   user_id: string;
 }
 
+interface PostReportRow {
+  post_id: string;
+  reporter_id: string;
+  reason: string;
+  created_at: string;
+}
+
 interface PreferenceRow {
   user_id: string;
   preferred_topics: string[] | null;
@@ -102,7 +113,8 @@ const ensureRemote = () => {
 const normalizePost = (post: Post): Post => ({
   ...post,
   canonicalUrl: post.canonicalUrl ?? canonicalizeUrl(post.url),
-  interestScore: Math.max(1, Math.min(100, Math.round(post.interestScore)))
+  interestScore: Math.max(1, Math.min(100, Math.round(post.interestScore))),
+  status: post.status ?? "active"
 });
 
 const profileToUser = (row: ProfileRow, profilePrivate?: ProfilePrivateRow): User => ({
@@ -147,6 +159,10 @@ const postRowToPost = (
     id: row.id,
     userId: row.user_id,
     createdAt: Date.parse(row.created_at) || Date.now(),
+    status: row.status ?? "active",
+    removedBy: row.removed_by ?? undefined,
+    removedAt: row.removed_at ? Date.parse(row.removed_at) : undefined,
+    removedReason: row.removed_reason ?? undefined,
     url: row.url ?? undefined,
     canonicalUrl: row.canonical_url ?? undefined,
     title: row.title ?? undefined,
@@ -198,6 +214,10 @@ const postRowToPost = (
 const postToRow = (post: Post): Omit<PostRow, "id" | "created_at"> & { created_at: string } => ({
   user_id: post.userId,
   created_at: new Date(post.createdAt).toISOString(),
+  status: post.status ?? "active",
+  removed_by: post.removedBy ?? null,
+  removed_at: post.removedAt ? new Date(post.removedAt).toISOString() : null,
+  removed_reason: post.removedReason ?? null,
   url: post.url ?? null,
   canonical_url: post.canonicalUrl ?? canonicalizeUrl(post.url) ?? null,
   title: post.title ?? null,
@@ -239,6 +259,17 @@ const stripTopicV2Columns = <T extends Record<string, unknown>>(row: T): T => {
   return clone;
 };
 
+const stripModerationColumns = <T extends Record<string, unknown>>(row: T): T => {
+  const clone = { ...row };
+  delete clone.status;
+  delete clone.removed_by;
+  delete clone.removed_at;
+  delete clone.removed_reason;
+  return clone;
+};
+
+const POSTS_SELECT_V4 =
+  "id,user_id,created_at,status,removed_by,removed_at,removed_reason,url,canonical_url,title,text,preview_title,preview_description,preview_image_url,preview_site_name,source_domain,topics,subtopics,topic_v2,topic_candidates_v2,topic_explanation_v2,topic_version,quality_label,quality_score,interest_score,flags,rationale,normalized_text";
 const POSTS_SELECT_V3 =
   "id,user_id,created_at,url,canonical_url,title,text,preview_title,preview_description,preview_image_url,preview_site_name,source_domain,topics,subtopics,topic_v2,topic_candidates_v2,topic_explanation_v2,topic_version,quality_label,quality_score,interest_score,flags,rationale,normalized_text";
 const POSTS_SELECT_V1 =
@@ -527,8 +558,12 @@ export const addPost = async (post: Post): Promise<void> => {
   };
   let { error } = await client.from("posts").insert(row);
   if (error && isMissingColumn(error as { code?: string })) {
-    const fallback = stripTopicV2Columns(row);
-    ({ error } = await client.from("posts").insert(fallback));
+    const fallbackV3 = stripTopicV2Columns(row);
+    ({ error } = await client.from("posts").insert(fallbackV3));
+    if (error && isMissingColumn(error as { code?: string })) {
+      const fallbackV2 = stripModerationColumns(fallbackV3);
+      ({ error } = await client.from("posts").insert(fallbackV2));
+    }
   }
   if (error) throw new Error(`Remote post create failed: ${error.message}`);
 
@@ -573,6 +608,12 @@ export const updatePost = async (post: Post): Promise<void> => {
       .update(stripTopicV2Columns(postToRow(normalized)))
       .eq("id", normalized.id);
   }
+  if (result.error && isMissingColumn(result.error as { code?: string })) {
+    result = await client
+      .from("posts")
+      .update(stripModerationColumns(stripTopicV2Columns(postToRow(normalized))))
+      .eq("id", normalized.id);
+  }
   if (result.error && (result.error as { code?: string }).code !== "42501") {
     throw new Error(`Remote post update failed: ${result.error.message}`);
   }
@@ -586,10 +627,19 @@ export const listPosts = async (): Promise<Post[]> => {
 
   const primary = await client
     .from("posts")
-    .select(POSTS_SELECT_V3)
+    .select(POSTS_SELECT_V4)
     .order("created_at", { ascending: false });
   posts = (primary.data ?? null) as PostRow[] | null;
   postsError = primary.error as { message: string; code?: string } | null;
+
+  if (postsError && isMissingColumn(postsError)) {
+    const withTopicFallback = await client
+      .from("posts")
+      .select(POSTS_SELECT_V3)
+      .order("created_at", { ascending: false });
+    posts = (withTopicFallback.data ?? null) as PostRow[] | null;
+    postsError = withTopicFallback.error as { message: string; code?: string } | null;
+  }
 
   if (postsError && isMissingColumn(postsError)) {
     const fallback = await client
@@ -648,6 +698,18 @@ export const listPosts = async (): Promise<Post[]> => {
   }
 
   return postRows.map((row) => postRowToPost(row, commentRows, voteRows, shareRows, openRows, commentAuraRows));
+};
+
+export const reportPostById = async (postId: string, reporterId: string, reason: string): Promise<void> => {
+  const client = ensureRemote();
+  const payload: PostReportRow = {
+    post_id: postId,
+    reporter_id: reporterId,
+    reason: reason.slice(0, 280),
+    created_at: new Date().toISOString()
+  };
+  const { error } = await client.from("post_reports").insert(payload);
+  if (error) throw new Error(`Remote report create failed: ${error.message}`);
 };
 
 export const deletePostById = async (postId: string): Promise<void> => {

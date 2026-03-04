@@ -98,8 +98,7 @@ export const PostDetailModal = ({
             </header>
 
             <div className="modal-meta">
-              <span className={`quality quality-${current.qualityLabel}`}>{current.qualityLabel}</span>
-              <span className="badge">Aura {formatAuraScore(current.interestScore)}/100</span>
+              <span className="badge">Aura {formatAuraScore(current.interestScore)}</span>
               {(current.contributorUserIds?.length ?? 1) > 1 ? (
                 <span className="badge">+{current.contributorUserIds?.length ?? 1} colaboradores</span>
               ) : null}

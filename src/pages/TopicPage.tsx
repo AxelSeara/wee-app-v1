@@ -14,6 +14,7 @@ interface TopicPageProps {
   activeUser: User;
   users: User[];
   posts: Post[];
+  userInfluenceAuraById: Map<string, number>;
   onOpenShareModal?: () => void;
   onLogout: () => void;
   activeUserId: string | null;
@@ -32,6 +33,7 @@ export const TopicPage = ({
   activeUser,
   users,
   posts,
+  userInfluenceAuraById,
   onOpenShareModal,
   onLogout,
   activeUserId,
@@ -62,10 +64,10 @@ export const TopicPage = ({
   }, [topic]);
   const usersById = useMemo(() => new Map(users.map((user) => [user.id, user])), [users]);
 
-  const topicPosts = rankTopicPosts(posts.filter((post) => post.topics.includes(topic)), topic).map((post) => ({
+  const topicPosts = rankTopicPosts(posts.filter((post) => post.topics.includes(topic)), topic, userInfluenceAuraById).map((post) => ({
     post,
     eventDate: extractNewsDate(post),
-    forumScore: topicForumScore(post, topic)
+    forumScore: topicForumScore(post, topic, userInfluenceAuraById)
   }));
 
   useEffect(() => {
@@ -152,11 +154,11 @@ export const TopicPage = ({
                 <Icon name="spark" size={12} /> {pick(language, "Aura media", "Avg Aura", "Aura media")} {averageAura}
               </span>
             </div>
-            <div className="topic-head-actions-row">
-              <button type="button" className="btn" onClick={() => setTopicSettingsOpen((prev) => !prev)}>
+            <div className="topic-head-actions-row page-head-actions">
+              <button type="button" className="btn btn-nav" onClick={() => setTopicSettingsOpen((prev) => !prev)}>
                 <Icon name="settings" /> {pick(language, "Ajustes", "Settings", "Axustes")}
               </button>
-              <Link to="/home" className="link-btn">
+              <Link to="/home" className="btn btn-nav">
                 <Icon name="arrowLeft" /> {pick(language, "Volver", "Back")}
               </Link>
             </div>

@@ -21,6 +21,7 @@ import {
 import { remoteModeEnabled, supabase } from "./backend/supabase";
 import type { AppLanguage, ExportBundle, Post, SearchFilters, User, UserCommunityStats, UserPreferences } from "./types";
 import { hashPassword, isStrongPassword, verifyPassword } from "./auth";
+import { auraRuntimeConfig, computeUserInfluenceScore, computeUserQualityScore } from "./auraEngine";
 import { clamp, colorFromString, generateId, getInitials, normalizeSpace } from "./utils";
 
 interface CreateOrLoginResult {
@@ -79,21 +80,6 @@ const pointsForLevel = (level: number): number => {
   const safeLevel = Math.max(1, level);
   return (safeLevel - 1) * (safeLevel - 1) * 110;
 };
-
-const USER_AURA_RULES = {
-  min: 1000,
-  max: 10000,
-  start: 1000
-} as const;
-
-const sigmoid = (x: number): number => 1 / (1 + Math.exp(-x));
-
-const bayesianMean = (
-  sampleMean: number,
-  sampleSize: number,
-  priorMean: number,
-  priorWeight: number
-): number => (sampleMean * sampleSize + priorMean * priorWeight) / Math.max(1, sampleSize + priorWeight);
 
 const aliasToAuthEmail = (alias: string): string => {
   const base = alias
@@ -550,30 +536,7 @@ export const useAppData = () => {
 
     users.forEach((user) => {
       const userPosts = postsByUser.get(user.id) ?? [];
-      if (userPosts.length === 0) {
-        value.set(user.id, 40);
-        return;
-      }
-
-      const aggregate = userPosts.reduce((acc, post) => {
-        const labelBonus =
-          post.qualityLabel === "high" ? 10 : post.qualityLabel === "medium" ? 4 : post.qualityLabel === "clickbait" ? -8 : -3;
-        const duplicatePenalty =
-          post.contributorCounts && post.contributorCounts[user.id] && post.contributorCounts[user.id] > 1
-            ? (post.contributorCounts[user.id] - 1) * 6
-            : 0;
-        const evidencePenalty = post.flags.includes("no_source") ? 10 : post.flags.includes("unverified_claim") ? 6 : 0;
-        return acc + post.qualityScore * 0.74 + post.interestScore * 0.16 + labelBonus - duplicatePenalty - evidencePenalty;
-      }, 0);
-
-      const rawMean = aggregate / userPosts.length;
-      const blended = bayesianMean(rawMean, userPosts.length, 56, 4);
-      const poorRate =
-        userPosts.filter((post) => post.qualityScore < 50 || post.qualityLabel === "clickbait").length /
-        Math.max(1, userPosts.length);
-      const consistencyMultiplier = 1 - poorRate * 0.22;
-      const score = Math.round(blended * consistencyMultiplier);
-      value.set(user.id, clamp(score, 0, 100));
+      value.set(user.id, computeUserQualityScore(userPosts));
     });
 
     return value;
@@ -626,7 +589,7 @@ export const useAppData = () => {
         return acc + Math.max(0, repeated - 1) * 7;
       }, 0);
 
-      const qualityScore = userQualityValueById.get(user.id) ?? 40;
+      const qualityScore = userQualityValueById.get(user.id) ?? auraRuntimeConfig.userQuality.defaultScore;
       const commentCount = authoredComments.length;
       const pointsRaw =
         postCount * 5 +
@@ -680,49 +643,19 @@ export const useAppData = () => {
 
   const userInfluenceAuraById = useMemo(() => {
     const value = new Map<string, number>();
+    const postsByUser = new Map<string, Post[]>();
+    posts.forEach((post) => {
+      postsByUser.set(post.userId, [...(postsByUser.get(post.userId) ?? []), post]);
+    });
 
     users.forEach((user) => {
-      const authoredPosts = posts.filter((post) => post.userId === user.id);
-      if (authoredPosts.length === 0) {
-        value.set(user.id, USER_AURA_RULES.start);
-        return;
-      }
-
-      const avgQuality = authoredPosts.reduce((acc, post) => acc + post.qualityScore, 0) / authoredPosts.length;
-      const highQuality = authoredPosts.filter((post) => post.qualityScore >= 75 && post.qualityLabel !== "clickbait").length;
-      const poorQuality = authoredPosts.filter((post) => post.qualityScore < 50 || post.qualityLabel === "clickbait").length;
-      const postCount = authoredPosts.length;
-      const duplicatePenalty = authoredPosts.reduce((acc, post) => {
-        const repeated = post.contributorCounts?.[user.id] ?? 1;
-        return acc + Math.max(0, repeated - 1);
-      }, 0);
-
-      const voteDelta = authoredPosts.reduce((acc, post) => {
-        return acc + (post.feedbacks ?? []).reduce((sum, feedback) => sum + feedback.vote, 0);
-      }, 0);
-
-      const highQualityRate = highQuality / Math.max(1, postCount);
-      const poorQualityRate = poorQuality / Math.max(1, postCount);
-      const duplicateRate = duplicatePenalty / Math.max(1, postCount);
-      const voteDeltaPerPost = voteDelta / Math.max(1, postCount);
-
-      const qualitySignal =
-        avgQuality * 0.46 +
-        highQualityRate * 52 -
-        poorQualityRate * 34 -
-        duplicateRate * 24;
-
-      const qualityLift = 2500 * sigmoid((qualitySignal - 52) / 10.5);
-      const volumeLift = 900 * (1 - Math.exp(-postCount / 14));
-      const voteLift = 1100 * Math.tanh(voteDeltaPerPost / 2.4);
-      const duplicateHit = duplicatePenalty * 35;
-
-      const raw = USER_AURA_RULES.start + qualityLift + volumeLift + voteLift - duplicateHit;
-      value.set(user.id, clamp(Math.round(raw), USER_AURA_RULES.min, USER_AURA_RULES.max));
+      const authoredPosts = postsByUser.get(user.id) ?? [];
+      const qualityScore = userQualityValueById.get(user.id) ?? auraRuntimeConfig.userQuality.defaultScore;
+      value.set(user.id, computeUserInfluenceScore(authoredPosts, qualityScore));
     });
 
     return value;
-  }, [users, posts]);
+  }, [users, posts, userQualityValueById]);
 
   return {
     users,

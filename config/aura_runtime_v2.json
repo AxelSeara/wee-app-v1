@@ -1,0 +1,88 @@
+{
+  "version": "v2",
+  "userLimits": {
+    "min": 1000,
+    "max": 10000,
+    "start": 1000
+  },
+  "postFeedback": {
+    "baseWeight": 0.6,
+    "maxWeight": 2,
+    "weightExponent": 1.25,
+    "priorWeight": 3.5,
+    "confidencePivot": 5,
+    "scoreScale": 22,
+    "maxAbsScore": 40
+  },
+  "feedRanking": {
+    "qualityWeight": 0.52,
+    "auraWeight": 0.24,
+    "authorQualityWeight": 0.14,
+    "evidenceBonus": 6,
+    "noSourcePenalty": 12,
+    "unverifiedPenalty": 8,
+    "clickbaitPenalty": 26,
+    "collaborationStep": 3,
+    "collaborationCap": 8,
+    "recencyAmplitude": 14,
+    "recencyHalfLifeHours": 26,
+    "recencyBias": -3,
+    "feedbackWeight": 1
+  },
+  "topicRanking": {
+    "signalScale": 42,
+    "signalSaturation": 2.2,
+    "qualityWeight": 0.22,
+    "auraWeight": 0.18,
+    "weakSignalThreshold": 0.8,
+    "weakSignalPenalty": 10,
+    "collaborationStep": 2.4,
+    "collaborationCap": 7,
+    "recencyAmplitude": 12,
+    "recencyHalfLifeHours": 28,
+    "recencyBias": -2,
+    "feedbackWeight": 0.75
+  },
+  "userQuality": {
+    "defaultScore": 40,
+    "qualityWeight": 0.74,
+    "auraWeight": 0.16,
+    "labelBonus": {
+      "high": 10,
+      "medium": 4,
+      "low": -3,
+      "clickbait": -8
+    },
+    "duplicatePenaltyPerExtra": 6,
+    "noSourcePenalty": 10,
+    "unverifiedPenalty": 6,
+    "priorMean": 56,
+    "priorWeight": 4,
+    "poorRatePenaltyMultiplier": 0.22,
+    "halfLifeDays": 21
+  },
+  "userReputation": {
+    "avgQualityWeight": 0.46,
+    "highQualityRateWeight": 52,
+    "poorQualityRatePenalty": 34,
+    "duplicateRatePenalty": 24,
+    "qualityLiftMax": 2500,
+    "qualityPivot": 52,
+    "qualitySlope": 10.5,
+    "volumeLiftMax": 900,
+    "volumeScale": 14,
+    "voteLiftMax": 1100,
+    "voteScale": 2.4,
+    "duplicatePenaltyPerHit": 35,
+    "stalenessFloor": 0.75,
+    "stalenessHalfLifeDays": 30
+  },
+  "antiGaming": {
+    "maxCountedVotesPerPostPerDay": 30,
+    "burstWindowMinutes": 30,
+    "burstVoteThreshold": 8,
+    "burstPenaltyPerVote": 0.9,
+    "minDistinctVotersForFullWeight": 3,
+    "lowDiversityMultiplier": 0.72
+  }
+}

@@ -26,7 +26,9 @@ export const PostCard = ({ post, canDelete = false, onDelete, onOpenDetail, comp
   const coverImage = previewImage(post);
   const auraHealthClass =
     post.interestScore >= 75 ? "aura-health-good" : post.interestScore >= 50 ? "aura-health-warn" : "aura-health-bad";
-  const snippet = (post.text ?? "").trim();
+  const snippet = post.status === "collapsed"
+    ? pick(language, "Contenido colapsado por moderación.", "Content collapsed by moderation.")
+    : (post.text ?? "").trim();
   const auraWhy = post.rationale.slice(0, 3);
   const deleteTooltip = pick(language, "Clica aquí para eliminar", "Click here to delete", "Clica aquí para eliminar");
 
@@ -55,7 +57,7 @@ export const PostCard = ({ post, canDelete = false, onDelete, onOpenDetail, comp
       }
       onMouseLeave={() => setAuraOpen(false)}
     >
-      {coverImage ? (
+      {coverImage && post.status !== "collapsed" ? (
         <div className="post-media">
           <img src={coverImage} alt={title} loading="lazy" />
           <div className="post-media-topics">
@@ -121,7 +123,7 @@ export const PostCard = ({ post, canDelete = false, onDelete, onOpenDetail, comp
                   ))}
                 </ul>
               ) : (
-                <p>{pick(language, "Basado en calidad, señales y contexto del hilo.", "Based on quality, signals and thread context.", "Baseado en calidade, sinais e contexto do fío.")}</p>
+                <p>{pick(language, "Basado en señales de la comunidad y contexto del hilo.", "Based on community signals and thread context.", "Baseado en sinais da comunidade e contexto do fío.")}</p>
               )}
             </span>
           </span>

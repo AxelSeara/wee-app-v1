@@ -69,7 +69,7 @@ export const AppFooter = () => {
               <header className="modal-head">
                 <div>
                   <h2 id="about-wee-title">{pick(language, "Sobre Wee", "About Wee")}</h2>
-                  <p>{pick(language, "Wee está hecha para microcomunidades: intereses comunes, hilos por tema y filtro real de calidad.", "Wee is built for microcommunities: shared interests, topic threads and real quality filtering.")}</p>
+                  <p>{pick(language, "Wee está hecha para microcomunidades: intereses comunes, hilos por tema y señal clara de Aura.", "Wee is built for microcommunities: shared interests, topic threads and clear Aura signals.")}</p>
                 </div>
                 <button type="button" className="btn" onClick={() => setOpen(false)}>
                   {pick(language, "Cerrar", "Close")}
@@ -92,9 +92,9 @@ export const AppFooter = () => {
                 </article>
 
                 <article className="about-card">
-                  <h3><Icon name="check" /> {pick(language, "Calidad del contenido", "Content quality")}</h3>
+                  <h3><Icon name="heart" /> {pick(language, "Señal de Aura", "Aura signal")}</h3>
                   <p>
-                    {pick(language, "Usamos reglas claras: reputación de la fuente, señales de evidencia, detección de titulares gancho, actualidad y valoración del grupo. Así sube lo útil y se marca lo dudoso.", "We use clear rules: source reputation, evidence signals, clickbait-title detection, recency and group ratings. Useful content rises and doubtful content gets flagged.")}
+                    {pick(language, "Usamos reglas claras para Aura: señales de fuente, contexto, actualidad y valoración del grupo. Así sube lo útil para la comunidad.", "We use clear Aura rules: source signals, context, recency and group ratings. Useful content rises for the community.")}
                   </p>
                 </article>
               </div>

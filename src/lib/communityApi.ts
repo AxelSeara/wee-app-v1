@@ -2,10 +2,8 @@ import { getCommunitySession, type CommunityAuthSession, type CommunitySelection
 import type { Post, User, UserPreferences } from "./types";
 
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL as string | undefined;
-const supabasePublishableKey =
-  (import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY as string | undefined) ??
-  (import.meta.env.VITE_SUPABASE_ANON_KEY as string | undefined) ??
-  "";
+const supabasePublishableKey = (import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY as string | undefined) ?? "";
+const supabaseAnonKey = (import.meta.env.VITE_SUPABASE_ANON_KEY as string | undefined) ?? "";
 const base = supabaseUrl ? `${supabaseUrl}/functions/v1/community-api` : "";
 
 interface ApiError {
@@ -14,12 +12,17 @@ interface ApiError {
 
 const headers = (): HeadersInit => {
   const session = getCommunitySession();
+  const apikey = supabasePublishableKey || supabaseAnonKey;
   return {
     "Content-Type": "application/json",
-    ...(supabasePublishableKey
+    ...(apikey
       ? {
-          apikey: supabasePublishableKey,
-          Authorization: `Bearer ${supabasePublishableKey}`
+          apikey
+        }
+      : {}),
+    ...(supabaseAnonKey
+      ? {
+          Authorization: `Bearer ${supabaseAnonKey}`
         }
       : {}),
     ...(session ? { "x-wee-session": session.sessionToken } : {})

@@ -47,6 +47,36 @@ const corsHeaders = {
   "Access-Control-Allow-Methods": "POST, OPTIONS"
 };
 
+const isPrivateIpv4 = (host: string): boolean => {
+  const parts = host.split(".").map((item) => Number(item));
+  if (parts.length !== 4 || parts.some((item) => Number.isNaN(item) || item < 0 || item > 255)) return false;
+  const [a, b] = parts;
+  if (a === 10 || a === 127) return true;
+  if (a === 192 && b === 168) return true;
+  if (a === 172 && b >= 16 && b <= 31) return true;
+  return false;
+};
+
+const isBlockedHost = (host: string): boolean => {
+  const normalized = host.trim().toLowerCase();
+  if (!normalized) return true;
+  if (normalized === "localhost" || normalized.endsWith(".local") || normalized.endsWith(".internal")) return true;
+  if (normalized === "::1" || normalized.startsWith("fe80:") || normalized.startsWith("fc") || normalized.startsWith("fd")) return true;
+  return isPrivateIpv4(normalized);
+};
+
+const parseJwtPayload = (token: string): Record<string, unknown> | null => {
+  try {
+    const raw = token.split(".")[1];
+    if (!raw) return null;
+    const padded = raw.replace(/-/g, "+").replace(/_/g, "/");
+    const decoded = atob(padded);
+    return JSON.parse(decoded) as Record<string, unknown>;
+  } catch {
+    return null;
+  }
+};
+
 const clean = (value?: string | null, max = 320): string | undefined => {
   if (!value) return undefined;
   const next = value.replace(/\s+/g, " ").trim();
@@ -367,6 +397,24 @@ Deno.serve(async (req) => {
   }
 
   try {
+    const authHeader = req.headers.get("authorization") ?? "";
+    const bearer = authHeader.startsWith("Bearer ") ? authHeader.slice("Bearer ".length).trim() : "";
+    if (!bearer) {
+      return new Response(JSON.stringify({ error: "Unauthorized" }), {
+        status: 401,
+        headers: { ...corsHeaders, "Content-Type": "application/json" }
+      });
+    }
+
+    const claims = parseJwtPayload(bearer);
+    const role = typeof claims?.role === "string" ? claims.role : "";
+    if (role !== "authenticated") {
+      return new Response(JSON.stringify({ error: "Forbidden" }), {
+        status: 403,
+        headers: { ...corsHeaders, "Content-Type": "application/json" }
+      });
+    }
+
     const { url } = (await req.json()) as { url?: string };
     if (!url) {
       return new Response(JSON.stringify({ error: "Missing url" }), {
@@ -376,7 +424,15 @@ Deno.serve(async (req) => {
     }
 
     let canonicalUrl: string;
+    let parsedInput: URL;
     try {
+      parsedInput = new URL(url);
+      if (!["http:", "https:"].includes(parsedInput.protocol)) {
+        throw new Error("Invalid URL scheme");
+      }
+      if (isBlockedHost(parsedInput.hostname)) {
+        throw new Error("Blocked host");
+      }
       canonicalUrl = canonicalizeUrl(url);
     } catch {
       return new Response(JSON.stringify({ error: "Invalid URL" }), {
@@ -420,6 +476,14 @@ Deno.serve(async (req) => {
         "accept-language": "es-ES,es;q=0.9,en;q=0.8"
       }
     });
+
+    const contentLength = Number(response.headers.get("content-length") ?? "0");
+    if (Number.isFinite(contentLength) && contentLength > 2_000_000) {
+      return new Response(JSON.stringify({ error: "Content too large" }), {
+        status: 413,
+        headers: { ...corsHeaders, "Content-Type": "application/json" }
+      });
+    }
 
     const html = await response.text();
     const finalUrl = response.url || canonicalUrl;

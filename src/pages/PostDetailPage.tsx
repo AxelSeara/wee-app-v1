@@ -291,23 +291,33 @@ export const PostDetailPage = ({
                 disabled={canRate}
                 onClick={async () => {
                   if (canRate) return;
-                  const openedWindow = window.open(current.url, "_blank", "noopener,noreferrer");
-                  await onOpenExternalSource(current.id);
-                  setCurrent((prev) =>
-                    prev
-                      ? {
-                          ...prev,
-                          openedByUserIds: Array.from(new Set([...(prev.openedByUserIds ?? []), activeUserId ?? ""]))
-                            .filter(Boolean)
-                        }
-                      : prev
-                  );
-                  setShowSourceVoteHint(false);
-                  onToast(
-                    openedWindow
-                      ? pick(language, "Fuente abierta. Ya puedes valorar esta noticia.", "Source opened. You can now rate this post.")
-                      : pick(language, "Si no se abrió la pestaña, revisa el bloqueador. Ya puedes valorar esta noticia.", "If the tab did not open, check popup blocker. You can now rate this post.")
-                  );
+                  try {
+                    const openedWindow = window.open(current.url, "_blank", "noopener,noreferrer");
+                    await onOpenExternalSource(current.id);
+                    setCurrent((prev) =>
+                      prev
+                        ? {
+                            ...prev,
+                            openedByUserIds: Array.from(new Set([...(prev.openedByUserIds ?? []), activeUserId ?? ""]))
+                              .filter(Boolean)
+                          }
+                        : prev
+                    );
+                    setShowSourceVoteHint(false);
+                    onToast(
+                      openedWindow
+                        ? pick(language, "Fuente abierta. Ya puedes valorar esta noticia.", "Source opened. You can now rate this post.")
+                        : pick(language, "Si no se abrió la pestaña, revisa el bloqueador. Ya puedes valorar esta noticia.", "If the tab did not open, check popup blocker. You can now rate this post.")
+                    );
+                  } catch {
+                    onToast(
+                      pick(
+                        language,
+                        "No pudimos registrar la apertura de fuente. Reintenta en unos segundos.",
+                        "Could not register source opening. Try again in a few seconds."
+                      )
+                    );
+                  }
                 }}
               >
                 <Icon name="news" /> {pick(language, "Fuente", "Source", "Fonte")}

@@ -1,5 +1,5 @@
 import { AnimatePresence, motion } from "framer-motion";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { pick, useI18n } from "../lib/i18n";
 import { EASE_STANDARD, MOTION_DURATION } from "../lib/motion";
 import { Icon } from "./Icon";
@@ -10,6 +10,17 @@ const ALPHA_UPDATED_AT = "2026-03-04";
 export const AppFooter = () => {
   const { language } = useI18n();
   const [open, setOpen] = useState(false);
+  const dialogRef = useRef<HTMLElement | null>(null);
+
+  useEffect(() => {
+    if (!open) return;
+    dialogRef.current?.focus();
+    const onEsc = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setOpen(false);
+    };
+    document.addEventListener("keydown", onEsc);
+    return () => document.removeEventListener("keydown", onEsc);
+  }, [open]);
 
   return (
     <>
@@ -43,7 +54,12 @@ export const AppFooter = () => {
             onClick={() => setOpen(false)}
           >
             <motion.section
+              ref={dialogRef}
               className="modal-card modal-card-compact about-modal"
+              role="dialog"
+              aria-modal="true"
+              aria-labelledby="about-wee-title"
+              tabIndex={-1}
               initial={{ opacity: 0, y: 20, scale: 0.985 }}
               animate={{ opacity: 1, y: 0, scale: 1 }}
               exit={{ opacity: 0, y: 14, scale: 0.99 }}
@@ -52,7 +68,7 @@ export const AppFooter = () => {
             >
               <header className="modal-head">
                 <div>
-                  <h2>{pick(language, "Sobre Wee", "About Wee")}</h2>
+                  <h2 id="about-wee-title">{pick(language, "Sobre Wee", "About Wee")}</h2>
                   <p>{pick(language, "Wee está hecha para microcomunidades: intereses comunes, hilos por tema y filtro real de calidad.", "Wee is built for microcommunities: shared interests, topic threads and real quality filtering.")}</p>
                 </div>
                 <button type="button" className="btn" onClick={() => setOpen(false)}>

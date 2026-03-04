@@ -232,18 +232,18 @@ export const enrichUrl = async (url: string): Promise<UrlMetadata> => {
   const fromYoutube = isYoutubeUrl(url) ? await youtubeOEmbed(url) : null;
   if (fromYoutube) return fromYoutube;
 
-  const providers: Array<() => Promise<UrlMetadata | null>> = [() => microlink(url), () => jsonLink(url), () => genericOEmbed(url)];
-  for (const provider of providers) {
-    const result = await provider();
-    if (result && (result.title || result.description || result.imageUrl)) {
-      const safeTitle = result.title && !isUnusableTitle(result.title) ? result.title : undefined;
-      return {
-        title: edgeTitle ?? safeTitle,
-        description: fromEdge?.description ?? result.description,
-        imageUrl: fromEdge?.imageUrl ?? result.imageUrl ?? screenshotFallback(url),
-        siteName: fromEdge?.siteName ?? result.siteName ?? hostnameFromUrl(url)
-      };
-    }
+  const providerResults = await Promise.allSettled([microlink(url), jsonLink(url), genericOEmbed(url)]);
+  for (const settled of providerResults) {
+    if (settled.status !== "fulfilled") continue;
+    const result = settled.value;
+    if (!result || (!result.title && !result.description && !result.imageUrl)) continue;
+    const safeTitle = result.title && !isUnusableTitle(result.title) ? result.title : undefined;
+    return {
+      title: edgeTitle ?? safeTitle,
+      description: fromEdge?.description ?? result.description,
+      imageUrl: fromEdge?.imageUrl ?? result.imageUrl ?? screenshotFallback(url),
+      siteName: fromEdge?.siteName ?? result.siteName ?? hostnameFromUrl(url)
+    };
   }
 
   const fallbackTitle = edgeTitle ?? hostnameFromUrl(url);

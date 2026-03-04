@@ -43,6 +43,18 @@ Tests:
 npm run test
 ```
 
+Typecheck:
+
+```bash
+npm run typecheck
+```
+
+Full local checks:
+
+```bash
+npm run check
+```
+
 UX guardrails (design lint):
 
 ```bash
@@ -278,7 +290,9 @@ create policy "comment_aura_update_own" on comment_aura for update using (auth.u
 create policy "comment_aura_delete_own" on comment_aura for delete using (auth.uid() = user_id);
 ```
 
-Para capacidades admin globales (gestión de roles, borrado de terceros, moderación transversal), aplica el **SQL v3** de admin además de este bloque v2.
+Para capacidades admin globales (gestión de roles, borrado de terceros, moderación transversal), aplica el SQL:
+
+- [supabase/sql/admin_v3.sql](supabase/sql/admin_v3.sql)
 
 Si las miniaturas no se guardan en posts existentes, aplica esta migración:
 

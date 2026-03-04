@@ -111,6 +111,18 @@ const aliasToAuthEmail = (alias: string): string => {
   return `${base}.${suffix}@weeapp.dev`;
 };
 
+const toPublicBackendError = (raw: string): string => {
+  const value = raw.toLowerCase();
+  if (value.includes("remote_required_missing_config")) return "BACKEND_CONFIG_MISSING";
+  if (value.includes("invalid api key") || value.includes("jwt") || value.includes("permission denied")) {
+    return "BACKEND_AUTH_FAILED";
+  }
+  if (value.includes("failed to fetch") || value.includes("network") || value.includes("timeout")) {
+    return "BACKEND_UNREACHABLE";
+  }
+  return "BACKEND_GENERIC";
+};
+
 export const useAppData = () => {
   const [users, setUsers] = useState<User[]>([]);
   const [posts, setPosts] = useState<Post[]>([]);
@@ -138,7 +150,7 @@ export const useAppData = () => {
       setBackendError(null);
     } catch (error) {
       const message = error instanceof Error ? error.message : "Unknown backend error";
-      setBackendError(message);
+      setBackendError(toPublicBackendError(message));
     }
 
     if (showSkeleton) {

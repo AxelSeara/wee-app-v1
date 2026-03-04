@@ -1,5 +1,5 @@
 import { AnimatePresence, motion } from "framer-motion";
-import { type FormEvent, useEffect, useState } from "react";
+import { type FormEvent, useEffect, useRef, useState } from "react";
 import { pick, useI18n } from "../lib/i18n";
 import { EASE_STANDARD, MOTION_DURATION } from "../lib/motion";
 import { Icon } from "./Icon";
@@ -16,6 +16,7 @@ export const ShareLinkModal = ({ open, onClose, onShareUrl, getDuplicatePreview,
   const { language } = useI18n();
   const [url, setUrl] = useState("");
   const [submitting, setSubmitting] = useState(false);
+  const dialogRef = useRef<HTMLElement | null>(null);
 
   useEffect(() => {
     if (!open) {
@@ -23,6 +24,16 @@ export const ShareLinkModal = ({ open, onClose, onShareUrl, getDuplicatePreview,
       setSubmitting(false);
     }
   }, [open]);
+
+  useEffect(() => {
+    if (!open) return;
+    dialogRef.current?.focus();
+    const onEsc = (event: KeyboardEvent) => {
+      if (event.key === "Escape") onClose();
+    };
+    document.addEventListener("keydown", onEsc);
+    return () => document.removeEventListener("keydown", onEsc);
+  }, [open, onClose]);
 
   const duplicateState = getDuplicatePreview(url.trim());
 
@@ -35,6 +46,14 @@ export const ShareLinkModal = ({ open, onClose, onShareUrl, getDuplicatePreview,
       const result = await onShareUrl(clean);
       onToast(result.message);
       onClose();
+    } catch {
+      onToast(
+        pick(
+          language,
+          "No pudimos publicar ahora. Inténtalo de nuevo.",
+          "Could not publish right now. Please try again."
+        )
+      );
     } finally {
       setSubmitting(false);
     }
@@ -52,7 +71,12 @@ export const ShareLinkModal = ({ open, onClose, onShareUrl, getDuplicatePreview,
           onClick={onClose}
         >
           <motion.section
+            ref={dialogRef}
             className="modal-card modal-card-compact"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="share-link-title"
+            tabIndex={-1}
             initial={{ opacity: 0, y: 20, scale: 0.985 }}
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: 14, scale: 0.99 }}
@@ -61,7 +85,7 @@ export const ShareLinkModal = ({ open, onClose, onShareUrl, getDuplicatePreview,
           >
             <header className="modal-head">
               <div>
-                <h2>{pick(language, "Comparte un enlace", "Share a link")}</h2>
+                <h2 id="share-link-title">{pick(language, "Comparte un enlace", "Share a link")}</h2>
                 <p>{pick(language, "Pásalo por Wee para que quede en su tema, con contexto y sin duplicados.", "Share it via Wee so it stays in its topic, with context and no duplicates.")}</p>
               </div>
               <button type="button" className="btn" onClick={onClose}>

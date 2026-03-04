@@ -48,3 +48,4 @@ Redeploy y prueba compartir una noticia.
 - La app ahora intenta `Edge Function unfurl` primero en `enrich.ts`.
 - Si la función falla, cae al método anterior (microlink/jsonlink/noembed) para no romper UX.
 - TTL de cache por defecto: 12 horas.
+- Seguridad: `unfurl` requiere `Authorization Bearer` de usuario autenticado y rechaza hosts privados/localhost.

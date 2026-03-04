@@ -765,6 +765,30 @@ const AppRoutes = () => {
   }
 
   if (backendError) {
+    const backendErrorMessage =
+      backendError === "BACKEND_CONFIG_MISSING"
+        ? pick(
+            language,
+            "Este despliegue exige backend remoto y no tiene configuración de Supabase. Revisa variables VITE_SUPABASE_* en Vercel.",
+            "This deployment requires remote backend but Supabase is not configured. Check VITE_SUPABASE_* variables in Vercel."
+          )
+        : backendError === "BACKEND_AUTH_FAILED"
+          ? pick(
+              language,
+              "No tenemos permisos para acceder al backend. Revisa claves públicas y sesión de Supabase.",
+              "Backend access is not authorized. Check Supabase public keys and session."
+            )
+          : backendError === "BACKEND_UNREACHABLE"
+            ? pick(
+                language,
+                "No pudimos conectar con el backend. Revisa red, proyecto Supabase y Edge Functions.",
+                "Could not connect to backend. Check network, Supabase project and Edge Functions."
+              )
+            : pick(
+                language,
+                "El backend respondió con un error no esperado. Revisa logs de Supabase para más detalle.",
+                "Backend returned an unexpected error. Check Supabase logs for details."
+              );
     return (
       <I18nContext.Provider value={{ language }}>
         <NotificationsContext.Provider
@@ -777,15 +801,7 @@ const AppRoutes = () => {
         >
           <main className="page-section narrow">
             <h2>{pick(language, "Error de conexión de backend", "Backend connection error")}</h2>
-            <p className="warning">
-              {backendError === "REMOTE_REQUIRED_MISSING_CONFIG"
-                ? pick(
-                    language,
-                    "Este despliegue exige backend remoto y no tiene configuración de Supabase. Revisa variables VITE_SUPABASE_* en Vercel.",
-                    "This deployment requires remote backend but Supabase is not configured. Check VITE_SUPABASE_* variables in Vercel."
-                  )
-                : backendError}
-            </p>
+            <p className="warning">{backendErrorMessage}</p>
           </main>
         </NotificationsContext.Provider>
       </I18nContext.Provider>

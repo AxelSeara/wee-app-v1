@@ -33,22 +33,16 @@ const TopBarInner = ({ user, communityName, onLeaveCommunity, searchValue, onSea
   const { language } = useI18n();
   const fallbackCommunity = getSelectedCommunity();
   const communityLabel = communityName ?? fallbackCommunity?.name;
-  const [communityOpen, setCommunityOpen] = useState(false);
   const [profileOpen, setProfileOpen] = useState(false);
-  const communityMenuRef = useRef<HTMLDivElement | null>(null);
   const profileMenuRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
     const onDocClick = (event: MouseEvent) => {
-      if (communityMenuRef.current && !communityMenuRef.current.contains(event.target as Node)) setCommunityOpen(false);
       if (profileMenuRef.current && !profileMenuRef.current.contains(event.target as Node)) setProfileOpen(false);
     };
 
     const onEsc = (event: KeyboardEvent) => {
-      if (event.key === "Escape") {
-        setCommunityOpen(false);
-        setProfileOpen(false);
-      }
+      if (event.key === "Escape") setProfileOpen(false);
     };
 
     document.addEventListener("mousedown", onDocClick);
@@ -95,55 +89,11 @@ const TopBarInner = ({ user, communityName, onLeaveCommunity, searchValue, onSea
 
         <NotificationsMenu />
 
-        <div className="topbar-user-menu" ref={communityMenuRef}>
-          <button
-            type="button"
-            className="user-link user-menu-trigger"
-            onClick={() => {
-              setCommunityOpen((curr) => !curr);
-              setProfileOpen(false);
-            }}
-            aria-expanded={communityOpen}
-            aria-haspopup="menu"
-          >
-            <Icon name="users" size={13} />
-            <span>{pick(language, "Comunidad", "Community")}</span>
-            <span className="user-menu-caret">▾</span>
-          </button>
-
-          {communityOpen ? (
-            <div className="user-menu-dropdown" role="menu" aria-label={pick(language, "Menú de comunidad", "Community menu")}>
-              <Link to="/community" role="menuitem" className="user-menu-item" onClick={() => setCommunityOpen(false)}>
-                <Icon name="book" size={13} /> {pick(language, "Ver normas y miembros", "View rules & members")}
-              </Link>
-              <Link to="/login" role="menuitem" className="user-menu-item" onClick={() => setCommunityOpen(false)}>
-                <Icon name="users" size={13} /> {pick(language, "Cambiar comunidad", "Switch community")}
-              </Link>
-              {onLeaveCommunity ? (
-                <button
-                  type="button"
-                  role="menuitem"
-                  className="user-menu-item user-menu-item-danger"
-                  onClick={() => {
-                    setCommunityOpen(false);
-                    onLeaveCommunity();
-                  }}
-                >
-                  <Icon name="logout" size={13} /> {pick(language, "Salir de comunidad", "Leave community")}
-                </button>
-              ) : null}
-            </div>
-          ) : null}
-        </div>
-
         <div className="topbar-user-menu" ref={profileMenuRef}>
           <button
             type="button"
             className="user-link user-menu-trigger"
-            onClick={() => {
-              setProfileOpen((curr) => !curr);
-              setCommunityOpen(false);
-            }}
+            onClick={() => setProfileOpen((curr) => !curr)}
             aria-expanded={profileOpen}
             aria-haspopup="menu"
           >
@@ -164,6 +114,9 @@ const TopBarInner = ({ user, communityName, onLeaveCommunity, searchValue, onSea
               <Link to={`/profile/${user.id}`} role="menuitem" className="user-menu-item" onClick={() => setProfileOpen(false)}>
                 <Icon name="user" size={13} /> {pick(language, "Perfil", "Profile")}
               </Link>
+              <Link to="/community" role="menuitem" className="user-menu-item" onClick={() => setProfileOpen(false)}>
+                <Icon name="users" size={13} /> {pick(language, "Comunidad y miembros", "Community & members")}
+              </Link>
               <Link
                 to={`/profile/${user.id}/posts`}
                 role="menuitem"
@@ -172,9 +125,25 @@ const TopBarInner = ({ user, communityName, onLeaveCommunity, searchValue, onSea
               >
                 <Icon name="news" size={13} /> {pick(language, "Mis publicaciones", "My posts")}
               </Link>
+              <Link to="/login" role="menuitem" className="user-menu-item" onClick={() => setProfileOpen(false)}>
+                <Icon name="users" size={13} /> {pick(language, "Cambiar comunidad", "Switch community")}
+              </Link>
               <Link to="/settings" role="menuitem" className="user-menu-item" onClick={() => setProfileOpen(false)}>
                 <Icon name="settings" size={13} /> {pick(language, "Ajustes", "Settings")}
               </Link>
+              {onLeaveCommunity ? (
+                <button
+                  type="button"
+                  role="menuitem"
+                  className="user-menu-item user-menu-item-danger"
+                  onClick={() => {
+                    setProfileOpen(false);
+                    onLeaveCommunity();
+                  }}
+                >
+                  <Icon name="logout" size={13} /> {pick(language, "Salir de comunidad", "Leave community")}
+                </button>
+              ) : null}
               {onLogout ? (
                 <button
                   type="button"

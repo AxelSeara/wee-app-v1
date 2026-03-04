@@ -19,13 +19,15 @@ import {
 } from "./store";
 import {
   confirmJoinCommunity,
+  createInvite,
   createCommunity,
   leaveCommunity,
   loadCommunityMeta,
   loginCommunityUser,
   logoutCommunityUser,
   previewCommunity,
-  registerCommunityUser
+  registerCommunityUser,
+  updateCommunity
 } from "./communityApi";
 import { clearCommunitySession, getCommunitySession, getSelectedCommunity, setSelectedCommunity, type CommunitySelection } from "./communitySession";
 import type { AppLanguage, ExportBundle, Post, SearchFilters, User, UserCommunityStats, UserPreferences } from "./types";
@@ -320,6 +322,23 @@ export const useAppData = () => {
     }
     return data;
   }, []);
+
+  const updateCommunityDetails = useCallback(
+    async (input: { name?: string; description?: string; rulesText?: string }) => {
+      const community = await updateCommunity({
+        name: input.name,
+        description: input.description,
+        rules_text: input.rulesText
+      });
+      setSelectedCommunityState(community);
+      setSelectedCommunity(community);
+      await loadCommunityOverview();
+      return community;
+    },
+    [loadCommunityOverview]
+  );
+
+  const createCommunityInvite = useCallback(async () => createInvite(), []);
 
   const createPost = useCallback(
     async (post: Post) => {
@@ -650,6 +669,8 @@ export const useAppData = () => {
     confirmCommunityInvite,
     leaveCurrentCommunity,
     loadCommunityOverview,
+    updateCommunityDetails,
+    createCommunityInvite,
     logout,
     createPost,
     savePost,

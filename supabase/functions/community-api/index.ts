@@ -60,7 +60,7 @@ const requireSession = async (req: Request): Promise<{
   session: { id: string; user_id: string; community_id: string; expires_at: string; revoked_at: string | null };
   user: { id: string; alias: string; status: string };
   role: Role;
-  community: { id: string; name: string; rules_text: string | null; invite_policy: InvitePolicy };
+  community: { id: string; name: string; description: string | null; rules_text: string | null; invite_policy: InvitePolicy };
 } | Response> => {
   const token = extractSessionToken(req);
   if (!token) return json(401, { message: "Missing session" });
@@ -90,7 +90,7 @@ const requireSession = async (req: Request): Promise<{
       .maybeSingle(),
     db
       .from("communities")
-      .select("id,name,rules_text,invite_policy")
+      .select("id,name,description,rules_text,invite_policy")
       .eq("id", session.community_id)
       .maybeSingle()
   ]);
@@ -103,7 +103,7 @@ const requireSession = async (req: Request): Promise<{
     session,
     user: userRes.data,
     role: roleRes.data.role as Role,
-    community: communityRes.data as { id: string; name: string; rules_text: string | null; invite_policy: InvitePolicy }
+    community: communityRes.data as { id: string; name: string; description: string | null; rules_text: string | null; invite_policy: InvitePolicy }
   };
 };
 
@@ -627,9 +627,49 @@ const handlers = {
       community: {
         id: auth.community.id,
         name: auth.community.name,
-        rulesText: auth.community.rules_text ?? ""
+        description: auth.community.description ?? "",
+        rulesText: auth.community.rules_text ?? "",
+        invite_policy: auth.community.invite_policy
       },
       members: (members ?? []).map((m: any) => ({ id: m.id, alias: m.alias, role: m.community_user_roles?.[0]?.role ?? "member" }))
+    });
+  },
+
+  "/community/update": async (req: Request) => {
+    const auth = await requireSession(req);
+    if (auth instanceof Response) return auth;
+    const denied = ensureAdmin(auth.role);
+    if (denied) return denied;
+
+    const body = await parseBody(req);
+    const name = body.name !== undefined ? String(body.name).trim().slice(0, 90) : undefined;
+    const description = body.description !== undefined ? String(body.description).trim().slice(0, 240) : undefined;
+    const rulesText = body.rules_text !== undefined ? String(body.rules_text).trim().slice(0, 4000) : undefined;
+
+    if (name !== undefined && name.length < 2) return bad("Community name too short");
+
+    const payload: Record<string, unknown> = {};
+    if (name !== undefined) payload.name = name;
+    if (description !== undefined) payload.description = description || null;
+    if (rulesText !== undefined) payload.rules_text = rulesText || null;
+    if (Object.keys(payload).length === 0) return bad("No changes");
+
+    const { data, error } = await db
+      .from("communities")
+      .update(payload)
+      .eq("id", auth.community.id)
+      .select("id,name,description,rules_text,invite_policy")
+      .single();
+    if (error || !data) return json(400, { message: error?.message ?? "Community update failed" });
+
+    return json(200, {
+      community: {
+        id: data.id,
+        name: data.name,
+        description: data.description ?? undefined,
+        rules_text: data.rules_text ?? undefined,
+        invite_policy: data.invite_policy
+      }
     });
   },
 

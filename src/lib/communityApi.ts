@@ -140,6 +140,31 @@ export const logoutCommunityUser = async (): Promise<void> => {
 export const loadCommunityMeta = async (): Promise<{ community: CommunitySelection; members: Array<{ id: string; alias: string; role: "admin" | "member" }> }> =>
   request<{ community: CommunitySelection; members: Array<{ id: string; alias: string; role: "admin" | "member" }> }>("/community/meta", {});
 
+export const updateCommunity = async (payload: {
+  name?: string;
+  description?: string;
+  rules_text?: string;
+}): Promise<CommunitySelection> => {
+  const data = await request<{
+    community: {
+      id: string;
+      name: string;
+      description?: string;
+      rules_text?: string;
+      invite_policy: "admins_only" | "members_allowed";
+    };
+  }>("/community/update", payload);
+  const community: CommunitySelection = {
+    id: data.community.id,
+    name: data.community.name,
+    description: data.community.description,
+    rulesText: data.community.rules_text,
+    invitePolicy: data.community.invite_policy
+  };
+  setSelectedCommunity(community);
+  return community;
+};
+
 export const promoteMember = async (targetUserId: string): Promise<void> => {
   await request<{ ok: true }>("/community/admin/promote", { target_user_id: targetUserId });
 };
@@ -157,8 +182,8 @@ export const leaveCommunity = async (): Promise<void> => {
   setCommunitySession(null);
 };
 
-export const createInvite = async (input?: { code?: string; expires_at?: string }): Promise<{ code: string; token: string }> =>
-  request<{ code: string; token: string }>("/community/invite/create", input ?? {});
+export const createInvite = async (input?: { code?: string; expires_at?: string }): Promise<{ id: string; code: string; token: string; link: string }> =>
+  request<{ id: string; code: string; token: string; link: string }>("/community/invite/create", input ?? {});
 
 export const revokeInvite = async (inviteId: string): Promise<void> => {
   await request<{ ok: true }>("/community/invite/revoke", { invite_id: inviteId });

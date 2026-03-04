@@ -46,6 +46,8 @@ const AppRoutes = () => {
     confirmCommunityInvite,
     leaveCurrentCommunity,
     loadCommunityOverview,
+    updateCommunityDetails,
+    createCommunityInvite,
     loginWithUserId,
     logout,
     createPost,
@@ -1121,6 +1123,8 @@ const AppRoutes = () => {
                   selectedCommunity={selectedCommunity}
                   members={communityMembers}
                   rulesText={communityRulesText}
+                  onUpdateCommunity={updateCommunityDetails}
+                  onCreateInvite={createCommunityInvite}
                   onLeaveCommunity={leaveCurrentCommunity}
                   onLogout={logout}
                   onOpenShareModal={() => setShareModalOpen(true)}

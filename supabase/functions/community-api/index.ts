@@ -121,7 +121,7 @@ const parseBody = async (req: Request): Promise<Record<string, any>> => {
   }
 };
 
-const buildInviteUrl = (token: string): string => `#/login?invite=${token}`;
+const buildInviteUrl = (token: string): string => `#/invite/${token}`;
 
 const toMillis = (value: string | null | undefined): number =>
   value ? Date.parse(value) || Date.now() : Date.now();
@@ -417,7 +417,7 @@ const handlers = {
 
     const query = db
       .from("community_invites")
-      .select("community_id,expires_at,revoked_at,communities(name,description)")
+      .select("community_id,created_by,expires_at,revoked_at,communities(name,description)")
       .is("revoked_at", null)
       .limit(1);
 
@@ -426,10 +426,26 @@ const handlers = {
     if (data.expires_at && Date.parse(data.expires_at) < Date.now()) return json(410, { message: "Invite expired" });
 
     const community = data.communities as { name: string; description: string | null };
+    let inviter: { alias: string; avatar_url: string | null } | null = null;
+    if (data.created_by) {
+      const inviterRes = await db
+        .from("community_users")
+        .select("alias,avatar_url")
+        .eq("id", data.created_by)
+        .eq("community_id", data.community_id)
+        .maybeSingle();
+      if (!inviterRes.error && inviterRes.data) inviter = inviterRes.data as { alias: string; avatar_url: string | null };
+    }
     return json(200, {
       community_id: data.community_id,
       name: community.name,
-      description: community.description ?? undefined
+      description: community.description ?? undefined,
+      inviter: inviter
+        ? {
+            alias: inviter.alias,
+            avatar_url: inviter.avatar_url ?? undefined
+          }
+        : undefined
     });
   },
 
@@ -441,7 +457,7 @@ const handlers = {
 
     const query = db
       .from("community_invites")
-      .select("community_id,expires_at,revoked_at,communities(name,description)")
+      .select("community_id,created_by,expires_at,revoked_at,communities(name,description)")
       .is("revoked_at", null)
       .limit(1);
 
@@ -450,10 +466,26 @@ const handlers = {
     if (data.expires_at && Date.parse(data.expires_at) < Date.now()) return json(410, { message: "Invite expired" });
 
     const community = data.communities as { name: string; description: string | null };
+    let inviter: { alias: string; avatar_url: string | null } | null = null;
+    if (data.created_by) {
+      const inviterRes = await db
+        .from("community_users")
+        .select("alias,avatar_url")
+        .eq("id", data.created_by)
+        .eq("community_id", data.community_id)
+        .maybeSingle();
+      if (!inviterRes.error && inviterRes.data) inviter = inviterRes.data as { alias: string; avatar_url: string | null };
+    }
     return json(200, {
       community_id: data.community_id,
       name: community.name,
       description: community.description ?? undefined,
+      inviter: inviter
+        ? {
+            alias: inviter.alias,
+            avatar_url: inviter.avatar_url ?? undefined
+          }
+        : undefined,
       confirmed: true
     });
   },

@@ -278,9 +278,11 @@ export const useAppData = () => {
   );
 
   const previewCommunityInvite = useCallback(
-    async (input: { code?: string; token?: string }): Promise<CommunitySelection> => {
+    async (
+      input: { code?: string; token?: string }
+    ): Promise<CommunitySelection & { inviter?: { alias: string; avatar_url?: string } }> => {
       const data = await previewCommunity(input);
-      return { id: data.community_id, name: data.name, description: data.description };
+      return { id: data.community_id, name: data.name, description: data.description, inviter: data.inviter };
     },
     []
   );

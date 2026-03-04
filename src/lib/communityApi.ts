@@ -58,6 +58,10 @@ export interface CommunityPreviewResponse {
   community_id: string;
   name: string;
   description?: string;
+  inviter?: {
+    alias: string;
+    avatar_url?: string;
+  };
 }
 
 export interface CommunityAuthResponse {

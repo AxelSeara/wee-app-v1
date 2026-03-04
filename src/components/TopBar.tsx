@@ -115,7 +115,7 @@ const TopBarInner = ({ user, communityName, onLeaveCommunity, searchValue, onSea
                 <Icon name="user" size={13} /> {pick(language, "Perfil", "Profile")}
               </Link>
               <Link to="/community" role="menuitem" className="user-menu-item" onClick={() => setProfileOpen(false)}>
-                <Icon name="users" size={13} /> {pick(language, "Comunidad y miembros", "Community & members")}
+                <Icon name="users" size={13} /> {pick(language, "Comunidad", "Community", "Comunidade")}
               </Link>
               <Link
                 to={`/profile/${user.id}/posts`}
@@ -126,7 +126,7 @@ const TopBarInner = ({ user, communityName, onLeaveCommunity, searchValue, onSea
                 <Icon name="news" size={13} /> {pick(language, "Mis publicaciones", "My posts")}
               </Link>
               <Link to="/login" role="menuitem" className="user-menu-item" onClick={() => setProfileOpen(false)}>
-                <Icon name="users" size={13} /> {pick(language, "Cambiar comunidad", "Switch community")}
+                <Icon name="users" size={13} /> {pick(language, "Cambiar comunidad", "Switch community", "Cambiar comunidade")}
               </Link>
               <Link to="/settings" role="menuitem" className="user-menu-item" onClick={() => setProfileOpen(false)}>
                 <Icon name="settings" size={13} /> {pick(language, "Ajustes", "Settings")}
@@ -141,7 +141,7 @@ const TopBarInner = ({ user, communityName, onLeaveCommunity, searchValue, onSea
                     onLeaveCommunity();
                   }}
                 >
-                  <Icon name="logout" size={13} /> {pick(language, "Salir de comunidad", "Leave community")}
+                  <Icon name="logout" size={13} /> {pick(language, "Salir de comunidad", "Leave community", "Saír da comunidade")}
                 </button>
               ) : null}
               {onLogout ? (

@@ -22,6 +22,7 @@ import { LoginPage } from "./pages/LoginPage";
 import { PostDetailPage } from "./pages/PostDetailPage";
 import { ProfilePage } from "./pages/ProfilePage";
 import { RequireAuth } from "./pages/RequireAuth";
+import { InvitePage } from "./pages/InvitePage";
 import { SettingsPage } from "./pages/SettingsPage";
 import { SharePage } from "./pages/SharePage";
 import { TopicPage } from "./pages/TopicPage";
@@ -948,6 +949,19 @@ const AppRoutes = () => {
                 users={users}
                 selectedCommunity={selectedCommunity}
                 onCreateCommunity={createCommunityFlow}
+                onPreviewCommunity={previewCommunityInvite}
+                onConfirmCommunity={confirmCommunityInvite}
+                onCreateOrLogin={createOrLogin}
+              />
+            </PageTransition>
+          }
+        />
+
+        <Route
+          path="/invite/:token"
+          element={
+            <PageTransition>
+              <InvitePage
                 onPreviewCommunity={previewCommunityInvite}
                 onConfirmCommunity={confirmCommunityInvite}
                 onCreateOrLogin={createOrLogin}

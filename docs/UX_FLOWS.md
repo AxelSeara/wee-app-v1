@@ -13,13 +13,25 @@
 ## `/login`
 
 Objetivo:
-- Entrar rápido con alias opcional + avatar opcional.
-- Elegir idioma del perfil al crear usuario.
-- Elegir usuario existente local.
+- Entrar rápido con cuenta global (`nombre de usuario + contraseña`).
+- Permitir cambio de idioma previo a login/registro.
+- Llevar al selector de comunidades al completar auth.
 
 Puntos clave:
-- botón dado para alias aleatorio
-- persistencia de sesión local (`activeUserId`)
+- copy corto y cercano
+- estado de carga claro en CTA principal
+- persistencia de sesión global + settings (`default_community_id`, `skip_picker`)
+
+## `/communities`
+
+Objetivo:
+- Elegir comunidad activa tras login global.
+
+Puntos clave:
+- tarjetas de comunidades
+- opción “Entrar siempre aquí”
+- crear comunidad / unirse por código
+- estado loading con skeletons (sin pantalla vacía)
 
 ## `/home`
 
@@ -27,11 +39,10 @@ Secciones:
 - Topbar con buscador global, menú de perfil y botón compartir.
 - Onboarding de 3 pasos (solo primera vez por usuario).
 - Sidebar de navegación interna:
-  - Popular
+  - Feed
   - Temas
-  - Noticias
   - Comunidad
-- Bloque `Popular ahora` (ranking comunitario).
+- Bloque principal del feed (ranking comunitario).
 - Bloques de temas activos con estilo por tema y señal de recencia (chilis).
 - `Noticias recientes`.
 - `Comunidad`: top contributors + salud de comunidad.
@@ -39,7 +50,8 @@ Secciones:
 Interacción:
 - click en noticia -> `/post/:postId`
 - click en tema -> `/topic/:topic`
-- búsqueda por texto/tema/fuente desde navbar
+- búsqueda por texto/tema/fuente en Home
+- en móvil: barra inferior de secciones + extras colapsables para reducir fricción
 
 ## `/post/:postId`
 
@@ -120,6 +132,7 @@ La app está escrita para público hispanohablante con tono:
 - `framer-motion` en transiciones de página (`PageTransition`)
 - modal de compartir y modal about con `AnimatePresence`
 - animaciones sutiles en tarjetas/hovers
+- pantalla de carga comunitaria animada al entrar en Home y fade al contenido
 
 ## Reglas UX funcionales importantes
 

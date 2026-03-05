@@ -4,8 +4,8 @@ Wee es una app de curación de noticias para microcomunidades: compartir enlaces
 
 ## Qué hace hoy
 
-- Comunidades aisladas (multi-tenant) con auth propia por comunidad (sin Supabase Auth).
-- Flujo de entrada: crear/unirse, preview+confirmación y luego login/registro dentro de la comunidad.
+- Comunidades aisladas (multi-tenant) con usuario global único.
+- Flujo de entrada: login/registro global y luego selector de comunidades.
 - Publicación rápida de enlaces desde navbar (modal).
 - Clasificación heurística por tema y subtema (sin IA).
 - Detección y fusión de duplicados por URL canónica.
@@ -15,6 +15,8 @@ Wee es una app de curación de noticias para microcomunidades: compartir enlaces
 - Perfil de usuario, edición de alias/avatar y página separada de publicaciones.
 - Idiomas de interfaz: Español, English, Galego.
 - Telemetría básica en Vercel Analytics (sin PII): navegación, compartir, abrir fuente, voto y comentario.
+- UX móvil optimizada: topbar compacta, barra inferior de secciones en Home y extras colapsables para reducir ruido.
+- Pantalla de carga animada al entrar a Home (sin flash vacío) y transición suave al contenido.
 
 ## Stack
 

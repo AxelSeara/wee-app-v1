@@ -2,14 +2,19 @@
 
 ## Rutas principales
 - `/#/login`
-  - Estado `landing`: claim + CTAs (crear cuenta / login).
-  - Estado `login`: alias + contraseña + errores inline.
-  - Estado `register`: alias + contraseña + confirmación + idioma + privacidad + subida avatar + usuarios existentes.
+  - Estado `login`: usuario global + contraseña + errores inline.
+  - Estado `register`: usuario global + contraseña (+ email opcional) + idioma.
+- `/#/communities`
+  - Picker de comunidades con tarjetas.
+  - Crear comunidad / unirse por código.
+  - Toggle “Entrar siempre aquí”.
+  - Estado loading con skeleton cards.
 - `/#/home`
   - Topbar global.
-  - Sidebar izquierda: navegación por secciones + búsqueda + usuarios activos.
-  - Secciones: popular, topics, news, community.
-  - Estados: loading (skeleton), contenido, vacíos parciales por bloque.
+  - Sidebar izquierda: navegación por secciones + filtro de tema + extras (usuarios activos y búsqueda).
+  - En móvil: barra inferior fija de secciones y extras colapsables.
+  - Secciones: feed, topics, community.
+  - Estados: loading animado de comunidad (entrada), contenido, vacíos parciales por bloque.
 - `/#/topic/:topic`
   - Header hilo + KPIs + ajustes tema.
   - Form inline para añadir URL al hilo.
@@ -44,4 +49,4 @@
 - Footer con modal About (`AppFooter`).
 - Menú de notificaciones (`NotificationsMenu`).
 - Transiciones de página (`PageTransition` + `AnimatePresence`).
-- Carga inicial/sin datos (`AppSkeleton`).
+- Carga inicial/entrada comunidad (`CommunityLoadingScreen`).

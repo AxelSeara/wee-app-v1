@@ -60,6 +60,7 @@ export const HomePage = ({
   const [showOnboarding, setShowOnboarding] = useState(false);
   const [activeSection, setActiveSection] = useState("feed-section");
   const [showAllActiveUsers, setShowAllActiveUsers] = useState(false);
+  const [mobileExtrasOpen, setMobileExtrasOpen] = useState(false);
   const [compactFeed, setCompactFeed] = useState(false);
   const [selectedGroup, setSelectedGroup] = useState("all");
   const filteredPosts = useMemo(
@@ -347,47 +348,59 @@ export const HomePage = ({
                 ))}
               </select>
             </label>
-
-            <section className="home-users-block">
-              <div className="home-users-head">
-                <h4><Icon name="users" size={14} /> {pick(language, "Gente activa", "Active people", "Xente activa")}</h4>
-                <span className="badge">{activeUsers.length}</span>
-              </div>
-              {usersSidebarList.length === 0 ? (
-                <p className="hint">{pick(language, "Aún no se movió nada por aquí.", "Nothing has moved here yet.", "Aínda non se moveu nada por aquí.")}</p>
-              ) : (
-                <ul className="home-users-list">
-                  {usersSidebarList.map((entry) => (
-                    <li key={entry.user.id}>
-                      <Link to={`/profile/${entry.user.id}`} className="home-user-link">
-                        <span>{entry.user.alias}</span>
-                        <small>{entry.recentPosts}</small>
-                      </Link>
-                    </li>
-                  ))}
-                </ul>
-              )}
-              {users.length > 0 ? (
-                <button
-                  type="button"
-                  className="btn home-users-toggle"
-                  onClick={() => setShowAllActiveUsers((prev) => !prev)}
-                >
-                  <Icon name="eye" size={14} />
-                  {showAllActiveUsers
-                    ? pick(language, "Ver solo activos", "Show active only", "Ver só activos")
-                    : pick(language, "Mostrar todos", "Show all", "Amosar todos")}
-                </button>
-              ) : null}
-            </section>
-            <label className="home-sidebar-search" aria-label={pick(language, "Buscar en Wee", "Search in Wee", "Buscar en Wee")}>
-              <Icon name="search" size={13} />
-              <input
-                value={searchQuery}
-                onChange={(event) => setSearchQuery(event.target.value)}
-                placeholder={pick(language, "Buscar tema, palabra o fuente...", "Search topic, keyword or source...", "Buscar tema, palabra ou fonte...")}
-              />
-            </label>
+            <button
+              type="button"
+              className={`btn home-mobile-extras-toggle${mobileExtrasOpen ? " is-open" : ""}`}
+              onClick={() => setMobileExtrasOpen((prev) => !prev)}
+              aria-expanded={mobileExtrasOpen}
+            >
+              <Icon name="settings" size={13} />
+              {mobileExtrasOpen
+                ? pick(language, "Ocultar extras", "Hide extras", "Ocultar extras")
+                : pick(language, "Ver extras", "Show extras", "Ver extras")}
+            </button>
+            <div className={`home-sidebar-extras${mobileExtrasOpen ? " is-open" : ""}`}>
+              <section className="home-users-block">
+                <div className="home-users-head">
+                  <h4><Icon name="users" size={14} /> {pick(language, "Gente activa", "Active people", "Xente activa")}</h4>
+                  <span className="badge">{activeUsers.length}</span>
+                </div>
+                {usersSidebarList.length === 0 ? (
+                  <p className="hint">{pick(language, "Aún no se movió nada por aquí.", "Nothing has moved here yet.", "Aínda non se moveu nada por aquí.")}</p>
+                ) : (
+                  <ul className="home-users-list">
+                    {usersSidebarList.map((entry) => (
+                      <li key={entry.user.id}>
+                        <Link to={`/profile/${entry.user.id}`} className="home-user-link">
+                          <span>{entry.user.alias}</span>
+                          <small>{entry.recentPosts}</small>
+                        </Link>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+                {users.length > 0 ? (
+                  <button
+                    type="button"
+                    className="btn home-users-toggle"
+                    onClick={() => setShowAllActiveUsers((prev) => !prev)}
+                  >
+                    <Icon name="eye" size={14} />
+                    {showAllActiveUsers
+                      ? pick(language, "Ver solo activos", "Show active only", "Ver só activos")
+                      : pick(language, "Mostrar todos", "Show all", "Amosar todos")}
+                  </button>
+                ) : null}
+              </section>
+              <label className="home-sidebar-search" aria-label={pick(language, "Buscar en Wee", "Search in Wee", "Buscar en Wee")}>
+                <Icon name="search" size={13} />
+                <input
+                  value={searchQuery}
+                  onChange={(event) => setSearchQuery(event.target.value)}
+                  placeholder={pick(language, "Buscar tema, palabra o fuente...", "Search topic, keyword or source...", "Buscar tema, palabra ou fonte...")}
+                />
+              </label>
+            </div>
 
           </div>
         </aside>

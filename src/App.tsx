@@ -142,14 +142,19 @@ const AppRoutes = () => {
     return () => window.cancelAnimationFrame(raf);
   }, [location.pathname]);
 
+  const shouldKeepLoaderVisible =
+    autoEnteringDefaultCommunity ||
+    (loading && !activeUser) ||
+    (Boolean(globalSession) && location.pathname === "/home" && !activeUser);
+
   useEffect(() => {
-    if (loading || autoEnteringDefaultCommunity) {
+    if (shouldKeepLoaderVisible) {
       setShowLoadingOverlay(true);
       return;
     }
-    const timeout = window.setTimeout(() => setShowLoadingOverlay(false), 320);
+    const timeout = window.setTimeout(() => setShowLoadingOverlay(false), 920);
     return () => window.clearTimeout(timeout);
-  }, [loading, autoEnteringDefaultCommunity]);
+  }, [shouldKeepLoaderVisible]);
 
   useEffect(() => {
     if (!globalSession || activeUser || loading || communitiesLoading) return;
@@ -983,7 +988,7 @@ const AppRoutes = () => {
             communityName={selectedCommunity?.name}
             topics={Array.from(new Set(posts.flatMap((post) => post.topics))).slice(0, 3)}
             usersCount={users.length}
-            finishing={!loading}
+            finishing={!shouldKeepLoaderVisible}
           />
         </NotificationsContext.Provider>
       </I18nContext.Provider>

@@ -149,10 +149,12 @@ export const CommunitiesPickerPage = ({
 
         <div className="community-picker-grid">
           {loading && communities.length === 0 ? (
-            <article className="community-picker-card-skeleton" aria-hidden="true">
-              <span className="sk sk-line sk-line-mid" />
-              <span className="sk sk-line sk-line-short" />
-            </article>
+            Array.from({ length: 3 }).map((_, index) => (
+              <article className="community-picker-card-skeleton" aria-hidden="true" key={`community-skeleton-${index}`}>
+                <span className="sk sk-line sk-line-mid" />
+                <span className="sk sk-line sk-line-short" />
+              </article>
+            ))
           ) : null}
           <AnimatePresence initial={false}>
             {communities.map((community) => {

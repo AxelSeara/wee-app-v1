@@ -1026,6 +1026,20 @@ h3 svg,
   gap: 0.55rem;
 }
 
+@media (min-width: 801px) {
+  .home-mobile-extras-toggle {
+    display: none !important;
+  }
+
+  .home-sidebar-extras {
+    max-height: none !important;
+    opacity: 1 !important;
+    overflow: visible !important;
+    pointer-events: auto !important;
+    transform: none !important;
+  }
+}
+
 .mobile-share-fab {
   display: none;
 }

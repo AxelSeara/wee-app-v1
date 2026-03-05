@@ -11,6 +11,7 @@ import {
   getUsers,
   importAllData,
   listPosts,
+  loadMorePosts,
   listPostsByTopic,
   listPostsByUser,
   setActiveUserId,
@@ -137,9 +138,11 @@ export const useAppData = () => {
   const [loading, setLoading] = useState(true);
   const [backendError, setBackendError] = useState<string | null>(null);
   const hasBootstrapped = useRef(false);
+  const pagingInBackground = useRef(false);
 
-  const reload = useCallback(async (options?: { showSkeleton?: boolean }) => {
+  const reload = useCallback(async (options?: { showSkeleton?: boolean; includePreferences?: boolean }) => {
     const showSkeleton = options?.showSkeleton ?? false;
+    const includePreferences = options?.includePreferences ?? true;
     if (showSkeleton) {
       setLoading(true);
     }
@@ -160,10 +163,10 @@ export const useAppData = () => {
       setSelectedCommunityState(session.community);
       setSelectedCommunity(session.community);
 
-      if (activeUserId) {
+      if (includePreferences && activeUserId) {
         const prefs = await getPreferences(activeUserId);
         setPreferences(prefs);
-      } else {
+      } else if (!activeUserId) {
         setPreferences(null);
       }
       setBackendError(null);
@@ -186,6 +189,31 @@ export const useAppData = () => {
     hasBootstrapped.current = true;
     void reload({ showSkeleton: showFullLoading });
   }, [reload]);
+
+  useEffect(() => {
+    if (!activeUserId || posts.length === 0 || pagingInBackground.current) return;
+    pagingInBackground.current = true;
+    let cancelled = false;
+    void (async () => {
+      try {
+        for (let page = 0; page < 6; page += 1) {
+          if (cancelled) break;
+          const added = await loadMorePosts(120);
+          if (added <= 0) break;
+          if (cancelled) break;
+          const nextPosts = await listPosts();
+          if (!cancelled) setPosts(nextPosts);
+          if (added < 120) break;
+          await new Promise((resolve) => setTimeout(resolve, 0));
+        }
+      } finally {
+        pagingInBackground.current = false;
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [activeUserId, posts.length]);
 
   useEffect(() => {
     const session = getCommunitySession();
@@ -430,7 +458,7 @@ export const useAppData = () => {
   const createPost = useCallback(
     async (post: Post) => {
       await addPost(post);
-      await reload();
+      await reload({ includePreferences: false });
     },
     [reload]
   );
@@ -438,7 +466,7 @@ export const useAppData = () => {
   const savePost = useCallback(
     async (post: Post) => {
       await updatePost(post);
-      await reload();
+      await reload({ includePreferences: false });
     },
     [reload]
   );
@@ -446,7 +474,7 @@ export const useAppData = () => {
   const removePost = useCallback(
     async (postId: string) => {
       await deletePostById(postId);
-      await reload();
+      await reload({ includePreferences: false });
     },
     [reload]
   );
@@ -457,7 +485,7 @@ export const useAppData = () => {
       if (!post) return;
       const nextComments = (post.comments ?? []).filter((comment) => comment.id !== commentId);
       await updatePost({ ...post, comments: nextComments });
-      await reload();
+      await reload({ includePreferences: false });
     },
     [posts, reload]
   );
@@ -470,7 +498,7 @@ export const useAppData = () => {
       if (!nextTopic) return;
       const restTopics = (post.topics ?? []).filter((topic) => topic !== nextTopic);
       await updatePost({ ...post, topics: [nextTopic, ...restTopics].slice(0, 6) });
-      await reload();
+      await reload({ includePreferences: false });
     },
     [posts, reload]
   );
@@ -486,7 +514,7 @@ export const useAppData = () => {
         const unique = Array.from(new Set(nextTopics));
         await updatePost({ ...post, topics: unique });
       }
-      await reload();
+      await reload({ includePreferences: false });
     },
     [posts, reload]
   );
@@ -494,7 +522,7 @@ export const useAppData = () => {
   const removeUser = useCallback(
     async (userId: string) => {
       await deleteUserById(userId);
-      await reload();
+      await reload({ includePreferences: false });
     },
     [reload]
   );
@@ -512,7 +540,7 @@ export const useAppData = () => {
       };
 
       await updateUser(nextUser);
-      await reload();
+      await reload({ includePreferences: false });
     },
     [users, reload]
   );
@@ -544,7 +572,7 @@ export const useAppData = () => {
       };
 
       await updateUser(nextUser);
-      await reload();
+      await reload({ includePreferences: false });
     },
     [users, reload]
   );
@@ -555,7 +583,7 @@ export const useAppData = () => {
       if (!existing) return;
       if ((existing.language ?? "es") === language) return;
       await updateUser({ ...existing, language });
-      await reload();
+      await reload({ includePreferences: false });
     },
     [users, reload]
   );
@@ -574,7 +602,7 @@ export const useAppData = () => {
       }
 
       await updateUser({ ...target, role });
-      await reload();
+      await reload({ includePreferences: false });
     },
     [users, reload]
   );

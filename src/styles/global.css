@@ -4281,6 +4281,10 @@ textarea:focus-visible {
 }
 
 @media (max-width: 800px) {
+  body {
+    background-attachment: scroll;
+  }
+
   .filters {
     grid-template-columns: 1fr;
   }

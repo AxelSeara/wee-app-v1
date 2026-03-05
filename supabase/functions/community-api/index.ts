@@ -1193,31 +1193,53 @@ const handlers = {
   "/data/bootstrap": async (req: Request) => {
     const auth = await requireSession(req);
     if (auth instanceof Response) return auth;
+    const body = await parseBody(req);
+    const requestedLimit = Number(body.limit ?? 80);
+    const pageLimit = Number.isFinite(requestedLimit)
+      ? Math.max(20, Math.min(200, Math.floor(requestedLimit)))
+      : 80;
+    const cursorCreatedAt = String(body.cursor_created_at ?? "").trim();
+    const includeUsers = body.include_users !== false;
+    const includePreferences = body.include_preferences !== false;
 
-    const [usersRes, postsRes, prefsRes] = await Promise.all([
-      db
-        .from("community_users")
-        .select("id,alias,avatar_url,language,created_at,community_user_roles(role)")
-        .eq("community_id", auth.community.id)
-        .eq("status", "active")
-        .order("created_at", { ascending: false }),
-      db
-        .from("posts")
-        .select("id,user_id,created_at,status,removed_by,removed_at,removed_reason,url,canonical_url,title,text,preview_title,preview_description,preview_image_url,preview_site_name,source_domain,topics,subtopics,topic_v2,topic_candidates_v2,topic_explanation_v2,topic_version,quality_label,quality_score,interest_score,flags,rationale,normalized_text")
-        .eq("community_id", auth.community.id)
-        .order("created_at", { ascending: false }),
-      db
-        .from("user_preferences")
-        .select("user_id,preferred_topics,blocked_domains,blocked_keywords")
-        .eq("community_id", auth.community.id)
-        .eq("user_id", auth.user.id)
-        .maybeSingle()
-    ]);
+    const usersPromise = includeUsers
+      ? db
+          .from("community_users")
+          .select("id,alias,avatar_url,language,created_at,community_user_roles(role)")
+          .eq("community_id", auth.community.id)
+          .eq("status", "active")
+          .order("created_at", { ascending: false })
+      : Promise.resolve({ data: [], error: null } as const);
+
+    let postsQuery = db
+      .from("posts")
+      .select("id,user_id,created_at,status,removed_by,removed_at,removed_reason,url,canonical_url,title,text,preview_title,preview_description,preview_image_url,preview_site_name,source_domain,topics,subtopics,topic_v2,topic_candidates_v2,topic_explanation_v2,topic_version,quality_label,quality_score,interest_score,flags,rationale,normalized_text")
+      .eq("community_id", auth.community.id)
+      .order("created_at", { ascending: false })
+      .limit(pageLimit + 1);
+    if (cursorCreatedAt) {
+      postsQuery = postsQuery.lt("created_at", cursorCreatedAt);
+    }
+
+    const prefsPromise = includePreferences
+      ? db
+          .from("user_preferences")
+          .select("user_id,preferred_topics,blocked_domains,blocked_keywords")
+          .eq("community_id", auth.community.id)
+          .eq("user_id", auth.user.id)
+          .maybeSingle()
+      : Promise.resolve({ data: null, error: null } as const);
+
+    const [usersRes, postsRes, prefsRes] = await Promise.all([usersPromise, postsQuery, prefsPromise]);
 
     if (usersRes.error) return json(500, { message: usersRes.error.message });
     if (postsRes.error) return json(500, { message: postsRes.error.message });
 
-    const postIds = (postsRes.data ?? []).map((post: Record<string, any>) => post.id);
+    const rawPosts = (postsRes.data ?? []) as Record<string, any>[];
+    const hasMore = rawPosts.length > pageLimit;
+    const pageRows = hasMore ? rawPosts.slice(0, pageLimit) : rawPosts;
+    const nextCursor = hasMore ? String(pageRows[pageRows.length - 1]?.created_at ?? "") : null;
+    const postIds = pageRows.map((post: Record<string, any>) => post.id);
     let comments: Record<string, any>[] = [];
     let votes: Record<string, any>[] = [];
     let shares: Record<string, any>[] = [];
@@ -1270,7 +1292,7 @@ const handlers = {
 
     return json(200, {
       users: (usersRes.data ?? []).map((row) => rowToCommunityUser(row as Record<string, any>)),
-      posts: (postsRes.data ?? []).map((row) =>
+      posts: pageRows.map((row) =>
         buildPostFromRows(
           row as Record<string, any>,
           comments,
@@ -1288,6 +1310,9 @@ const handlers = {
             blockedKeywords: prefsRes.data.blocked_keywords ?? []
           }
         : null
+      ,
+      next_cursor: nextCursor || null,
+      has_more: hasMore
     });
   },
 

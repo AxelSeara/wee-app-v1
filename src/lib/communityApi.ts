@@ -67,6 +67,8 @@ export interface CommunityBootstrapResponse {
   users: CommunityUser[];
   posts: Post[];
   preferences: UserPreferences | null;
+  next_cursor?: string | null;
+  has_more?: boolean;
 }
 
 export interface CommunityPreviewResponse {
@@ -298,8 +300,18 @@ export const setInviteExpiry = async (inviteId: string, expiresAt: string | null
   await request<{ ok: true }>("/community/invite/set_expiry", { invite_id: inviteId, expires_at: expiresAt });
 };
 
-export const bootstrapCommunityData = async (): Promise<CommunityBootstrapResponse> =>
-  request<CommunityBootstrapResponse>("/data/bootstrap", {});
+export const bootstrapCommunityData = async (options?: {
+  limit?: number;
+  cursorCreatedAt?: string;
+  includeUsers?: boolean;
+  includePreferences?: boolean;
+}): Promise<CommunityBootstrapResponse> =>
+  request<CommunityBootstrapResponse>("/data/bootstrap", {
+    ...(typeof options?.limit === "number" ? { limit: options.limit } : {}),
+    ...(options?.cursorCreatedAt ? { cursor_created_at: options.cursorCreatedAt } : {}),
+    ...(typeof options?.includeUsers === "boolean" ? { include_users: options.includeUsers } : {}),
+    ...(typeof options?.includePreferences === "boolean" ? { include_preferences: options.includePreferences } : {})
+  });
 
 export const createCommunityPost = async (post: Post): Promise<Post> =>
   request<Post>("/data/post/create", { post });

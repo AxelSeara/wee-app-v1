@@ -1,5 +1,5 @@
 import { AnimatePresence } from "framer-motion";
-import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { Suspense, lazy, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { HashRouter, Navigate, Route, Routes, useLocation } from "react-router-dom";
 import { AppFooter } from "./components/AppFooter";
 import { CommunityLoadingScreen } from "./components/CommunityLoadingScreen";
@@ -19,19 +19,20 @@ import { consumeRateLimit } from "./lib/rateLimit";
 import type { AppLanguage, AuraRulesetVersion, ExportBundle } from "./lib/types";
 import { canonicalizeUrl, duplicateUrlKeys, generateId, normalizeSpace, sha256Hex } from "./lib/utils";
 import { resolveRootRoute, shouldAutoEnterDefaultCommunity } from "./lib/communityNavigation";
-import { HomePage } from "./pages/HomePage";
-import { AuthPage } from "./pages/AuthPage";
-import { PostDetailPage } from "./pages/PostDetailPage";
-import { ProfilePage } from "./pages/ProfilePage";
 import { RequireAuth } from "./pages/RequireAuth";
-import { CommunitiesPickerPage } from "./pages/CommunitiesPickerPage";
-import { SettingsPage } from "./pages/SettingsPage";
-import { SharePage } from "./pages/SharePage";
-import { TopicPage } from "./pages/TopicPage";
-import { UserPostsPage } from "./pages/UserPostsPage";
-import { CommunityPage } from "./pages/CommunityPage";
-import { InvitePage } from "./pages/InvitePage";
-import { JoinPage } from "./pages/JoinPage";
+
+const AuthPage = lazy(async () => ({ default: (await import("./pages/AuthPage")).AuthPage }));
+const HomePage = lazy(async () => ({ default: (await import("./pages/HomePage")).HomePage }));
+const TopicPage = lazy(async () => ({ default: (await import("./pages/TopicPage")).TopicPage }));
+const PostDetailPage = lazy(async () => ({ default: (await import("./pages/PostDetailPage")).PostDetailPage }));
+const SharePage = lazy(async () => ({ default: (await import("./pages/SharePage")).SharePage }));
+const ProfilePage = lazy(async () => ({ default: (await import("./pages/ProfilePage")).ProfilePage }));
+const UserPostsPage = lazy(async () => ({ default: (await import("./pages/UserPostsPage")).UserPostsPage }));
+const SettingsPage = lazy(async () => ({ default: (await import("./pages/SettingsPage")).SettingsPage }));
+const CommunityPage = lazy(async () => ({ default: (await import("./pages/CommunityPage")).CommunityPage }));
+const CommunitiesPickerPage = lazy(async () => ({ default: (await import("./pages/CommunitiesPickerPage")).CommunitiesPickerPage }));
+const InvitePage = lazy(async () => ({ default: (await import("./pages/InvitePage")).InvitePage }));
+const JoinPage = lazy(async () => ({ default: (await import("./pages/JoinPage")).JoinPage }));
 
 const AppRoutes = () => {
   const location = useLocation();
@@ -1054,6 +1055,16 @@ const AppRoutes = () => {
           markAllAsRead: markAllNotificationsAsRead
         }}
       >
+        <Suspense
+          fallback={
+            <CommunityLoadingScreen
+              communityName={selectedCommunity?.name}
+              topics={Array.from(new Set(posts.flatMap((post) => post.topics))).slice(0, 3)}
+              usersCount={users.length}
+              finishing={false}
+            />
+          }
+        >
         <AnimatePresence mode="wait" initial={false}>
         <Routes location={location} key={location.pathname}>
         <Route
@@ -1357,6 +1368,7 @@ const AppRoutes = () => {
         <Route path="*" element={<Navigate to={resolveRootRoute({ hasGlobalSession: Boolean(globalSession), hasActiveCommunitySession: Boolean(activeUser) })} replace />} />
         </Routes>
         </AnimatePresence>
+        </Suspense>
         {activeUser && location.pathname !== "/share" ? (
           <button
             type="button"

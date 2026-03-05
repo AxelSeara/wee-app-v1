@@ -24,6 +24,8 @@ let cache: { users: User[]; posts: Post[]; preferences: UserPreferences | null }
   posts: [],
   preferences: null
 };
+let postsNextCursor: string | null = null;
+let postsHasMore = true;
 
 export const clearStoreCache = (): void => {
   cache = {
@@ -31,6 +33,8 @@ export const clearStoreCache = (): void => {
     posts: [],
     preferences: null
   };
+  postsNextCursor = null;
+  postsHasMore = true;
 };
 
 const ensureSession = () => {
@@ -41,12 +45,14 @@ const ensureSession = () => {
 
 const refresh = async (): Promise<void> => {
   ensureSession();
-  const data = await bootstrapCommunityData();
+  const data = await bootstrapCommunityData({ limit: 80 });
   cache = {
     users: data.users,
     posts: data.posts,
     preferences: data.preferences
   };
+  postsNextCursor = data.next_cursor ?? null;
+  postsHasMore = Boolean(data.has_more);
 };
 
 const maybeRefresh = async (): Promise<void> => {
@@ -96,13 +102,15 @@ export const deleteUserById = async (_userId: string): Promise<void> => {
 };
 
 export const addPost = async (post: Post): Promise<void> => {
-  await createCommunityPost(post);
-  await refresh();
+  await maybeRefresh();
+  const created = await createCommunityPost(post);
+  cache.posts = [created, ...cache.posts.filter((entry) => entry.id !== created.id)];
 };
 
 export const updatePost = async (post: Post): Promise<void> => {
-  await updateCommunityPost(post);
-  await refresh();
+  await maybeRefresh();
+  const updated = await updateCommunityPost(post);
+  cache.posts = cache.posts.map((entry) => (entry.id === updated.id ? updated : entry));
 };
 
 export const listPosts = async (): Promise<Post[]> => {
@@ -116,7 +124,33 @@ export const reportPostById = async (postId: string, _reporterId: string, reason
 
 export const deletePostById = async (postId: string): Promise<void> => {
   await deleteCommunityPost(postId);
-  await refresh();
+  cache.posts = cache.posts.filter((entry) => entry.id !== postId);
+};
+
+export const loadMorePosts = async (limit = 120): Promise<number> => {
+  await maybeRefresh();
+  if (!postsHasMore || !postsNextCursor) return 0;
+  const data = await bootstrapCommunityData({
+    limit,
+    cursorCreatedAt: postsNextCursor,
+    includeUsers: false,
+    includePreferences: false
+  });
+  const incoming = data.posts ?? [];
+  if (incoming.length === 0) {
+    postsHasMore = false;
+    postsNextCursor = null;
+    return 0;
+  }
+  const seen = new Set(cache.posts.map((entry) => entry.id));
+  const merged = [...cache.posts];
+  incoming.forEach((post) => {
+    if (!seen.has(post.id)) merged.push(post);
+  });
+  cache.posts = merged.sort((a, b) => b.createdAt - a.createdAt);
+  postsNextCursor = data.next_cursor ?? null;
+  postsHasMore = Boolean(data.has_more);
+  return incoming.length;
 };
 
 export const listPostsByTopic = async (topic: string): Promise<Post[]> => {
@@ -132,6 +166,7 @@ export const listPostsByUser = async (userId: string): Promise<Post[]> => {
 export const getPreferences = async (userId: string): Promise<UserPreferences> => {
   const session = ensureSession();
   if (userId !== session.userId) return DEFAULT_PREFERENCES(userId);
+  if (cache.preferences?.userId === userId) return cache.preferences;
   const data = await getCommunityPreferences();
   if (!data) return DEFAULT_PREFERENCES(userId);
   cache.preferences = data;

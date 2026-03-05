@@ -24,6 +24,7 @@ export const PostCard = ({ post, canDelete = false, onDelete, onOpenDetail, comp
   const [auraOpen, setAuraOpen] = useState(false);
   const title = displayTitle(post);
   const coverImage = previewImage(post);
+  const shouldAnimateIn = !compact;
   const auraHealthClass =
     post.interestScore >= 75 ? "aura-health-good" : post.interestScore >= 50 ? "aura-health-warn" : "aura-health-bad";
   const snippet = post.status === "collapsed"
@@ -37,10 +38,10 @@ export const PostCard = ({ post, canDelete = false, onDelete, onOpenDetail, comp
   return (
     <motion.article
       className={`post-card ${onOpenDetail ? "post-card-clickable" : ""} ${compact ? "post-card-compact" : ""}`}
-      initial={{ opacity: 0, y: 8 }}
-      whileInView={{ opacity: 1, y: 0 }}
-      viewport={VIEWPORT_ONCE}
-      transition={{ duration: MOTION_DURATION.base, ease: EASE_STANDARD }}
+      initial={shouldAnimateIn ? { opacity: 0, y: 8 } : false}
+      whileInView={shouldAnimateIn ? { opacity: 1, y: 0 } : undefined}
+      viewport={shouldAnimateIn ? VIEWPORT_ONCE : undefined}
+      transition={shouldAnimateIn ? { duration: MOTION_DURATION.base, ease: EASE_STANDARD } : undefined}
       whileHover={onOpenDetail ? { y: -2, borderColor: "#5b8dcc" } : { y: -1.5 }}
       onClick={onOpenDetail ? openDetail : undefined}
       role={onOpenDetail ? "button" : undefined}

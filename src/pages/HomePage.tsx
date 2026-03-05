@@ -33,7 +33,12 @@ const groupByTopic = (posts: Post[]): Array<{ topic: string; posts: Post[] }> =>
   const grouped = new Map<string, Post[]>();
   posts.forEach((post) => {
     post.topics.forEach((topic) => {
-      grouped.set(topic, [...(grouped.get(topic) ?? []), post]);
+      const bucket = grouped.get(topic);
+      if (bucket) {
+        bucket.push(post);
+        return;
+      }
+      grouped.set(topic, [post]);
     });
   });
 
@@ -57,15 +62,20 @@ export const HomePage = ({
   const { language } = useI18n();
   const navigate = useNavigate();
   const [searchQuery, setSearchQuery] = useState("");
+  const [debouncedSearchQuery, setDebouncedSearchQuery] = useState("");
   const [showOnboarding, setShowOnboarding] = useState(false);
   const [activeSection, setActiveSection] = useState("feed-section");
   const [showAllActiveUsers, setShowAllActiveUsers] = useState(false);
   const [mobileExtrasOpen, setMobileExtrasOpen] = useState(false);
   const [compactFeed, setCompactFeed] = useState(false);
   const [selectedGroup, setSelectedGroup] = useState("all");
+  useEffect(() => {
+    const timeout = window.setTimeout(() => setDebouncedSearchQuery(searchQuery), 180);
+    return () => window.clearTimeout(timeout);
+  }, [searchQuery]);
   const filteredPosts = useMemo(
-    () => filterPosts({ ...DEFAULT_FILTERS, query: searchQuery }),
-    [filterPosts, searchQuery]
+    () => filterPosts({ ...DEFAULT_FILTERS, query: debouncedSearchQuery }),
+    [filterPosts, debouncedSearchQuery]
   );
   const visiblePosts = useMemo(
     () =>

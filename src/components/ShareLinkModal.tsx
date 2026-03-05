@@ -75,7 +75,7 @@ export const ShareLinkModal = ({ open, onClose, onShareUrl, getDuplicatePreview,
         >
           <motion.section
             ref={dialogRef}
-            className="modal-card modal-card-compact"
+            className="modal-card modal-card-compact modal-card-share"
             role="dialog"
             aria-modal="true"
             aria-labelledby="share-link-title"

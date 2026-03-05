@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import { useNavigate } from "react-router-dom";
 import { Icon } from "../components/Icon";
@@ -65,10 +65,15 @@ export const HomePage = ({
   const [debouncedSearchQuery, setDebouncedSearchQuery] = useState("");
   const [showOnboarding, setShowOnboarding] = useState(false);
   const [activeSection, setActiveSection] = useState("feed-section");
+  const [mobileNavHidden, setMobileNavHidden] = useState(false);
+  const [isMobileView, setIsMobileView] = useState(() =>
+    typeof window !== "undefined" ? window.matchMedia("(max-width: 800px)").matches : false
+  );
   const [showAllActiveUsers, setShowAllActiveUsers] = useState(false);
   const [mobileExtrasOpen, setMobileExtrasOpen] = useState(false);
   const [compactFeed, setCompactFeed] = useState(false);
   const [selectedGroup, setSelectedGroup] = useState("all");
+  const lastScrollY = useRef(0);
   useEffect(() => {
     const timeout = window.setTimeout(() => setDebouncedSearchQuery(searchQuery), 180);
     return () => window.clearTimeout(timeout);
@@ -216,6 +221,25 @@ export const HomePage = ({
   }, [activeUser.id]);
 
   useEffect(() => {
+    const media = window.matchMedia("(max-width: 800px)");
+    const onChange = (event: MediaQueryListEvent) => setIsMobileView(event.matches);
+    setIsMobileView(media.matches);
+    if (media.addEventListener) {
+      media.addEventListener("change", onChange);
+      return () => media.removeEventListener("change", onChange);
+    }
+    media.addListener(onChange);
+    return () => media.removeListener(onChange);
+  }, []);
+
+  useEffect(() => {
+    if (isMobileView && compactFeed) {
+      setCompactFeed(false);
+      localStorage.setItem(`wee_compact_feed_${activeUser.id}`, "0");
+    }
+  }, [isMobileView, compactFeed, activeUser.id]);
+
+  useEffect(() => {
     const sectionIds = ["feed-section", "topics-section", "community-section"];
     if (typeof IntersectionObserver !== "undefined") {
       const sections = sectionIds
@@ -263,6 +287,18 @@ export const HomePage = ({
 
     const onScroll = () => {
       const offset = 140;
+      const currentY = window.scrollY;
+      const delta = currentY - lastScrollY.current;
+      if (isMobileView) {
+        if (currentY < 28) {
+          setMobileNavHidden(false);
+        } else if (delta > 8) {
+          setMobileNavHidden(true);
+        } else if (delta < -8) {
+          setMobileNavHidden(false);
+        }
+      }
+      lastScrollY.current = currentY;
       let current = sectionIds[0];
       for (const id of sectionIds) {
         const element = document.getElementById(id);
@@ -278,7 +314,7 @@ export const HomePage = ({
     onScroll();
     window.addEventListener("scroll", onScroll, { passive: true });
     return () => window.removeEventListener("scroll", onScroll);
-  }, []);
+  }, [isMobileView]);
 
   const closeOnboarding = (): void => {
     const key = `wee_onboarding_seen_${activeUser.id}`;
@@ -291,6 +327,7 @@ export const HomePage = ({
   };
 
   const toggleCompactFeed = (): void => {
+    if (isMobileView) return;
     setCompactFeed((prev) => {
       const next = !prev;
       localStorage.setItem(`wee_compact_feed_${activeUser.id}`, next ? "1" : "0");
@@ -319,7 +356,7 @@ export const HomePage = ({
       <div className="home-layout" id="home-top">
         <aside className="home-sidebar">
           <div className="home-sidebar-stack">
-            <nav className="home-side-nav" aria-label={pick(language, "Navegación de Wee", "Wee navigation", "Navegación de Wee")}>
+            <nav className={`home-side-nav${mobileNavHidden ? " is-hidden" : ""}`} aria-label={pick(language, "Navegación de Wee", "Wee navigation", "Navegación de Wee")}>
               <button
                 type="button"
                 className={activeSection === "feed-section" ? "side-nav-btn active" : "side-nav-btn"}
@@ -424,11 +461,13 @@ export const HomePage = ({
                   ? pick(language, "Lo que está sonando", "What's popping now", "O que está soando")
                   : `${pick(language, "Popular en", "Popular in", "Popular en")} ${selectedGroup}`}
               </h2>
-              <button type="button" className="btn" onClick={toggleCompactFeed}>
-                <Icon name="news" size={13} /> {compactFeed
-                  ? pick(language, "Ver grande", "Expanded view", "Ver grande")
-                  : pick(language, "Ver compacto", "Compact view", "Ver compacto")}
-              </button>
+              {!isMobileView ? (
+                <button type="button" className="btn" onClick={toggleCompactFeed}>
+                  <Icon name="news" size={13} /> {compactFeed
+                    ? pick(language, "Ver grande", "Expanded view", "Ver grande")
+                    : pick(language, "Ver compacto", "Compact view", "Ver compacto")}
+                </button>
+              ) : null}
             </div>
             <p className="section-intro">
               {pick(language, "Lo que más está ayudando y moviendo conversación ahora mismo.", "What is helping most and driving conversation right now.", "O que máis está axudando e movendo conversa agora mesmo.")}

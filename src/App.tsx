@@ -1369,7 +1369,7 @@ const AppRoutes = () => {
         </Routes>
         </AnimatePresence>
         </Suspense>
-        {activeUser && location.pathname !== "/share" ? (
+        {activeUser && location.pathname.startsWith("/home") ? (
           <button
             type="button"
             className="mobile-share-fab"

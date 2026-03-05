@@ -154,15 +154,12 @@ export const CommunityPage = ({
         onLogout={onLogout}
       />
 
-      <section className="page-section">
+      <section className="page-section community-page-section">
         <div className="section-head">
           <h2><Icon name="users" /> {pick(language, "Comunidad", "Community", "Comunidade")}</h2>
           <div className="page-head-actions">
             <Link to="/home" className="btn btn-nav">
               <Icon name="home" /> {pick(language, "Inicio", "Home", "Inicio")}
-            </Link>
-            <Link to="/communities" className="btn btn-nav">
-              <Icon name="users" /> {pick(language, "Comunidades", "Communities", "Comunidades")}
             </Link>
           </div>
         </div>

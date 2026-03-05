@@ -66,7 +66,7 @@ export const UserPostsPage = ({
               <p>{pick(language, `${userPosts.length} noticias compartidas`, `${userPosts.length} shared posts`, `${userPosts.length} novas compartidas`)}</p>
             </div>
           </div>
-          <div className="profile-actions page-head-actions">
+          <div className="profile-actions page-head-actions profile-top-links">
             {isOwnProfile ? (
               <Link to={`/profile/${profileUser.id}`} className="btn btn-nav">
                 <Icon name="settings" /> {pick(language, "Ajustes de perfil", "Profile settings", "Axustes de perfil")}

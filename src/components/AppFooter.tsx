@@ -80,7 +80,7 @@ export const AppFooter = () => {
                 <article className="about-card">
                   <h3><Icon name="users" /> {pick(language, "Qué es Wee", "What Wee is", "Que é Wee")}</h3>
                   <p>
-                    {pick(language, "Wee es un sitio para grupos pequeños con intereses parecidos. Aquí los links no se pierden: quedan agrupados por tema y listos para seguir el hilo.", "Wee is a space for small groups with shared interests. Links don't get lost: they stay grouped by topic and ready to follow in-thread.", "Wee é un sitio para grupos pequenos con intereses parecidos. Aquí as ligazóns non se perden: quedan agrupadas por tema e listas para seguir o fío.")}
+                    {pick(language, "Somos gente que comparte links a diario y quería una forma más clara de ordenar conversaciones en pequeño. Wee nace para eso: microcomunidades, contexto y criterio compartido. pom Ave Gabe. Aquí los links no se pierden: quedan agrupados por tema y listos para seguir el hilo.", "We are people who share links every day and wanted a clearer way to organize small-group conversations. Wee is built for that: micro-communities, context, and shared judgment. pom Ave Gabe. Links do not get lost here: they stay grouped by topic and ready to follow in-thread.", "Somos xente que comparte ligazóns a diario e quería unha forma máis clara de ordenar conversas en pequeno. Wee nace para iso: microcomunidades, contexto e criterio compartido. pom Ave Gabe. Aquí as ligazóns non se perden: quedan agrupadas por tema e listas para seguir o fío.")}
                   </p>
                 </article>
 

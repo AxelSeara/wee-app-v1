@@ -2025,6 +2025,14 @@ textarea::placeholder {
   flex-wrap: wrap;
 }
 
+.profile-top-links {
+  flex-wrap: nowrap;
+}
+
+.profile-top-links .btn {
+  white-space: nowrap;
+}
+
 .delete-chip {
   width: 28px;
   height: 28px;
@@ -3983,6 +3991,10 @@ textarea::placeholder {
   margin: 0 auto 0.72rem;
 }
 
+.community-page-section {
+  margin-top: 0.48rem;
+}
+
 .community-settings-head {
   display: flex;
   align-items: flex-start;
@@ -4216,9 +4228,9 @@ textarea::placeholder {
 
 .footer-bar p {
   margin: 0;
-  color: #c5d5ef;
-  font-size: 0.86rem;
-  text-shadow: 0 1px 0 rgb(6 14 29 / 45%);
+  color: rgb(162 182 212 / 58%);
+  font-size: 0.8rem;
+  letter-spacing: 0.01em;
 }
 
 .footer-copy {
@@ -4227,8 +4239,8 @@ textarea::placeholder {
 }
 
 .footer-meta {
-  color: #98afcf;
-  font-size: 0.76rem;
+  color: rgb(142 164 196 / 44%);
+  font-size: 0.72rem;
 }
 
 .about-modal {
@@ -4522,8 +4534,8 @@ textarea:focus-visible {
   .home-layout {
     grid-template-columns: 1fr;
     grid-template-areas:
-      "main"
-      "sidebar";
+      "sidebar"
+      "main";
     gap: 0.7rem;
     margin-top: 0.72rem;
   }
@@ -4596,7 +4608,7 @@ textarea:focus-visible {
 
   .home-main .page-section {
     padding: 0.7rem 0.66rem;
-    scroll-margin-top: calc(max(0.38rem, env(safe-area-inset-top)) + 7.4rem);
+    scroll-margin-top: calc(max(0.38rem, env(safe-area-inset-top)) + 5.2rem);
     animation: home-block-in 320ms var(--ease-standard) forwards;
   }
 
@@ -4629,11 +4641,11 @@ textarea:focus-visible {
   }
 
   .home-side-nav {
-    position: fixed;
-    left: 0.78rem;
-    right: 0.78rem;
-    top: calc(max(0.38rem, env(safe-area-inset-top)) + 3.45rem);
-    z-index: 44;
+    position: static;
+    left: auto;
+    right: auto;
+    top: auto;
+    z-index: auto;
     display: grid;
     grid-template-columns: repeat(3, minmax(0, 1fr));
     align-items: center;
@@ -4646,10 +4658,17 @@ textarea:focus-visible {
     transition: transform var(--motion-base) var(--ease-standard), opacity var(--motion-base) var(--ease-standard);
   }
 
-  .home-side-nav.is-hidden {
-    transform: translateY(-130%);
+  main:has(.topbar .user-menu-dropdown) .home-side-nav,
+  main:has(.topbar .notification-dropdown) .home-side-nav {
     opacity: 0;
     pointer-events: none;
+    transform: translateY(-4px);
+  }
+
+  .home-side-nav.is-hidden {
+    transform: none;
+    opacity: 1;
+    pointer-events: auto;
   }
 
   .side-nav-btn {
@@ -4672,7 +4691,11 @@ textarea:focus-visible {
   }
 
   .home-main {
-    margin-top: 3.65rem;
+    margin-top: 0;
+  }
+
+  .community-page-section {
+    margin-top: 0.62rem;
   }
 
   .toast {
@@ -4809,6 +4832,13 @@ textarea:focus-visible {
   .btn {
     min-height: 36px;
     padding: 0.42rem 0.62rem;
+  }
+
+  .profile-top-links {
+    width: 100%;
+    overflow-x: auto;
+    padding-bottom: 0.1rem;
+    scrollbar-width: thin;
   }
 }
 

@@ -138,7 +138,12 @@ export const AuthPage = ({ mode, onLogin, onRegister, onChangeLanguage }: AuthPa
           {error ? <p className="error">{error}</p> : null}
           <button type="submit" className="btn btn-primary auth-submit-btn" disabled={loading}>
             <Icon name="check" /> {loading
-              ? pick(language, "Entrando...", "Signing in...", "Entrando...")
+              ? (
+                <>
+                  {pick(language, "Entrando", "Signing in", "Entrando")}
+                  <span className="loading-dots" aria-hidden="true" />
+                </>
+              )
               : mode === "login"
                 ? pick(language, "Entrar", "Log in", "Entrar")
                 : pick(language, "Crear cuenta", "Create account", "Crear conta")}

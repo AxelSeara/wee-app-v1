@@ -181,27 +181,32 @@ export const PostDetailModal = ({
                   <button
                     type="button"
                     className={currentUserVote === 1 ? "btn btn-primary" : "btn"}
-                    disabled={ratingBusy || !canRate}
+                    disabled={ratingBusy}
                     onClick={async () => {
-                      if (!current) return;
+                      if (!current || !activeUserId) return;
+                      if (!canRate) {
+                        setShowSourceVoteHint(true);
+                        onToast(pick(language, "Primero abre la fuente y después valora.", "Open the source first, then rate."));
+                        return;
+                      }
                       setRatingBusy(true);
+                      const previousFeedbacks = current.feedbacks ?? [];
+                      const existing = previousFeedbacks.find((item) => item.userId === activeUserId);
+                      const optimisticFeedbacks: NonNullable<Post["feedbacks"]> = existing
+                        ? previousFeedbacks.map((item) =>
+                            item.userId === activeUserId ? { ...item, vote: 1 as const, votedAt: Date.now() } : item
+                          )
+                        : [...previousFeedbacks, { userId: activeUserId, vote: 1 as const, votedAt: Date.now() }];
+                      setCurrent((prev) => (prev ? { ...prev, feedbacks: optimisticFeedbacks } : prev));
                       const result = await onRatePost(current.id, 1);
                       onToast(result.message);
-                      if (result.ok && activeUserId) {
+                      if (result.ok) {
                         setShowSourceVoteHint(false);
-                        setCurrent((prev) => {
-                          if (!prev) return prev;
-                          const feedbacks: NonNullable<Post["feedbacks"]> = prev.feedbacks ?? [];
-                          const existing = feedbacks.find((item) => item.userId === activeUserId);
-                          const nextFeedbacks: NonNullable<Post["feedbacks"]> = existing
-                            ? feedbacks.map((item) =>
-                                item.userId === activeUserId ? { ...item, vote: 1 as const, votedAt: Date.now() } : item
-                              )
-                            : [...feedbacks, { userId: activeUserId, vote: 1 as const, votedAt: Date.now() }];
-                          return { ...prev, feedbacks: nextFeedbacks };
-                        });
                       } else if (!canRate) {
                         setShowSourceVoteHint(true);
+                        setCurrent((prev) => (prev ? { ...prev, feedbacks: previousFeedbacks } : prev));
+                      } else {
+                        setCurrent((prev) => (prev ? { ...prev, feedbacks: previousFeedbacks } : prev));
                       }
                       setRatingBusy(false);
                     }}
@@ -211,27 +216,32 @@ export const PostDetailModal = ({
                   <button
                     type="button"
                     className={currentUserVote === -1 ? "btn btn-primary" : "btn"}
-                    disabled={ratingBusy || !canRate}
+                    disabled={ratingBusy}
                     onClick={async () => {
-                      if (!current) return;
+                      if (!current || !activeUserId) return;
+                      if (!canRate) {
+                        setShowSourceVoteHint(true);
+                        onToast(pick(language, "Primero abre la fuente y después valora.", "Open the source first, then rate."));
+                        return;
+                      }
                       setRatingBusy(true);
+                      const previousFeedbacks = current.feedbacks ?? [];
+                      const existing = previousFeedbacks.find((item) => item.userId === activeUserId);
+                      const optimisticFeedbacks: NonNullable<Post["feedbacks"]> = existing
+                        ? previousFeedbacks.map((item) =>
+                            item.userId === activeUserId ? { ...item, vote: -1 as const, votedAt: Date.now() } : item
+                          )
+                        : [...previousFeedbacks, { userId: activeUserId, vote: -1 as const, votedAt: Date.now() }];
+                      setCurrent((prev) => (prev ? { ...prev, feedbacks: optimisticFeedbacks } : prev));
                       const result = await onRatePost(current.id, -1);
                       onToast(result.message);
-                      if (result.ok && activeUserId) {
+                      if (result.ok) {
                         setShowSourceVoteHint(false);
-                        setCurrent((prev) => {
-                          if (!prev) return prev;
-                          const feedbacks: NonNullable<Post["feedbacks"]> = prev.feedbacks ?? [];
-                          const existing = feedbacks.find((item) => item.userId === activeUserId);
-                          const nextFeedbacks: NonNullable<Post["feedbacks"]> = existing
-                            ? feedbacks.map((item) =>
-                                item.userId === activeUserId ? { ...item, vote: -1 as const, votedAt: Date.now() } : item
-                              )
-                            : [...feedbacks, { userId: activeUserId, vote: -1 as const, votedAt: Date.now() }];
-                          return { ...prev, feedbacks: nextFeedbacks };
-                        });
                       } else if (!canRate) {
                         setShowSourceVoteHint(true);
+                        setCurrent((prev) => (prev ? { ...prev, feedbacks: previousFeedbacks } : prev));
+                      } else {
+                        setCurrent((prev) => (prev ? { ...prev, feedbacks: previousFeedbacks } : prev));
                       }
                       setRatingBusy(false);
                     }}

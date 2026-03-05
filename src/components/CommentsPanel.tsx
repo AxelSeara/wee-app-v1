@@ -185,9 +185,34 @@ export const CommentsPanel = ({
                   className={auraActive ? "btn btn-primary aura-btn" : "btn aura-btn"}
                   disabled={!activeUserId}
                   onClick={async () => {
+                    if (!activeUserId) return;
+                    const previousAura = comment.auraUserIds ?? [];
+                    const nextAuraSet = new Set(previousAura);
+                    if (nextAuraSet.has(activeUserId)) {
+                      nextAuraSet.delete(activeUserId);
+                    } else {
+                      nextAuraSet.add(activeUserId);
+                    }
+                    const optimisticPost: Post = {
+                      ...post,
+                      comments: comments.map((entry) =>
+                        entry.id === comment.id ? { ...entry, auraUserIds: Array.from(nextAuraSet) } : entry
+                      )
+                    };
+                    if (onPostUpdate) onPostUpdate(optimisticPost);
+
                     const result = await onVoteCommentAura(post.id, comment.id);
                     onToast(result.message);
-                    if (result.ok && result.post && onPostUpdate) onPostUpdate(result.post);
+                    if (result.ok && result.post && onPostUpdate) {
+                      onPostUpdate(result.post);
+                    } else if (!result.ok && onPostUpdate) {
+                      onPostUpdate({
+                        ...post,
+                        comments: comments.map((entry) =>
+                          entry.id === comment.id ? { ...entry, auraUserIds: previousAura } : entry
+                        )
+                      });
+                    }
                   }}
                 >
                   Aura {auraCount}

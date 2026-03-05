@@ -118,7 +118,12 @@ export const InvitePage = ({ isLoggedIn, onPreviewCommunity, onConfirmCommunity,
                 <p className="hint">{pick(language, "Ya tienes sesión iniciada. Solo confirma y entramos.", "You're already signed in. Just confirm and we'll jump in.", "Xa tes sesión iniciada. Só confirma e entramos.")}</p>
                 {error ? <p className="error">{error}</p> : null}
                 <button type="button" className="btn btn-primary" onClick={() => void confirmAndEnter()} disabled={joining}>
-                  <Icon name="check" /> {joining ? pick(language, "Entrando...", "Entering...", "Entrando...") : pick(language, "Confirmar y entrar", "Confirm and enter", "Confirmar e entrar")}
+                  <Icon name="check" /> {joining ? (
+                    <>
+                      {pick(language, "Entrando", "Entering", "Entrando")}
+                      <span className="loading-dots" aria-hidden="true" />
+                    </>
+                  ) : pick(language, "Confirmar y entrar", "Confirm and enter", "Confirmar e entrar")}
                 </button>
               </div>
             )}

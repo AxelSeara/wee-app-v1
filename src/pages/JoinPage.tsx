@@ -108,7 +108,12 @@ export const JoinPage = ({ isLoggedIn, onPreviewCommunity, onJoinCommunity, onEn
         </label>
         <div className="auth-entry-actions">
           <button type="submit" className="btn btn-primary" disabled={loadingPreview}>
-            <Icon name="eye" /> {loadingPreview ? pick(language, "Mirando...", "Checking...", "Mirando...") : pick(language, "Ver comunidad", "See community", "Ver comunidade")}
+            <Icon name="eye" /> {loadingPreview ? (
+              <>
+                {pick(language, "Mirando", "Checking", "Mirando")}
+                <span className="loading-dots" aria-hidden="true" />
+              </>
+            ) : pick(language, "Ver comunidad", "See community", "Ver comunidade")}
           </button>
           <button type="button" className="btn" onClick={() => navigate("/communities")}>
             <Icon name="arrowLeft" /> {pick(language, "Volver", "Back", "Volver")}
@@ -122,7 +127,12 @@ export const JoinPage = ({ isLoggedIn, onPreviewCommunity, onJoinCommunity, onEn
           {preview.description ? <p className="hint">{preview.description}</p> : null}
           {isLoggedIn ? (
             <button type="button" className="btn btn-primary" onClick={() => void confirmJoin()} disabled={joining}>
-              <Icon name="check" /> {joining ? pick(language, "Entrando...", "Entering...", "Entrando...") : pick(language, "Confirmar y entrar", "Confirm and enter", "Confirmar e entrar")}
+              <Icon name="check" /> {joining ? (
+                <>
+                  {pick(language, "Entrando", "Entering", "Entrando")}
+                  <span className="loading-dots" aria-hidden="true" />
+                </>
+              ) : pick(language, "Confirmar y entrar", "Confirm and enter", "Confirmar e entrar")}
             </button>
           ) : (
             <div className="auth-entry-actions">

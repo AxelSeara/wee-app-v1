@@ -477,26 +477,31 @@ export const PostDetailPage = ({
             <button
               type="button"
               className={currentUserVote === 1 ? `btn btn-primary ${thumbUpPulse ? "thumb-up-pulse" : ""}` : "btn"}
-              disabled={ratingBusy || !current.url || !canRate}
+              disabled={ratingBusy || !current.url}
               onClick={async () => {
+                if (!activeUserId) return;
+                if (!canRate) {
+                  setShowSourceVoteHint(true);
+                  onToast(pick(language, "Primero abre la fuente y después vota.", "Open the source first, then vote."));
+                  return;
+                }
                 setRatingBusy(true);
+                const previousFeedbacks = current.feedbacks ?? [];
+                const existing = previousFeedbacks.find((item) => item.userId === activeUserId);
+                const optimisticFeedbacks: NonNullable<Post["feedbacks"]> = existing
+                  ? previousFeedbacks.map((item) =>
+                      item.userId === activeUserId ? { ...item, vote: 1 as const, votedAt: Date.now() } : item
+                    )
+                  : [...previousFeedbacks, { userId: activeUserId, vote: 1 as const, votedAt: Date.now() }];
+                setCurrent((prev) => (prev ? { ...prev, feedbacks: optimisticFeedbacks } : prev));
                 const result = await onRatePost(current.id, 1);
                 onToast(result.message);
-                if (result.ok && activeUserId) {
+                if (result.ok) {
                   setShowSourceVoteHint(false);
-                  setCurrent((prev) => {
-                    if (!prev) return prev;
-                    const feedbacks: NonNullable<Post["feedbacks"]> = prev.feedbacks ?? [];
-                    const existing = feedbacks.find((item) => item.userId === activeUserId);
-                    const nextFeedbacks: NonNullable<Post["feedbacks"]> = existing
-                      ? feedbacks.map((item) =>
-                          item.userId === activeUserId ? { ...item, vote: 1 as const, votedAt: Date.now() } : item
-                        )
-                      : [...feedbacks, { userId: activeUserId, vote: 1 as const, votedAt: Date.now() }];
-                    return { ...prev, feedbacks: nextFeedbacks };
-                  });
                   setThumbUpPulse(true);
                   window.setTimeout(() => setThumbUpPulse(false), 650);
+                } else {
+                  setCurrent((prev) => (prev ? { ...prev, feedbacks: previousFeedbacks } : prev));
                 }
                 setRatingBusy(false);
               }}
@@ -506,24 +511,29 @@ export const PostDetailPage = ({
             <button
               type="button"
               className={currentUserVote === -1 ? "btn btn-primary" : "btn"}
-              disabled={ratingBusy || !current.url || !canRate}
+              disabled={ratingBusy || !current.url}
               onClick={async () => {
+                if (!activeUserId) return;
+                if (!canRate) {
+                  setShowSourceVoteHint(true);
+                  onToast(pick(language, "Primero abre la fuente y después vota.", "Open the source first, then vote."));
+                  return;
+                }
                 setRatingBusy(true);
+                const previousFeedbacks = current.feedbacks ?? [];
+                const existing = previousFeedbacks.find((item) => item.userId === activeUserId);
+                const optimisticFeedbacks: NonNullable<Post["feedbacks"]> = existing
+                  ? previousFeedbacks.map((item) =>
+                      item.userId === activeUserId ? { ...item, vote: -1 as const, votedAt: Date.now() } : item
+                    )
+                  : [...previousFeedbacks, { userId: activeUserId, vote: -1 as const, votedAt: Date.now() }];
+                setCurrent((prev) => (prev ? { ...prev, feedbacks: optimisticFeedbacks } : prev));
                 const result = await onRatePost(current.id, -1);
                 onToast(result.message);
-                if (result.ok && activeUserId) {
+                if (result.ok) {
                   setShowSourceVoteHint(false);
-                  setCurrent((prev) => {
-                    if (!prev) return prev;
-                    const feedbacks: NonNullable<Post["feedbacks"]> = prev.feedbacks ?? [];
-                    const existing = feedbacks.find((item) => item.userId === activeUserId);
-                    const nextFeedbacks: NonNullable<Post["feedbacks"]> = existing
-                      ? feedbacks.map((item) =>
-                          item.userId === activeUserId ? { ...item, vote: -1 as const, votedAt: Date.now() } : item
-                        )
-                      : [...feedbacks, { userId: activeUserId, vote: -1 as const, votedAt: Date.now() }];
-                    return { ...prev, feedbacks: nextFeedbacks };
-                  });
+                } else {
+                  setCurrent((prev) => (prev ? { ...prev, feedbacks: previousFeedbacks } : prev));
                 }
                 setRatingBusy(false);
               }}
@@ -531,7 +541,7 @@ export const PostDetailPage = ({
               <Icon name="thumbDown" />
             </button>
           </div>
-          {(!canRate && current.url) || (showSourceVoteHint && !canRate && current.url) ? <p className="warning">{pick(language, "Visita la fuente antes de votar esta noticia.", "Visit the source before rating this post.", "Visita a fonte antes de votar esta nova.")}</p> : null}
+          {showSourceVoteHint && !canRate && current.url ? <p className="warning">{pick(language, "Visita la fuente antes de votar esta noticia.", "Visit the source before rating this post.", "Visita a fonte antes de votar esta nova.")}</p> : null}
 
           <section className="detail-comments">
             <CommentsPanel

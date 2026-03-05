@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   addPost,
   clearStoreCache,
@@ -136,6 +136,7 @@ export const useAppData = () => {
   const [preferences, setPreferences] = useState<UserPreferences | null>(null);
   const [loading, setLoading] = useState(true);
   const [backendError, setBackendError] = useState<string | null>(null);
+  const hasBootstrapped = useRef(false);
 
   const reload = useCallback(async (options?: { showSkeleton?: boolean }) => {
     const showSkeleton = options?.showSkeleton ?? false;
@@ -181,7 +182,9 @@ export const useAppData = () => {
   }, [activeUserId]);
 
   useEffect(() => {
-    void reload({ showSkeleton: true });
+    const showFullLoading = !hasBootstrapped.current;
+    hasBootstrapped.current = true;
+    void reload({ showSkeleton: showFullLoading });
   }, [reload]);
 
   useEffect(() => {

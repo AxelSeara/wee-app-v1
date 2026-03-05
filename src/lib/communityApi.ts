@@ -156,7 +156,11 @@ export const loginGlobalUser = async (input: { username: string; password: strin
 };
 
 export const logoutGlobalUser = async (): Promise<void> => {
-  await request<{ ok: true }>("/auth/logout_global", {});
+  try {
+    await request<{ ok: true }>("/auth/logout_global", {});
+  } catch {
+    // Even if backend logout fails, clear local session to avoid lock-in loops.
+  }
   clearCommunitySession();
   clearGlobalSession();
 };

@@ -1,10 +1,11 @@
 import { type FormEvent, useEffect, useState } from "react";
+import { AnimatePresence, motion } from "framer-motion";
 import { useLocation, useNavigate } from "react-router-dom";
 import { Icon } from "../components/Icon";
 import { pick, useI18n } from "../lib/i18n";
 import type { CommunitySelection } from "../lib/communitySession";
 import type { CommunityListItem } from "../lib/communityApi";
-import { parseCommunityJoinInput, shouldAutoEnterDefaultCommunity } from "../lib/communityNavigation";
+import { shouldAutoEnterDefaultCommunity } from "../lib/communityNavigation";
 
 interface CommunitiesPickerPageProps {
   communities: CommunityListItem[];
@@ -18,9 +19,8 @@ interface CommunitiesPickerPageProps {
     rulesText?: string;
     invitePolicy: "admins_only" | "members_allowed";
   }) => Promise<CommunitySelection>;
-  onPreviewCommunity: (input: { code?: string; token?: string }) => Promise<CommunitySelection>;
-  onJoinCommunity: (input: { code?: string; token?: string }) => Promise<CommunitySelection>;
   onSaveSettings: (input: { defaultCommunityId?: string | null; skipPicker?: boolean }) => Promise<void>;
+  onLogout: () => Promise<void>;
 }
 
 export const CommunitiesPickerPage = ({
@@ -30,46 +30,26 @@ export const CommunitiesPickerPage = ({
   onReload,
   onEnterCommunity,
   onCreateCommunity,
-  onPreviewCommunity,
-  onJoinCommunity,
-  onSaveSettings
+  onSaveSettings,
+  onLogout
 }: CommunitiesPickerPageProps) => {
   const { language } = useI18n();
   const navigate = useNavigate();
   const location = useLocation();
-  const toFriendlyError = (raw: unknown, fallbackEs: string, fallbackEn: string, fallbackGl: string) => {
-    const message = raw instanceof Error ? raw.message : "";
-    if (message.includes("COMMUNITY_NAME_EXISTS")) {
-      return pick(language, "Ya existe una comunidad con ese nombre.", "A community with that name already exists.", "Xa existe unha comunidade con ese nome.");
-    }
-    return raw instanceof Error ? raw.message : pick(language, fallbackEs, fallbackEn, fallbackGl);
-  };
   const [loadingId, setLoadingId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [createOpen, setCreateOpen] = useState(false);
-  const [joinOpen, setJoinOpen] = useState(false);
   const [communityName, setCommunityName] = useState("");
   const [communityDescription, setCommunityDescription] = useState("");
   const [invitePolicy, setInvitePolicy] = useState<"admins_only" | "members_allowed">("admins_only");
-  const [joinCode, setJoinCode] = useState("");
-  const [joinPreview, setJoinPreview] = useState<CommunitySelection | null>(null);
   const [persistChoice, setPersistChoice] = useState(Boolean(skipPicker));
   const [creatingCommunity, setCreatingCommunity] = useState(false);
-  const [previewingJoin, setPreviewingJoin] = useState(false);
-  const [confirmingJoin, setConfirmingJoin] = useState(false);
+  const [loggingOut, setLoggingOut] = useState(false);
+  const [selectedCommunityId, setSelectedCommunityId] = useState<string | null>(null);
 
   useEffect(() => {
     setPersistChoice(Boolean(skipPicker));
   }, [skipPicker]);
-
-  useEffect(() => {
-    const query = new URLSearchParams(location.search);
-    const inviteToken = query.get("invite");
-    if (inviteToken) {
-      setJoinOpen(true);
-      setJoinCode(inviteToken);
-    }
-  }, [location.search]);
 
   useEffect(() => {
     const query = new URLSearchParams(location.search);
@@ -84,6 +64,19 @@ export const CommunitiesPickerPage = ({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [skipPicker, defaultCommunityId, communities, location.search]);
 
+  useEffect(() => {
+    if (selectedCommunityId && communities.some((entry) => entry.community_id === selectedCommunityId)) return;
+    setSelectedCommunityId(communities[0]?.community_id ?? null);
+  }, [communities, selectedCommunityId]);
+
+  const toFriendlyError = (raw: unknown, fallbackEs: string, fallbackEn: string, fallbackGl: string) => {
+    const message = raw instanceof Error ? raw.message : "";
+    if (message.includes("COMMUNITY_NAME_EXISTS")) {
+      return pick(language, "Ese nombre ya está pillado por otra comunidad.", "That name is already taken by another community.", "Ese nome xa está collido por outra comunidade.");
+    }
+    return raw instanceof Error ? raw.message : pick(language, fallbackEs, fallbackEn, fallbackGl);
+  };
+
   const enter = async (communityId: string) => {
     setError(null);
     setLoadingId(communityId);
@@ -96,7 +89,7 @@ export const CommunitiesPickerPage = ({
       }
       navigate("/home");
     } catch (err) {
-      setError(toFriendlyError(err, "No pudimos abrir la comunidad.", "Could not open community.", "Non puidemos abrir a comunidade."));
+      setError(toFriendlyError(err, "No pudimos entrar en esa comunidad.", "Could not enter that community.", "Non puidemos entrar nesa comunidade."));
     } finally {
       setLoadingId(null);
     }
@@ -115,118 +108,134 @@ export const CommunitiesPickerPage = ({
         rulesText: undefined
       });
       await onReload();
+      setSelectedCommunityId(created.id);
       await enter(created.id);
     } catch (err) {
-      setError(toFriendlyError(err, "No pudimos crear la comunidad.", "Could not create community.", "Non puidemos crear a comunidade."));
+      setError(toFriendlyError(err, "No pudimos crear la comunidad ahora mismo.", "Could not create community right now.", "Non puidemos crear a comunidade agora mesmo."));
     } finally {
       setCreatingCommunity(false);
     }
   };
 
-  const submitPreview = async (event: FormEvent) => {
-    event.preventDefault();
-    if (previewingJoin) return;
-    const parsed = parseCommunityJoinInput(joinCode);
-    if (!parsed.code && !parsed.token) return;
-    setPreviewingJoin(true);
-    setError(null);
+  const exitToLogin = async () => {
+    if (loggingOut) return;
+    setLoggingOut(true);
     try {
-      setJoinPreview(await onPreviewCommunity(parsed));
-    } catch (err) {
-      setError(toFriendlyError(err, "Código o link no válido.", "Invalid code or link.", "Código ou ligazón non válido."));
+      await onLogout();
+      navigate("/login");
     } finally {
-      setPreviewingJoin(false);
-    }
-  };
-
-  const confirmJoin = async () => {
-    if (!joinPreview || confirmingJoin) return;
-    setConfirmingJoin(true);
-    setError(null);
-    try {
-      await onJoinCommunity(parseCommunityJoinInput(joinCode));
-      await onReload();
-      await enter(joinPreview.id);
-    } catch (err) {
-      setError(toFriendlyError(err, "No pudimos unirte.", "Could not join.", "Non puidemos unirte."));
-    } finally {
-      setConfirmingJoin(false);
+      setLoggingOut(false);
     }
   };
 
   return (
-    <main className="page-section narrow">
-      <div className="section-head">
-        <h2><Icon name="users" /> {pick(language, "Tus comunidades", "Your communities", "As túas comunidades")}</h2>
-      </div>
-      <p className="section-intro">{pick(language, "Elige dónde quieres entrar.", "Pick where you want to enter.", "Escolle onde queres entrar.")}</p>
+    <main className="auth-layout auth-layout-single communities-picker-layout">
+      <section className="auth-card auth-card-main auth-card-access communities-picker-card">
+        <div className="section-head">
+          <h2><Icon name="users" /> {pick(language, "Tus comunidades", "Your communities", "As túas comunidades")}</h2>
+          <button type="button" className="btn" onClick={() => void exitToLogin()} disabled={loggingOut}>
+            <Icon name="logout" /> {loggingOut ? pick(language, "Saliendo...", "Signing out...", "Saíndo...") : pick(language, "Cerrar sesión", "Log out", "Pechar sesión")}
+          </button>
+        </div>
+        <p className="section-intro">
+          {communities.length > 0
+            ? pick(language, "Elige dónde quieres entrar hoy.", "Pick where you want to jump in today.", "Escolle onde queres entrar hoxe.")
+            : pick(language, "Todavía no estás en ninguna comunidad. Crea una o únete con un código y arrancamos.", "You are not in any community yet. Create one or join with a code and let's get going.", "Aínda non estás en ningunha comunidade. Crea unha ou únete cun código e arrincamos.")}
+        </p>
 
-      <label className="consent-row">
-        <input
-          type="checkbox"
-          checked={persistChoice}
-          onChange={(event) => setPersistChoice(event.target.checked)}
-        />
-        <span>{pick(language, "Entrar siempre aquí la próxima vez", "Always enter here next time", "Entrar sempre aquí a próxima vez")}</span>
-      </label>
+        <div className="community-picker-grid">
+          {communities.map((community) => {
+            const isActive = selectedCommunityId === community.community_id;
+            return (
+              <motion.article
+                key={community.community_id}
+                className={`community-picker-card-item${isActive ? " is-active" : ""}`}
+                onClick={() => setSelectedCommunityId(community.community_id)}
+                whileHover={{ y: -2 }}
+                whileTap={{ scale: 0.995 }}
+                transition={{ duration: 0.2, ease: "easeOut" }}
+              >
+                <h3>{community.name}</h3>
+                <p className="hint">{pick(language, "Rol", "Role", "Rol")}: {community.role}</p>
+              </motion.article>
+            );
+          })}
+        </div>
 
-      <div className="topic-grid">
-        {communities.map((community) => (
-          <article key={community.community_id} className="topic-block">
-            <h3>{community.name}</h3>
-            {community.description ? <p className="hint">{community.description}</p> : null}
-            <p className="hint">{pick(language, "Rol", "Role", "Rol")}: {community.role}</p>
-            <button type="button" className="btn btn-primary" onClick={() => void enter(community.community_id)} disabled={loadingId === community.community_id}>
-              <Icon name="check" /> {loadingId === community.community_id ? pick(language, "Entrando...", "Entering...", "Entrando...") : pick(language, "Entrar", "Enter", "Entrar")}
-            </button>
-          </article>
-        ))}
-      </div>
-
-      <div className="auth-entry-actions" style={{ marginTop: "1rem" }}>
-        <button type="button" className="btn" onClick={() => setCreateOpen((v) => !v)}>
-          <Icon name="plus" /> {pick(language, "Crear comunidad", "Create community", "Crear comunidade")}
-        </button>
-        <button type="button" className="btn" onClick={() => setJoinOpen((v) => !v)}>
-          <Icon name="link" /> {pick(language, "Unirme por código/link", "Join with code/link", "Unirme por código/ligazón")}
-        </button>
-      </div>
-
-      {createOpen ? (
-        <form className="stack" style={{ marginTop: "0.8rem" }} onSubmit={submitCreate}>
-          <label className="form-field">{pick(language, "Nombre", "Name", "Nome")}<input value={communityName} onChange={(event) => setCommunityName(event.target.value)} /></label>
-          <label className="form-field">{pick(language, "Descripción", "Description", "Descrición")}<input value={communityDescription} onChange={(event) => setCommunityDescription(event.target.value)} /></label>
-          <label className="form-field">{pick(language, "Invitaciones", "Invites", "Invitacións")}
-            <select value={invitePolicy} onChange={(event) => setInvitePolicy(event.target.value as "admins_only" | "members_allowed")}>
-              <option value="admins_only">{pick(language, "Solo admins", "Admins only", "Só admins")}</option>
-              <option value="members_allowed">{pick(language, "Todos", "Everyone", "Todos")}</option>
-            </select>
+        {selectedCommunityId ? (
+          <label className="consent-row community-picker-default-toggle">
+            <input
+              type="checkbox"
+              checked={persistChoice}
+              onChange={(event) => setPersistChoice(event.target.checked)}
+            />
+            <span>{pick(language, "Entrar siempre aquí", "Always enter here", "Entrar sempre aquí")}</span>
           </label>
-          <button type="submit" className="btn btn-primary" disabled={creatingCommunity}>
-            <Icon name="check" /> {creatingCommunity ? pick(language, "Creando...", "Creating...", "Creando...") : pick(language, "Crear y entrar", "Create and enter", "Crear e entrar")}
-          </button>
-        </form>
-      ) : null}
+        ) : null}
 
-      {joinOpen ? (
-        <form className="stack" style={{ marginTop: "0.8rem" }} onSubmit={submitPreview}>
-          <label className="form-field">{pick(language, "Código o link", "Code or link", "Código ou ligazón")}<input value={joinCode} onChange={(event) => setJoinCode(event.target.value)} /></label>
-          <button type="submit" className="btn" disabled={previewingJoin}>
-            <Icon name="eye" /> {previewingJoin ? pick(language, "Mirando...", "Checking...", "Mirando...") : pick(language, "Previsualizar", "Preview", "Previsualizar")}
-          </button>
-          {joinPreview ? (
-            <article className="invite-preview-card">
-              <h3>{joinPreview.name}</h3>
-              {joinPreview.description ? <p className="hint">{joinPreview.description}</p> : null}
-              <button type="button" className="btn btn-primary" onClick={() => void confirmJoin()} disabled={confirmingJoin}>
-                <Icon name="check" /> {confirmingJoin ? pick(language, "Entrando...", "Entering...", "Entrando...") : pick(language, "Confirmar y entrar", "Confirm and enter", "Confirmar e entrar")}
-              </button>
-            </article>
+        <div className="auth-entry-actions community-picker-actions">
+          {selectedCommunityId ? (
+            <button
+              type="button"
+              className="btn btn-primary"
+              onClick={() => void enter(selectedCommunityId)}
+              disabled={loadingId === selectedCommunityId}
+            >
+              <Icon name="check" /> {loadingId === selectedCommunityId ? (
+                <>
+                  {pick(language, "Entrando", "Entering", "Entrando")}
+                  <span className="loading-dots" aria-hidden="true" />
+                </>
+              ) : (
+                pick(language, "Entrar", "Enter", "Entrar")
+              )}
+            </button>
+          ) : (
+            <button type="button" className="btn btn-primary" onClick={() => setCreateOpen((v) => !v)}>
+              <Icon name="plus" /> {pick(language, "Crear comunidad", "Create community", "Crear comunidade")}
+            </button>
+          )}
+
+          {selectedCommunityId ? (
+            <button type="button" className="btn" onClick={() => setCreateOpen((v) => !v)}>
+              <Icon name="plus" /> {createOpen
+                ? pick(language, "Cerrar creación", "Close create", "Pechar creación")
+                : pick(language, "Nueva comunidad", "New community", "Nova comunidade")}
+            </button>
           ) : null}
-        </form>
-      ) : null}
+          <button type="button" className="btn" onClick={() => navigate(`/join${location.search}`)}>
+            <Icon name="link" /> {pick(language, "Unirme por código", "Join with code", "Unirme con código")}
+          </button>
+        </div>
 
-      {error ? <p className="error" style={{ marginTop: "0.8rem" }}>{error}</p> : null}
+        <AnimatePresence initial={false}>
+          {createOpen ? (
+            <motion.form
+              key="create-community-form"
+              className="stack community-create-form"
+              onSubmit={submitCreate}
+              initial={{ opacity: 0, y: -6 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -6 }}
+              transition={{ duration: 0.18, ease: "easeOut" }}
+            >
+              <label className="form-field">{pick(language, "Nombre", "Name", "Nome")}<input value={communityName} onChange={(event) => setCommunityName(event.target.value)} /></label>
+              <label className="form-field">{pick(language, "Descripción", "Description", "Descrición")}<input value={communityDescription} onChange={(event) => setCommunityDescription(event.target.value)} /></label>
+              <label className="form-field">{pick(language, "Invitaciones", "Invites", "Invitacións")}
+                <select value={invitePolicy} onChange={(event) => setInvitePolicy(event.target.value as "admins_only" | "members_allowed")}>
+                  <option value="admins_only">{pick(language, "Solo admins", "Admins only", "Só admins")}</option>
+                  <option value="members_allowed">{pick(language, "Todos", "Everyone", "Todos")}</option>
+                </select>
+              </label>
+              <button type="submit" className="btn btn-primary" disabled={creatingCommunity}>
+                <Icon name="check" /> {creatingCommunity ? pick(language, "Creando...", "Creating...", "Creando...") : pick(language, "Crear y entrar", "Create and enter", "Crear e entrar")}
+              </button>
+            </motion.form>
+          ) : null}
+        </AnimatePresence>
+
+        {error ? <p className="error community-picker-error">{error}</p> : null}
+      </section>
     </main>
   );
 };

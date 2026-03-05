@@ -123,10 +123,15 @@ export const TopicPage = ({
     const text = chatDraft.trim();
     if (!text) return;
     setChatBusy(true);
-    const result = await onAddComment(selectedPost.id, text);
-    onToast(result.message);
-    if (result.ok) setChatDraft("");
-    setChatBusy(false);
+    try {
+      const result = await onAddComment(selectedPost.id, text);
+      onToast(result.message);
+      if (result.ok) setChatDraft("");
+    } catch {
+      onToast(pick(language, "Ups, no pudimos enviar el comentario.", "Oops, we couldn't send the comment.", "Ups, non puidemos enviar o comentario."));
+    } finally {
+      setChatBusy(false);
+    }
   };
 
   const submitShareInTopic = async (event: FormEvent) => {
@@ -134,10 +139,19 @@ export const TopicPage = ({
     const clean = shareUrl.trim();
     if (!clean || sharing) return;
     setSharing(true);
-    const result = await onShareUrl(clean, { forceTopic: topic });
-    onToast(result.message);
-    setShareUrl("");
-    setSharing(false);
+    try {
+      const result = await onShareUrl(clean, { forceTopic: topic });
+      onToast(result.message);
+      setShareUrl("");
+    } catch (err) {
+      onToast(
+        err instanceof Error
+          ? err.message
+          : pick(language, "Ups, no pudimos publicar ahora. Prueba otra vez.", "Oops, we couldn't publish right now. Try again.", "Ups, non puidemos publicar agora. Proba outra vez.")
+      );
+    } finally {
+      setSharing(false);
+    }
   };
 
   return (

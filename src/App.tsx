@@ -2,7 +2,7 @@ import { AnimatePresence } from "framer-motion";
 import { useCallback, useEffect, useLayoutEffect, useMemo, useState } from "react";
 import { HashRouter, Navigate, Route, Routes, useLocation } from "react-router-dom";
 import { AppFooter } from "./components/AppFooter";
-import { AppSkeleton } from "./components/AppSkeleton";
+import { CommunityLoadingScreen } from "./components/CommunityLoadingScreen";
 import { PageTransition } from "./components/PageTransition";
 import { ShareLinkModal } from "./components/ShareLinkModal";
 import { Toast } from "./components/Toast";
@@ -29,7 +29,8 @@ import { SharePage } from "./pages/SharePage";
 import { TopicPage } from "./pages/TopicPage";
 import { UserPostsPage } from "./pages/UserPostsPage";
 import { CommunityPage } from "./pages/CommunityPage";
-import { InviteRedirectPage } from "./pages/InviteRedirectPage";
+import { InvitePage } from "./pages/InvitePage";
+import { JoinPage } from "./pages/JoinPage";
 
 const AppRoutes = () => {
   const location = useLocation();
@@ -45,7 +46,6 @@ const AppRoutes = () => {
     preferences,
     loading,
     backendError,
-    createOrLogin,
     loginGlobal,
     registerGlobal,
     logoutGlobal,
@@ -83,6 +83,7 @@ const AppRoutes = () => {
   const [shareModalOpen, setShareModalOpen] = useState(false);
   const [notificationsReadAt, setNotificationsReadAt] = useState(0);
   const [myCommunities, setMyCommunities] = useState<Array<{ community_id: string; name: string; description?: string; role: "admin" | "member" }>>([]);
+  const [showLoadingOverlay, setShowLoadingOverlay] = useState(true);
   const [guestLanguage, setGuestLanguage] = useState<AppLanguage>(() => {
     try {
       return normalizeLanguage(localStorage.getItem("wee:guest-language") ?? undefined);
@@ -133,6 +134,15 @@ const AppRoutes = () => {
     });
     return () => window.cancelAnimationFrame(raf);
   }, [location.pathname]);
+
+  useEffect(() => {
+    if (loading) {
+      setShowLoadingOverlay(true);
+      return;
+    }
+    const timeout = window.setTimeout(() => setShowLoadingOverlay(false), 320);
+    return () => window.clearTimeout(timeout);
+  }, [loading]);
 
   const knownTopics = useMemo(
     () => Array.from(new Set(posts.flatMap((post) => post.topics))).sort(),
@@ -323,6 +333,14 @@ const AppRoutes = () => {
     };
   };
 
+  const formatRetry = (seconds: number): string => {
+    const safe = Math.max(1, Math.round(seconds));
+    if (safe < 60) return `${safe}s`;
+    const minutes = Math.floor(safe / 60);
+    const rest = safe % 60;
+    return rest > 0 ? `${minutes}m ${rest}s` : `${minutes}m`;
+  };
+
   const onShareUrl = async (
     url: string,
     options?: { forceTopic?: string }
@@ -330,12 +348,13 @@ const AppRoutes = () => {
     if (!activeUser) return { mode: "created", message: pick(language, "Entra para compartir links.", "Sign in to share links.") };
     const postLimit = await consumeRateLimit("create_post", activeUser.id);
     if (!postLimit.allowed) {
+      const retry = formatRetry(postLimit.retryAfterSec);
       return {
         mode: "created",
         message: pick(
           language,
-          `Te has pasado del ritmo de publicación. Prueba en ${postLimit.retryAfterSec}s.`,
-          `Posting too fast. Try again in ${postLimit.retryAfterSec}s.`
+          `Vas demasiado rápido publicando. Espera ${retry} y vuelve a intentarlo.`,
+          `You're posting too fast. Wait ${retry} and try again.`
         )
       };
     }
@@ -581,12 +600,13 @@ const AppRoutes = () => {
     if (!activeUser) return { ok: false, message: pick(language, "Entra para votar.", "Sign in to vote.") };
     const voteLimit = await consumeRateLimit("vote_post", activeUser.id);
     if (!voteLimit.allowed) {
+      const retry = formatRetry(voteLimit.retryAfterSec);
       return {
         ok: false,
         message: pick(
           language,
-          `Vas muy rápido votando. Prueba en ${voteLimit.retryAfterSec}s.`,
-          `Voting too fast. Try again in ${voteLimit.retryAfterSec}s.`
+          `Vas muy rápido valorando. Espera ${retry} y vuelve a probar.`,
+          `You're rating too fast. Wait ${retry} and try again.`
         )
       };
     }
@@ -625,12 +645,13 @@ const AppRoutes = () => {
     if (!activeUser) return { ok: false, message: pick(language, "Entra para comentar.", "Sign in to comment.") };
     const commentLimit = await consumeRateLimit("create_comment", activeUser.id);
     if (!commentLimit.allowed) {
+      const retry = formatRetry(commentLimit.retryAfterSec);
       return {
         ok: false,
         message: pick(
           language,
-          `Vas muy rápido comentando. Prueba en ${commentLimit.retryAfterSec}s.`,
-          `Commenting too fast. Try again in ${commentLimit.retryAfterSec}s.`
+          `Vas muy rápido comentando. Espera ${retry} y vuelve a intentarlo.`,
+          `You're commenting too fast. Wait ${retry} and try again.`
         )
       };
     }
@@ -910,7 +931,7 @@ const AppRoutes = () => {
     window.setTimeout(() => setToast(null), 1800);
   };
 
-  if (loading) {
+  if (showLoadingOverlay) {
     return (
       <I18nContext.Provider value={{ language }}>
         <NotificationsContext.Provider
@@ -921,8 +942,12 @@ const AppRoutes = () => {
             markAllAsRead: () => {}
           }}
         >
-          <AppSkeleton />
-          <p className="loading-caption">{pick(language, "Cargando tu comunidad...", "Loading your community...", "Cargando a túa comunidade...")}</p>
+          <CommunityLoadingScreen
+            communityName={selectedCommunity?.name}
+            topics={Array.from(new Set(posts.flatMap((post) => post.topics))).slice(0, 3)}
+            usersCount={users.length}
+            finishing={!loading}
+          />
         </NotificationsContext.Provider>
       </I18nContext.Provider>
     );
@@ -992,10 +1017,51 @@ const AppRoutes = () => {
           path="/login"
           element={
             globalSession ? (
-              <Navigate to={activeUser ? "/home" : "/communities"} replace />
+              <Navigate
+                to={
+                  new URLSearchParams(location.search).get("invite") || new URLSearchParams(location.search).get("code")
+                    ? `/join${location.search}`
+                    : activeUser
+                      ? "/home"
+                      : "/communities"
+                }
+                replace
+              />
             ) : (
               <PageTransition>
                 <AuthPage
+                  mode="login"
+                  onLogin={async (username, password) => {
+                    await loginGlobal(username, password);
+                  }}
+                  onRegister={async (username, password, email) => {
+                    await registerGlobal(username, password, email);
+                  }}
+                  onChangeLanguage={setGuestLanguage}
+                />
+              </PageTransition>
+            )
+          }
+        />
+
+        <Route
+          path="/signup"
+          element={
+            globalSession ? (
+              <Navigate
+                to={
+                  new URLSearchParams(location.search).get("invite") || new URLSearchParams(location.search).get("code")
+                    ? `/join${location.search}`
+                    : activeUser
+                      ? "/home"
+                      : "/communities"
+                }
+                replace
+              />
+            ) : (
+              <PageTransition>
+                <AuthPage
+                  mode="signup"
                   onLogin={async (username, password) => {
                     await loginGlobal(username, password);
                   }}
@@ -1012,7 +1078,14 @@ const AppRoutes = () => {
         <Route
           path="/invite/:token"
           element={
-            <InviteRedirectPage />
+            <PageTransition>
+              <InvitePage
+                isLoggedIn={Boolean(globalSession)}
+                onPreviewCommunity={previewCommunityInvite}
+                onConfirmCommunity={confirmCommunityInvite}
+                onEnterCommunity={setCommunityAsActive}
+              />
+            </PageTransition>
           }
         />
 
@@ -1028,12 +1101,26 @@ const AppRoutes = () => {
                   onReload={reloadMyCommunities}
                   onEnterCommunity={setCommunityAsActive}
                   onCreateCommunity={createCommunityFlow}
-                  onPreviewCommunity={previewCommunityInvite}
-                  onJoinCommunity={confirmCommunityInvite}
                   onSaveSettings={saveGlobalSettings}
+                  onLogout={logoutGlobal}
                 />
               </PageTransition>
-            ) : <Navigate to="/login" replace />
+            ) : <Navigate to={`/login${location.search}`} replace />
+          }
+        />
+
+        <Route
+          path="/join"
+          element={
+            <PageTransition>
+              <JoinPage
+                isLoggedIn={Boolean(globalSession)}
+                onPreviewCommunity={previewCommunityInvite}
+                onJoinCommunity={confirmCommunityInvite}
+                onEnterCommunity={setCommunityAsActive}
+                onReloadCommunities={reloadMyCommunities}
+              />
+            </PageTransition>
           }
         />
 
@@ -1052,7 +1139,7 @@ const AppRoutes = () => {
                   userInfluenceAuraById={userInfluenceAuraById}
                   userCommunityStatsById={userCommunityStatsById}
                   onOpenShareModal={() => setShareModalOpen(true)}
-                  onLogout={logout}
+                  onLogout={logoutGlobal}
                 />
               </PageTransition>
             </RequireAuth>
@@ -1070,7 +1157,7 @@ const AppRoutes = () => {
                   posts={postsForViewer}
                   userInfluenceAuraById={userInfluenceAuraById}
                   onOpenShareModal={() => setShareModalOpen(true)}
-                  onLogout={logout}
+                  onLogout={logoutGlobal}
                   activeUserId={activeUser?.id ?? null}
                   onAddComment={onAddComment}
                   onVoteCommentAura={onVoteCommentAura}
@@ -1094,7 +1181,7 @@ const AppRoutes = () => {
                   users={users}
                   posts={postsForViewer}
                   onOpenShareModal={() => setShareModalOpen(true)}
-                  onLogout={logout}
+                  onLogout={logoutGlobal}
                   activeUserId={activeUser?.id ?? null}
                   onOpenExternalSource={onOpenExternalSource}
                   onRatePost={onRatePost}
@@ -1123,7 +1210,7 @@ const AppRoutes = () => {
                   onShareUrl={onShareUrl}
                   getDuplicatePreview={getDuplicatePreview}
                   onToast={showToast}
-                  onLogout={logout}
+                  onLogout={logoutGlobal}
                 />
               </PageTransition>
             </RequireAuth>
@@ -1140,7 +1227,7 @@ const AppRoutes = () => {
                   users={users}
                   posts={postsForViewer}
                   userCommunityStatsById={userCommunityStatsById}
-                  onLogout={logout}
+                  onLogout={logoutGlobal}
                   onUpdateAvatar={updateUserAvatar}
                   onUpdateAlias={updateUserAlias}
                   onDeleteUser={onAdminDeleteUser}
@@ -1165,7 +1252,7 @@ const AppRoutes = () => {
                   onDeletePost={removePost}
                   onToast={showToast}
                   onOpenShareModal={() => setShareModalOpen(true)}
-                  onLogout={logout}
+                  onLogout={logoutGlobal}
                 />
               </PageTransition>
             </RequireAuth>
@@ -1187,7 +1274,7 @@ const AppRoutes = () => {
                   onImport={onImport}
                   onDeleteMyData={onDeleteMyData}
                   onOpenShareModal={() => setShareModalOpen(true)}
-                  onLogout={logout}
+                  onLogout={logoutGlobal}
                 />
               </PageTransition>
             </RequireAuth>
@@ -1207,7 +1294,7 @@ const AppRoutes = () => {
                   onUpdateCommunity={updateCommunityDetails}
                   onCreateInvite={createCommunityInvite}
                   onLeaveCommunity={leaveCurrentCommunity}
-                  onLogout={logout}
+                  onLogout={logoutGlobal}
                   onOpenShareModal={() => setShareModalOpen(true)}
                   onToast={showToast}
                 />
@@ -1228,7 +1315,7 @@ const AppRoutes = () => {
           getDuplicatePreview={getDuplicatePreview}
           onToast={showToast}
         />
-        <AppFooter />
+        {activeUser ? <AppFooter /> : null}
       </NotificationsContext.Provider>
     </I18nContext.Provider>
   );

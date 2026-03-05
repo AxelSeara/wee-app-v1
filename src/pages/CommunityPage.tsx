@@ -39,10 +39,12 @@ export const CommunityPage = ({
   const [invite, setInvite] = useState<{ code: string; token: string; link: string } | null>(null);
   const [saving, setSaving] = useState(false);
   const [copyNotice, setCopyNotice] = useState<string | null>(null);
+  const [isEditingSettings, setIsEditingSettings] = useState(false);
 
   useEffect(() => {
     setNameInput(selectedCommunity?.name ?? "");
     setDescriptionInput(selectedCommunity?.description ?? "");
+    setIsEditingSettings(false);
   }, [selectedCommunity?.name, selectedCommunity?.description]);
 
   useEffect(() => {
@@ -58,7 +60,7 @@ export const CommunityPage = ({
       setCopyNotice(message);
       window.setTimeout(() => setCopyNotice(null), 1800);
     } catch {
-      const message = pick(language, "No se pudo copiar, prueba de nuevo.", "Couldn't copy it, try again.", "Non se puido copiar, proba outra vez.");
+      const message = pick(language, "No se pudo copiar. Prueba de nuevo.", "Couldn't copy it. Please try again.", "Non se puido copiar. Proba outra vez.");
       onToast?.(message);
       setCopyNotice(message);
       window.setTimeout(() => setCopyNotice(null), 1800);
@@ -74,8 +76,9 @@ export const CommunityPage = ({
         rulesText: rulesInput.trim()
       });
       onToast?.(pick(language, "Comunidad actualizada.", "Community updated.", "Comunidade actualizada."));
+      setIsEditingSettings(false);
     } catch (error) {
-      onToast?.(error instanceof Error ? error.message : pick(language, "No se guardó, inténtalo otra vez.", "Couldn't save, please try again.", "Non se gardou, inténtao outra vez."));
+      onToast?.(error instanceof Error ? error.message : pick(language, "No se guardó. Inténtalo otra vez.", "Couldn't save. Please try again.", "Non se gardou. Inténtao outra vez."));
     } finally {
       setSaving(false);
     }
@@ -85,14 +88,32 @@ export const CommunityPage = ({
     try {
       const created = await onCreateInvite();
       setInvite({ code: created.code, token: created.token, link: created.link });
-      onToast?.(pick(language, "Invitación lista para compartir.", "Invite ready to share.", "Invitación lista para compartir."));
+      onToast?.(pick(language, "Código listo. Compártelo con tu gente.", "Code ready. Share it with your people.", "Código listo. Compárteo coa túa xente."));
     } catch (error) {
       onToast?.(
         error instanceof Error
           ? error.message
-          : pick(language, "No pudimos crear la invitación ahora.", "We couldn't create the invite right now.", "Non puidemos crear a invitación agora.")
+          : pick(language, "No pudimos crear la invitación ahora mismo.", "We couldn't create the invite right now.", "Non puidemos crear a invitación agora mesmo.")
       );
     }
+  };
+
+  const shareInviteLink = async (link: string) => {
+    if (!link) return;
+    try {
+      if (typeof navigator !== "undefined" && typeof navigator.share === "function") {
+        await navigator.share({
+          title: pick(language, "Invitación a Wee", "Wee invite", "Invitación a Wee"),
+          text: pick(language, "Únete a nuestra comunidad en Wee.", "Join our Wee community.", "Únete á nosa comunidade en Wee."),
+          url: link
+        });
+        onToast?.(pick(language, "Invitación compartida.", "Invite shared.", "Invitación compartida."));
+        return;
+      }
+    } catch (error) {
+      if (error instanceof Error && error.name === "AbortError") return;
+    }
+    await copy(link, pick(language, "Enlace", "Link", "Ligazón"));
   };
 
   return (
@@ -100,8 +121,8 @@ export const CommunityPage = ({
       <TopBar
         user={activeUser}
         communityName={selectedCommunity?.name}
-        onLeaveCommunity={async () => {
-          await onLeaveCommunity();
+          onLeaveCommunity={async () => {
+            await onLeaveCommunity();
           onToast?.(pick(language, "Has salido de la comunidad.", "You left the community.", "Saíches da comunidade."));
         }}
         onOpenShare={onOpenShareModal}
@@ -116,31 +137,54 @@ export const CommunityPage = ({
           </Link>
         </div>
 
-        <article className="settings-card">
-          <h3>{pick(language, "Ajustes de comunidad", "Community settings", "Axustes da comunidade")}</h3>
+        <article className="settings-card community-settings-card">
+          <div className="community-settings-head">
+            <h3>{pick(language, "Ajustes de comunidad", "Community settings", "Axustes da comunidade")}</h3>
+            {isAdmin ? (
+              <button
+                type="button"
+                className={`btn btn-icon-compact community-edit-toggle${isEditingSettings ? " active" : ""}`}
+                onClick={() => setIsEditingSettings((prev) => !prev)}
+                title={
+                  isEditingSettings
+                    ? pick(language, "Salir de edición", "Exit edit mode", "Saír da edición")
+                    : pick(language, "Editar ajustes", "Edit settings", "Editar axustes")
+                }
+              >
+                <Icon name="pencil" size={14} />
+              </button>
+            ) : null}
+          </div>
           <p className="hint">
             {pick(
               language,
-              "Aquí podéis dejar nombre, descripción y normas claras para todo el grupo.",
-              "Set name, description and rules so everyone stays on the same page.",
-              "Aquí podedes deixar nome, descrición e normas claras para todo o grupo."
+              "Pon esto a punto: nombre claro, descripción breve y normas fáciles de seguir.",
+              "Keep this tidy: clear name, short description, and easy-to-follow rules.",
+              "Deixa isto a punto: nome claro, descrición breve e normas fáciles de seguir."
             )}
           </p>
-          <div className="stack">
+          <div className="stack community-settings-form">
             <label className="form-field">
               {pick(language, "Nombre", "Name", "Nome")}
               <input
                 value={nameInput}
                 onChange={(event) => setNameInput(event.target.value)}
-                disabled={!isAdmin}
+                disabled={!isAdmin || !isEditingSettings}
               />
             </label>
             <label className="form-field">
               {pick(language, "Descripción", "Description", "Descrición")}
-              <input
+              <textarea
+                rows={3}
                 value={descriptionInput}
                 onChange={(event) => setDescriptionInput(event.target.value)}
-                disabled={!isAdmin}
+                disabled={!isAdmin || !isEditingSettings}
+                placeholder={pick(
+                  language,
+                  "Esto lo verán antes de unirse.",
+                  "People will see this before joining.",
+                  "Isto verano antes de unirse."
+                )}
               />
             </label>
             <label className="form-field">
@@ -149,15 +193,30 @@ export const CommunityPage = ({
                 rows={4}
                 value={rulesInput}
                 onChange={(event) => setRulesInput(event.target.value)}
-                disabled={!isAdmin}
+                disabled={!isAdmin || !isEditingSettings}
+                placeholder={pick(
+                  language,
+                  "Visible solo para miembros. Ejemplo: respeto, cero spam, fuentes claras.",
+                  "Visible to members only. Example: be respectful, no spam, share clear sources.",
+                  "Visible só para membros. Exemplo: respecto, cero spam, fontes claras."
+                )}
               />
             </label>
-            {isAdmin ? (
-              <button type="button" className="btn btn-primary" onClick={saveCommunity} disabled={saving}>
-                <Icon name="check" /> {pick(language, "Guardar cambios", "Save changes", "Gardar cambios")}
-              </button>
+            {isAdmin && isEditingSettings ? (
+              <div className="community-settings-actions">
+                <button type="button" className="btn btn-nav" onClick={() => setIsEditingSettings(false)} disabled={saving}>
+                  {pick(language, "Cancelar", "Cancel", "Cancelar")}
+                </button>
+                <button type="button" className="btn btn-primary btn-nav" onClick={saveCommunity} disabled={saving}>
+                  <Icon name="check" /> {pick(language, "Guardar cambios", "Save changes", "Gardar cambios")}
+                </button>
+              </div>
             ) : (
-              <p className="hint">{pick(language, "Solo admins pueden editar esto.", "Only admins can edit this.", "Só admins poden editar isto.")}</p>
+              <p className="hint">
+                {isAdmin
+                  ? pick(language, "Pulsa el lápiz y edítalo a tu ritmo.", "Tap the pencil and edit at your pace.", "Preme no lapis e edítao ao teu ritmo.")
+                  : pick(language, "Solo admins pueden editar esto.", "Only admins can edit this.", "Só admins poden editar isto.")}
+              </p>
             )}
           </div>
         </article>
@@ -165,11 +224,11 @@ export const CommunityPage = ({
         <div className="settings-grid">
           <article className="settings-card">
             <h3><Icon name="users" /> {pick(language, "Miembros", "Members", "Membros")}</h3>
-            <p className="hint">{pick(language, "Quién está dentro y quién lleva tareas de admin.", "Who is in and who has admin permissions.", "Quen está dentro e quen ten permisos admin.")}</p>
+            <p className="hint">{pick(language, "Aquí ves quién está dentro y quién puede moderar.", "Here you can see who is in and who can moderate.", "Aquí ves quen está dentro e quen pode moderar.")}</p>
             {members.length === 0 ? <p className="hint">{pick(language, "Todavía no hay miembros.", "No members yet.", "Aínda non hai membros.")}</p> : null}
             <ul className="user-list">
               {members.map((member) => (
-                <li key={member.id} className="user-option" style={{ justifyContent: "space-between" }}>
+                <li key={member.id} className="user-option user-option-spread">
                   <span>{member.alias}</span>
                   {member.role === "admin" ? <span className="badge">Admin</span> : <span className="hint">{pick(language, "Miembro", "Member", "Membro")}</span>}
                 </li>
@@ -179,17 +238,20 @@ export const CommunityPage = ({
 
           <article className="settings-card">
             <h3><Icon name="link" /> {pick(language, "Invitar gente", "Invite people", "Convidar xente")}</h3>
-            <p className="hint">{pick(language, "De momento, comparte solo el código de comunidad.", "For now, share only the community code.", "Polo momento, comparte só o código da comunidade.")}</p>
-            <div className="stack">
-              <button type="button" className="btn btn-primary" onClick={generateInvite}>
+            <p className="hint">{pick(language, "Comparte el código y trae a tu gente al hilo.", "Share the code and bring your people into the thread.", "Comparte o código e trae á túa xente ao fío.")}</p>
+            <div className="stack community-settings-form">
+              <button type="button" className="btn btn-nav" onClick={generateInvite}>
                 <Icon name="plus" /> {pick(language, "Crear invitación", "Create invite", "Crear invitación")}
               </button>
               {invite ? (
                 <>
                   <div className="hint">{pick(language, "Código de comunidad", "Community code", "Código da comunidade")}: <strong>{invite.code}</strong></div>
-                  <div className="auth-entry-actions">
-                    <button type="button" className="btn" onClick={() => copy(invite.code, pick(language, "Código", "Code", "Código"))}>
+                  <div className="auth-entry-actions community-invite-actions">
+                    <button type="button" className="btn btn-nav" onClick={() => copy(invite.code, pick(language, "Código", "Code", "Código"))}>
                       <Icon name="link" /> {pick(language, "Copiar código", "Copy code", "Copiar código")}
+                    </button>
+                    <button type="button" className="btn btn-nav" onClick={() => void shareInviteLink(invite.link)}>
+                      <Icon name="send" /> {pick(language, "Compartir enlace", "Share link", "Compartir ligazón")}
                     </button>
                   </div>
                   {copyNotice ? (
@@ -199,7 +261,7 @@ export const CommunityPage = ({
                   ) : null}
                 </>
               ) : (
-                <p className="hint">{pick(language, "Crea un código y pásalo a quien quieras invitar.", "Create a code and send it to people you want to invite.", "Crea un código e pásao a quen queiras convidar.")}</p>
+                <p className="hint">{pick(language, "Genera un código y pásaselo a quien quieras sumar.", "Generate a code and share it with people you want to bring in.", "Xera un código e pásallo a quen queiras sumar.")}</p>
               )}
             </div>
           </article>

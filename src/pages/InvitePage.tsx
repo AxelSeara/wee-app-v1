@@ -1,36 +1,26 @@
-import { type FormEvent, useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { Icon } from "../components/Icon";
-import { generateAlias } from "../lib/aliasGenerator";
 import type { CommunitySelection } from "../lib/communitySession";
 import { pick, useI18n } from "../lib/i18n";
-import type { AppLanguage, User } from "../lib/types";
 import { getInitials } from "../lib/utils";
 
 interface InvitePageProps {
+  isLoggedIn: boolean;
   onPreviewCommunity: (input: { code?: string; token?: string }) => Promise<CommunitySelection & { inviter?: { alias: string; avatar_url?: string } }>;
   onConfirmCommunity: (input: { code?: string; token?: string }) => Promise<CommunitySelection>;
-  onCreateOrLogin: (
-    alias: string,
-    password: string,
-    avatarDataUrl?: string,
-    language?: AppLanguage,
-    acceptedPrivacy?: boolean
-  ) => Promise<{ user: User; isNewUser: boolean }>;
+  onEnterCommunity: (communityId: string) => Promise<void>;
 }
 
-export const InvitePage = ({ onPreviewCommunity, onConfirmCommunity, onCreateOrLogin }: InvitePageProps) => {
+export const InvitePage = ({ isLoggedIn, onPreviewCommunity, onConfirmCommunity, onEnterCommunity }: InvitePageProps) => {
   const { language } = useI18n();
   const { token = "" } = useParams();
   const navigate = useNavigate();
 
   const [loading, setLoading] = useState(true);
+  const [joining, setJoining] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [community, setCommunity] = useState<(CommunitySelection & { inviter?: { alias: string; avatar_url?: string } }) | null>(null);
-  const [joinMode, setJoinMode] = useState(false);
-  const [alias, setAlias] = useState("");
-  const [password, setPassword] = useState("");
-  const [showPassword, setShowPassword] = useState(false);
 
   useEffect(() => {
     let active = true;
@@ -43,7 +33,14 @@ export const InvitePage = ({ onPreviewCommunity, onConfirmCommunity, onCreateOrL
         setError(null);
       } catch {
         if (!active) return;
-        setError(pick(language, "Ups, esta invitación no vale o ya caducó.", "Oops, this invite is invalid or expired.", "Ups, esta invitación non vale ou xa caducou."));
+        setError(
+          pick(
+            language,
+            "No pudimos abrir esta invitación. Pide un código nuevo al admin.",
+            "We couldn't open this invite. Ask an admin for a new code.",
+            "Non puidemos abrir esta invitación. Pídelle un código novo ao admin."
+          )
+        );
       } finally {
         if (active) setLoading(false);
       }
@@ -51,25 +48,25 @@ export const InvitePage = ({ onPreviewCommunity, onConfirmCommunity, onCreateOrL
     if (token) void run();
     else {
       setLoading(false);
-      setError(pick(language, "Falta el token de invitación.", "Invite token is missing.", "Falta o token de invitación."));
+      setError(pick(language, "Falta el token de invitación.", "Invite token is missing.", "Falta o token da invitación."));
     }
     return () => {
       active = false;
     };
   }, [language, onPreviewCommunity, token]);
 
-  const submitJoin = async (event: FormEvent) => {
-    event.preventDefault();
-    if (!alias.trim() || !password.trim()) {
-      setError(pick(language, "Te faltan alias o contraseña.", "Alias and password are required.", "Fáltanche alias ou contrasinal."));
-      return;
-    }
+  const confirmAndEnter = async () => {
+    if (!token || joining) return;
+    setJoining(true);
+    setError(null);
     try {
-      await onConfirmCommunity({ token });
-      await onCreateOrLogin(alias.trim(), password.trim(), undefined, language, true);
+      const joined = await onConfirmCommunity({ token });
+      await onEnterCommunity(joined.id);
       navigate("/home");
     } catch (err) {
-      setError(err instanceof Error ? err.message : pick(language, "No pudimos terminar la unión a la comunidad.", "We couldn't finish joining this community.", "Non puidemos rematar a unión á comunidade."));
+      setError(err instanceof Error ? err.message : pick(language, "No pudimos entrar ahora mismo. Prueba otra vez.", "We couldn't enter right now. Please try again.", "Non puidemos entrar agora mesmo. Proba outra vez."));
+    } finally {
+      setJoining(false);
     }
   };
 
@@ -85,7 +82,7 @@ export const InvitePage = ({ onPreviewCommunity, onConfirmCommunity, onCreateOrL
           </>
         ) : community ? (
           <>
-            <h2>{pick(language, "Te invitaron a Wee", "You're invited to Wee", "Convidáronte a Wee")}</h2>
+            <h2>{pick(language, "Tienes invitación a Wee", "You have a Wee invite", "Tes invitación a Wee")}</h2>
             <article className="invite-preview-card">
               <div className="invite-preview-head">
                 <div className="invite-avatar">
@@ -98,7 +95,7 @@ export const InvitePage = ({ onPreviewCommunity, onConfirmCommunity, onCreateOrL
                 <div>
                   <p className="invite-kicker">
                     {community.inviter?.alias
-                      ? pick(language, `${community.inviter.alias} te quiere en su comunidad`, `${community.inviter.alias} wants you in their community`, `${community.inviter.alias} quere que entres na súa comunidade`)
+                      ? pick(language, `${community.inviter.alias} te ha invitado a su comunidad`, `${community.inviter.alias} invited you to their community`, `${community.inviter.alias} convidoute á súa comunidade`)
                       : pick(language, "Tienes una invitación pendiente", "You have an invite waiting", "Tes unha invitación pendente")}
                   </p>
                   <h3>{community.name}</h3>
@@ -107,40 +104,23 @@ export const InvitePage = ({ onPreviewCommunity, onConfirmCommunity, onCreateOrL
               {community.description ? <p className="hint">{community.description}</p> : null}
             </article>
 
-            {!joinMode ? (
+            {!isLoggedIn ? (
               <div className="auth-entry-actions">
-                <button type="button" className="btn btn-primary" onClick={() => setJoinMode(true)}>
-                  <Icon name="spark" /> {pick(language, "Unirme y crear cuenta", "Join and create account", "Unirme e crear conta")}
+                <button type="button" className="btn btn-primary" onClick={() => navigate(`/login?invite=${encodeURIComponent(token)}`)}>
+                  <Icon name="check" /> {pick(language, "Entrar con mi cuenta", "Log in with my account", "Entrar coa miña conta")}
                 </button>
-                <button type="button" className="btn" onClick={() => navigate("/login")}>
-                  <Icon name="arrowLeft" /> {pick(language, "Volver", "Back", "Volver")}
+                <button type="button" className="btn" onClick={() => navigate(`/signup?invite=${encodeURIComponent(token)}`)}>
+                  <Icon name="plus" /> {pick(language, "Crear cuenta", "Create account", "Crear conta")}
                 </button>
               </div>
             ) : (
-              <form className="stack" onSubmit={submitJoin}>
-                <label className="form-field">
-                  {pick(language, "Alias", "Alias", "Alias")}
-                  <div className="alias-row">
-                    <input value={alias} onChange={(event) => setAlias(event.target.value)} placeholder={pick(language, "Tu alias en la comunidad", "Your community alias", "O teu alias na comunidade")} />
-                    <button type="button" className="btn dice-btn" onClick={() => setAlias(generateAlias())} title={pick(language, "Generar alias aleatorio", "Generate random alias", "Xerar alias aleatorio")}>
-                      <Icon name="dice" size={14} />
-                    </button>
-                  </div>
-                </label>
-                <label className="form-field">
-                  {pick(language, "Contraseña", "Password", "Contrasinal")}
-                  <div className="alias-row">
-                    <input type={showPassword ? "text" : "password"} value={password} onChange={(event) => setPassword(event.target.value)} placeholder={pick(language, "Mínimo 6 caracteres", "Minimum 6 characters", "Mínimo 6 caracteres")} />
-                    <button type="button" className="btn dice-btn" onClick={() => setShowPassword((prev) => !prev)} title={pick(language, "Mostrar u ocultar contraseña", "Show or hide password", "Mostrar ou ocultar contrasinal")}>
-                      <Icon name={showPassword ? "eyeOff" : "eye"} size={14} />
-                    </button>
-                  </div>
-                </label>
+              <div className="stack">
+                <p className="hint">{pick(language, "Ya tienes sesión iniciada. Solo confirma y entramos.", "You're already signed in. Just confirm and we'll jump in.", "Xa tes sesión iniciada. Só confirma e entramos.")}</p>
                 {error ? <p className="error">{error}</p> : null}
-                <button type="submit" className="btn btn-primary">
-                  <Icon name="check" /> {pick(language, "Entrar en la comunidad", "Enter community", "Entrar na comunidade")}
+                <button type="button" className="btn btn-primary" onClick={() => void confirmAndEnter()} disabled={joining}>
+                  <Icon name="check" /> {joining ? pick(language, "Entrando...", "Entering...", "Entrando...") : pick(language, "Confirmar y entrar", "Confirm and enter", "Confirmar e entrar")}
                 </button>
-              </form>
+              </div>
             )}
           </>
         ) : null}

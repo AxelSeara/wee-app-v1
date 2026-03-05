@@ -46,14 +46,16 @@ export const ShareLinkModal = ({ open, onClose, onShareUrl, getDuplicatePreview,
       const result = await onShareUrl(clean);
       onToast(result.message);
       onClose();
-    } catch {
+    } catch (err) {
       onToast(
-        pick(
-          language,
-          "Ups, no se pudo publicar ahora. Prueba otra vez.",
-          "Oops, couldn't post right now. Try again.",
-          "Ups, non se puido publicar agora. Proba outra vez."
-        )
+        err instanceof Error
+          ? err.message
+          : pick(
+              language,
+              "Ups, no se pudo publicar ahora. Prueba otra vez.",
+              "Oops, couldn't post right now. Try again.",
+              "Ups, non se puido publicar agora. Proba outra vez."
+            )
       );
     } finally {
       setSubmitting(false);

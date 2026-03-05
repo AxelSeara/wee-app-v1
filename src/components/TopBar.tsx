@@ -59,7 +59,7 @@ const TopBarInner = ({ user, communityName, onLeaveCommunity, searchValue, onSea
         <span className="brand-mark" aria-hidden="true">
           <Icon name="spiral" size={13} />
         </span>
-        <span className="brand-copy">
+          <span className="brand-copy">
           <span className="brand-text">Wee</span>
           <span className="brand-tag">{communityLabel ? `${communityLabel}` : pick(language, "tu comunidad", "your community", "a túa comunidade")}</span>
         </span>
@@ -71,7 +71,7 @@ const TopBarInner = ({ user, communityName, onLeaveCommunity, searchValue, onSea
           <input
             value={searchValue ?? ""}
             onChange={(event) => onSearchChange(event.target.value)}
-            placeholder={pick(language, "Buscar tema, palabra o fuente...", "Search topic, keyword or source...", "Buscar tema, palabra ou fonte...")}
+            placeholder={pick(language, "Busca tema, palabra o fuente...", "Search topic, keyword or source...", "Busca tema, palabra ou fonte...")}
           />
         </label>
       ) : null}
@@ -108,7 +108,7 @@ const TopBarInner = ({ user, communityName, onLeaveCommunity, searchValue, onSea
                 <Avatar user={user} size={28} />
                 <div>
                   <strong>{user.alias}</strong>
-                  <span>{pick(language, "Tu cuenta", "Your account", "A túa conta")}</span>
+                  <span>{pick(language, "Tu espacio", "Your space", "O teu espazo")}</span>
                 </div>
               </div>
               <Link to={`/profile/${user.id}`} role="menuitem" className="user-menu-item" onClick={() => setProfileOpen(false)}>
@@ -116,9 +116,6 @@ const TopBarInner = ({ user, communityName, onLeaveCommunity, searchValue, onSea
               </Link>
               <Link to="/community" role="menuitem" className="user-menu-item" onClick={() => setProfileOpen(false)}>
                 <Icon name="users" size={13} /> {pick(language, "Comunidad", "Community", "Comunidade")}
-              </Link>
-              <Link to="/communities" role="menuitem" className="user-menu-item" onClick={() => setProfileOpen(false)}>
-                <Icon name="users" size={13} /> {pick(language, "Mis comunidades", "My communities", "As miñas comunidades")}
               </Link>
               <Link
                 to={`/profile/${user.id}/posts`}

@@ -294,13 +294,13 @@ export const HomePage = ({
       {showOnboarding ? (
         <section className="page-section onboarding-card">
           <div className="section-head">
-            <h2><Icon name="spark" /> {pick(language, "Empieza en 3 pasos", "Start in 3 steps", "Empeza en 3 pasos")}</h2>
+            <h2><Icon name="spark" /> {pick(language, "Arranca en 3 pasos", "Start in 3 quick steps", "Arrinca en 3 pasos")}</h2>
             <button type="button" className="btn" onClick={closeOnboarding}>{pick(language, "Vamos", "Let's go", "Imos")}</button>
           </div>
           <ol className="onboarding-list">
-            <li>{pick(language, "Pega un link y Wee lo mete en su hilo por tema.", "Paste a link and Wee drops it into the right topic thread.", "Pega unha ligazón e Wee métese no fío correcto por tema.")}</li>
-            <li>{pick(language, "Abre la fuente y valora para que suba lo útil.", "Open the source and rate it so useful stuff rises.", "Abre a fonte e valora para que suba o útil.")}</li>
-            <li>{pick(language, "Deja contexto en comentarios y ayuda al resto.", "Add context in comments and help the group.", "Deixa contexto nos comentarios e axuda ao resto.")}</li>
+            <li>{pick(language, "Pega un link y Wee lo coloca donde toca.", "Paste a link and Wee puts it in the right place.", "Pega unha ligazón e Wee colócaa onde toca.")}</li>
+            <li>{pick(language, "Abre la fuente y vota para subir lo útil.", "Open the source and vote so useful content rises.", "Abre a fonte e vota para subir o útil.")}</li>
+            <li>{pick(language, "Añade contexto en comentarios y ayudas a todo el grupo.", "Add context in comments and help the whole group.", "Engade contexto nos comentarios e axudas a todo o grupo.")}</li>
           </ol>
         </section>
       ) : null}
@@ -354,7 +354,7 @@ export const HomePage = ({
                 <span className="badge">{activeUsers.length}</span>
               </div>
               {usersSidebarList.length === 0 ? (
-                <p className="hint">{pick(language, "Todavía no hubo movimiento reciente.", "No recent movement yet.", "Aínda non houbo movemento recente.")}</p>
+                <p className="hint">{pick(language, "Aún no se movió nada por aquí.", "Nothing has moved here yet.", "Aínda non se moveu nada por aquí.")}</p>
               ) : (
                 <ul className="home-users-list">
                   {usersSidebarList.map((entry) => (
@@ -408,7 +408,7 @@ export const HomePage = ({
               </button>
             </div>
             <p className="section-intro">
-              {pick(language, "Lo más útil y comentado por tu comunidad ahora mismo.", "Most useful and discussed by your community right now.", "O máis útil e comentado pola túa comunidade agora mesmo.")}
+              {pick(language, "Lo que más está ayudando y moviendo conversación ahora mismo.", "What is helping most and driving conversation right now.", "O que máis está axudando e movendo conversa agora mesmo.")}
             </p>
             <div className={compactFeed ? "post-grid post-grid-compact" : "post-grid"}>
               {feedPosts.length > 0 ? (
@@ -423,8 +423,8 @@ export const HomePage = ({
                 ))
               ) : (
                 <article className="empty-state">
-                  <h3>{pick(language, "Aún no hay nada por aquí", "Nothing here yet", "Aínda non hai nada por aquí")}</h3>
-                  <p>{pick(language, "Comparte la primera noticia y arrancamos el primer hilo.", "Share the first post and kick off the first thread.", "Comparte a primeira nova e arrincamos o primeiro fío.")}</p>
+                  <h3>{pick(language, "Aquí falta tu primer aporte", "Your first contribution is missing here", "Aquí falta a túa primeira achega")}</h3>
+                  <p>{pick(language, "Comparte una noticia y abrimos el hilo entre todos.", "Share a post and we will open the thread together.", "Comparte unha nova e abrimos o fío entre todos.")}</p>
                   <button type="button" className="btn btn-primary" onClick={onOpenShareModal}>{pick(language, "Compartir ahora", "Share now", "Compartir agora")}</button>
                 </article>
               )}
@@ -435,7 +435,7 @@ export const HomePage = ({
             <div className="section-head">
               <h2><Icon name="book" /> {pick(language, "Temas en marcha", "Topics in motion", "Temas en marcha")}</h2>
             </div>
-            <p className="section-intro">{pick(language, "Cada tema es un hilo vivo: misma conversación, menos duplicados y más contexto.", "Each topic is a live thread: same conversation, fewer duplicates, more context.", "Cada tema é un fío vivo: mesma conversa, menos duplicados e máis contexto.")}</p>
+            <p className="section-intro">{pick(language, "Cada tema es un hilo vivo: misma conversación, menos ruido y más contexto útil.", "Each topic is a live thread: same conversation, less noise and more useful context.", "Cada tema é un fío vivo: mesma conversa, menos ruído e máis contexto útil.")}</p>
             <div className="topic-grid">
               {topicBlocks.map((block) => (
                 <TopicBlock key={block.topic} topic={block.topic} posts={block.posts} />
@@ -446,7 +446,7 @@ export const HomePage = ({
           <section className="page-section section-collab" id="community-section">
             <div className="section-head">
               <h2><Icon name="users" /> {pick(language, "Comunidad", "Community", "Comunidade")}</h2>
-              <p className="hint">{pick(language, "Aquí destaca quien aporta con constancia y ayuda de verdad al grupo.", "This highlights people who contribute consistently and help the group for real.", "Aquí destaca quen aporta con constancia e axuda de verdade ao grupo.")}</p>
+              <p className="hint">{pick(language, "Aquí se ve quién está tirando del grupo con aportes útiles y constancia.", "Here you can see who is pulling the group forward with useful, consistent contributions.", "Aquí vese quen está tirando do grupo con achegas útiles e constancia.")}</p>
             </div>
 
             <div className="community-health">

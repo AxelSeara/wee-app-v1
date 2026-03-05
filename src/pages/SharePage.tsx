@@ -32,6 +32,12 @@ export const SharePage = ({ activeUser, onShareUrl, getDuplicatePreview, onToast
       const result = await onShareUrl(url.trim());
       onToast(result.message);
       navigate("/home");
+    } catch (err) {
+      onToast(
+        err instanceof Error
+          ? err.message
+          : pick(language, "Ups, no pudimos publicar ahora. Prueba otra vez.", "Oops, we couldn't publish right now. Try again.", "Ups, non puidemos publicar agora. Proba outra vez.")
+      );
     } finally {
       setSubmitting(false);
     }

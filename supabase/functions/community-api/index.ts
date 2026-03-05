@@ -6,6 +6,7 @@ type Role = "admin" | "member";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL") ?? "";
 const SERVICE_ROLE = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
+const APP_ORIGIN = (Deno.env.get("APP_ORIGIN") ?? "").replace(/\/+$/, "");
 const db = createClient(SUPABASE_URL, SERVICE_ROLE, { auth: { persistSession: false } });
 
 const json = (status: number, body: Record<string, unknown>, extraHeaders?: HeadersInit): Response =>
@@ -38,7 +39,7 @@ const normalizeCommunityName = (value: string): string =>
     .trim();
 
 const randomCode = (): string =>
-  Array.from(crypto.getRandomValues(new Uint8Array(6)))
+  Array.from(crypto.getRandomValues(new Uint8Array(8)))
     .map((b) => (b % 36).toString(36))
     .join("")
     .toUpperCase();
@@ -163,7 +164,10 @@ const parseBody = async (req: Request): Promise<Record<string, any>> => {
   }
 };
 
-const buildInviteUrl = (token: string): string => `#/invite/${token}`;
+const buildInviteUrl = (code: string): string => {
+  const path = `#/join?code=${encodeURIComponent(code)}`;
+  return APP_ORIGIN ? `${APP_ORIGIN}/${path}` : path;
+};
 
 const toMillis = (value: string | null | undefined): number =>
   value ? Date.parse(value) || Date.now() : Date.now();
@@ -1144,7 +1148,7 @@ const handlers = {
       .select("id,code,token")
       .single();
     if (error || !data) return json(400, { message: error?.message ?? "Invite create failed" });
-    return json(200, { id: data.id, code: data.code, token: data.token, link: buildInviteUrl(data.token) });
+    return json(200, { id: data.id, code: data.code, token: data.token, link: buildInviteUrl(data.code) });
   },
 
   "/community/invite/revoke": async (req: Request) => {

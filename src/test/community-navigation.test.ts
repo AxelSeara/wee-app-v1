@@ -43,5 +43,7 @@ describe("community navigation", () => {
     expect(parseCommunityJoinInput("abc123")).toEqual({ code: "ABC123" });
     expect(parseCommunityJoinInput("123456789012")).toEqual({ token: "123456789012" });
     expect(parseCommunityJoinInput("https://wee.app/#/invite/tok_tok_123456")).toEqual({ token: "tok_tok_123456" });
+    expect(parseCommunityJoinInput("https://wee.app/#/join?code=ab12cd34")).toEqual({ code: "AB12CD34" });
+    expect(parseCommunityJoinInput("https://wee.app/#/join?invite=tok_tok_123456")).toEqual({ token: "tok_tok_123456" });
   });
 });

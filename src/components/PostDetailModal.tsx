@@ -45,12 +45,27 @@ export const PostDetailModal = ({
   const [ratingBusy, setRatingBusy] = useState(false);
   const [justOpenedExternal, setJustOpenedExternal] = useState(false);
   const [showSourceVoteHint, setShowSourceVoteHint] = useState(false);
+  const [sourceOpenedSession, setSourceOpenedSession] = useState(false);
 
   useEffect(() => {
     setCurrent(post);
     setJustOpenedExternal(false);
     setShowSourceVoteHint(false);
+    setSourceOpenedSession(false);
   }, [post]);
+
+  useEffect(() => {
+    if (!current?.id || !activeUserId) {
+      setSourceOpenedSession(false);
+      return;
+    }
+    try {
+      const key = `wee:source-opened:${activeUserId}:${current.id}`;
+      setSourceOpenedSession(window.sessionStorage.getItem(key) === "1");
+    } catch {
+      setSourceOpenedSession(false);
+    }
+  }, [activeUserId, current?.id]);
 
   const related = useMemo(() => {
     if (!current) return [];
@@ -66,8 +81,8 @@ export const PostDetailModal = ({
 
   const canRate = useMemo(() => {
     if (!current || !activeUserId) return false;
-    return (current.openedByUserIds ?? []).includes(activeUserId);
-  }, [current, activeUserId]);
+    return (current.openedByUserIds ?? []).includes(activeUserId) || sourceOpenedSession;
+  }, [current, activeUserId, sourceOpenedSession]);
   const usersById = useMemo(() => new Map(users.map((user) => [user.id, user])), [users]);
 
   return (
@@ -141,6 +156,7 @@ export const PostDetailModal = ({
                           }
                         : prev
                     );
+                    setSourceOpenedSession(true);
                     window.open(current.url, "_blank", "noopener,noreferrer");
                     setJustOpenedExternal(true);
                     setShowSourceVoteHint(false);
@@ -165,7 +181,7 @@ export const PostDetailModal = ({
                   <button
                     type="button"
                     className={currentUserVote === 1 ? "btn btn-primary" : "btn"}
-                    disabled={ratingBusy}
+                    disabled={ratingBusy || !canRate}
                     onClick={async () => {
                       if (!current) return;
                       setRatingBusy(true);
@@ -195,7 +211,7 @@ export const PostDetailModal = ({
                   <button
                     type="button"
                     className={currentUserVote === -1 ? "btn btn-primary" : "btn"}
-                    disabled={ratingBusy}
+                    disabled={ratingBusy || !canRate}
                     onClick={async () => {
                       if (!current) return;
                       setRatingBusy(true);

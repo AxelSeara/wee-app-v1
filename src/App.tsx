@@ -390,19 +390,6 @@ const AppRoutes = () => {
     options?: { forceTopic?: string }
   ): Promise<{ mode: "created" | "merged" | "penalized"; message: string; debugBreakdown?: unknown; topicDebug?: unknown }> => {
     if (!activeUser) return { mode: "created", message: pick(language, "Entra para compartir links.", "Sign in to share links.") };
-    const postLimit = await consumeRateLimit("create_post", activeUser.id);
-    if (!postLimit.allowed) {
-      const retry = formatRetry(postLimit.retryAfterSec);
-      return {
-        mode: "created",
-        message: pick(
-          language,
-          `Vas demasiado rápido publicando. Espera ${retry} y vuelve a intentarlo.`,
-          `You're posting too fast. Wait ${retry} and try again.`
-        )
-      };
-    }
-
     const canonical = canonicalizeUrl(url);
     const existing = findDuplicatePost(url);
     const debugMode = new URLSearchParams(window.location.search).get("debug") === "1";
@@ -454,7 +441,37 @@ const AppRoutes = () => {
     }
 
     const createdAt = Date.now();
-    const metadata = await enrichUrl(url);
+    let metadata: Awaited<ReturnType<typeof enrichUrl>>;
+    try {
+      metadata = await enrichUrl(url);
+    } catch {
+      metadata = {
+        title: undefined,
+        description: undefined,
+        imageUrl: undefined,
+        siteName: undefined,
+        author: undefined,
+        publisher: undefined,
+        publishedAt: undefined,
+        schemaTypes: [],
+        hasImprintOrContact: false,
+        outboundUrls: [],
+        bodyText: undefined,
+        hasOverlayPopup: false,
+        adLikeNodeRatio: 0,
+        articleSection: undefined,
+        newsKeywords: [],
+        parselySection: undefined,
+        sailthruTags: [],
+        breadcrumbs: [],
+        relTags: [],
+        jsonLdSections: [],
+        jsonLdKeywords: [],
+        jsonLdAbout: [],
+        jsonLdGenre: [],
+        jsonLdIsPartOf: []
+      };
+    }
     const safeMetadataTitle = metadata.title && !isUnusableTitle(metadata.title) ? metadata.title : undefined;
     const derivedTitle = safeMetadataTitle ?? deriveTitleFromUrl(url) ?? pick(language, "Noticia compartida", "Shared post");
     const description = metadata.description;
@@ -466,6 +483,11 @@ const AppRoutes = () => {
       const contributorUserIds = Array.from(new Set([...(duplicateByContent.contributorUserIds ?? [duplicateByContent.userId]), activeUser.id]));
       const shareCount = Object.values(counts).reduce((acc, value) => acc + value, 0);
       const sameUserDuplicate = counts[activeUser.id] > 1;
+      const feedbacks = duplicateByContent.feedbacks ?? [];
+      const hasFeedbackFromSharer = feedbacks.some((entry) => entry.userId === activeUser.id);
+      const nextFeedbacks = hasFeedbackFromSharer
+        ? feedbacks
+        : [...feedbacks, { userId: activeUser.id, vote: 1 as const, votedAt: Date.now() }];
 
       await savePost({
         ...duplicateByContent,
@@ -473,6 +495,7 @@ const AppRoutes = () => {
         contributorCounts: counts,
         contributorUserIds,
         shareCount,
+        feedbacks: nextFeedbacks,
         rationale: sameUserDuplicate
           ? duplicateByContent.rationale.includes("Duplicado por hash de contenido; se aplica penalización interna")
             ? duplicateByContent.rationale
@@ -492,6 +515,19 @@ const AppRoutes = () => {
           language,
           `Ese contenido ya estaba en otro enlace. Lo unimos al mismo hilo (${contributorUserIds.length} colaboradores).`,
           `This content already existed under another link. Merged into the same thread (${contributorUserIds.length} contributors).`
+        )
+      };
+    }
+
+    const postLimit = await consumeRateLimit("create_post", activeUser.id);
+    if (!postLimit.allowed) {
+      const retry = formatRetry(postLimit.retryAfterSec);
+      return {
+        mode: "created",
+        message: pick(
+          language,
+          `Vas demasiado rápido publicando. Espera ${retry} y vuelve a intentarlo.`,
+          `You're posting too fast. Wait ${retry} and try again.`
         )
       };
     }

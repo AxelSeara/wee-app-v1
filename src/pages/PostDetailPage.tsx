@@ -76,6 +76,7 @@ export const PostDetailPage = ({
   const [current, setCurrent] = useState<Post | null>(postFromState);
   const [ratingBusy, setRatingBusy] = useState(false);
   const [showSourceVoteHint, setShowSourceVoteHint] = useState(false);
+  const [sourceOpenedSession, setSourceOpenedSession] = useState(false);
   const [auraOpen, setAuraOpen] = useState(false);
   const [thumbUpPulse, setThumbUpPulse] = useState(false);
   const [manualTopic, setManualTopic] = useState("");
@@ -89,6 +90,7 @@ export const PostDetailPage = ({
   useEffect(() => {
     setCurrent(postFromState);
     setShowSourceVoteHint(false);
+    setSourceOpenedSession(false);
     setAuraOpen(false);
     setThumbUpPulse(false);
     setManualTopic("");
@@ -96,6 +98,19 @@ export const PostDetailPage = ({
     setReportReason("");
     setModerationReason("");
   }, [postFromState]);
+
+  useEffect(() => {
+    if (!current?.id || !activeUserId) {
+      setSourceOpenedSession(false);
+      return;
+    }
+    try {
+      const key = `wee:source-opened:${activeUserId}:${current.id}`;
+      setSourceOpenedSession(window.sessionStorage.getItem(key) === "1");
+    } catch {
+      setSourceOpenedSession(false);
+    }
+  }, [activeUserId, current?.id]);
 
   useEffect(() => {
     const onDocPointerDown = (event: MouseEvent) => {
@@ -132,8 +147,8 @@ export const PostDetailPage = ({
 
   const canRate = useMemo(() => {
     if (!current || !activeUserId) return false;
-    return (current.openedByUserIds ?? []).includes(activeUserId);
-  }, [current, activeUserId]);
+    return (current.openedByUserIds ?? []).includes(activeUserId) || sourceOpenedSession;
+  }, [current, activeUserId, sourceOpenedSession]);
   const author = current ? usersById.get(current.userId) : undefined;
   const coverImage = current ? previewImage(current) : null;
   const auraDelta = current ? (current.feedbacks ?? []).reduce((acc, item) => acc + item.vote, 0) : 0;
@@ -434,6 +449,7 @@ export const PostDetailPage = ({
                           }
                         : prev
                     );
+                    setSourceOpenedSession(true);
                     setShowSourceVoteHint(false);
                     onToast(
                       openedWindow

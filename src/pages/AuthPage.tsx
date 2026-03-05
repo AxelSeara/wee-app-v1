@@ -1,4 +1,5 @@
 import { type FormEvent, useEffect, useState } from "react";
+import { AnimatePresence, motion } from "framer-motion";
 import { useLocation, useNavigate } from "react-router-dom";
 import { Icon } from "../components/Icon";
 import { pick, useI18n } from "../lib/i18n";
@@ -20,13 +21,27 @@ export const AuthPage = ({ mode, onLogin, onRegister, onChangeLanguage }: AuthPa
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
+  const [claimIndex, setClaimIndex] = useState(0);
   const appVersion = (import.meta.env.VITE_APP_VERSION as string | undefined) ?? "alpha v1";
   const lastUpdated = (import.meta.env.VITE_LAST_UPDATED as string | undefined) ?? "05 Mar 2026";
+  const heroClaims = [
+    pick(language, "Tu gente, tus temas, todo en orden", "Your people, your topics, all in one flow", "A túa xente, os teus temas, todo en orde"),
+    pick(language, "Comparte aquí primero y el hilo no se pierde", "Share here first and the thread stays clear", "Comparte aquí primeiro e o fío non se perde"),
+    pick(language, "Menos ruido, más contexto para decidir mejor", "Less noise, more context to decide better", "Menos ruído, máis contexto para decidir mellor")
+  ];
 
   useEffect(() => {
     const remembered = localStorage.getItem("wee:last-username");
     if (remembered && mode === "login") setUsername(remembered);
   }, [location.search, mode]);
+
+  useEffect(() => {
+    setClaimIndex(0);
+    const timer = window.setInterval(() => {
+      setClaimIndex((current) => (current + 1) % heroClaims.length);
+    }, 3600);
+    return () => window.clearInterval(timer);
+  }, [heroClaims.length, language]);
 
   const submit = async (event: FormEvent) => {
     event.preventDefault();
@@ -72,7 +87,20 @@ export const AuthPage = ({ mode, onLogin, onRegister, onChangeLanguage }: AuthPa
       <section className="auth-card auth-card-main auth-card-access">
         <h1 className="auth-hero-title">
           <span className="auth-hero-brand">Wee</span>
-          <span className="auth-hero-claim">{pick(language, "Tu gente, tus temas, todo en orden", "Your people, your topics, all in one flow", "A túa xente, os teus temas, todo en orde")}</span>
+          <span className="auth-hero-claim-wrap">
+            <AnimatePresence mode="wait" initial={false}>
+              <motion.span
+                key={`${language}-${claimIndex}`}
+                className="auth-hero-claim"
+                initial={{ opacity: 0, y: 6, filter: "blur(4px)" }}
+                animate={{ opacity: 1, y: 0, filter: "blur(0px)" }}
+                exit={{ opacity: 0, y: -6, filter: "blur(4px)" }}
+                transition={{ duration: 0.42, ease: [0.22, 1, 0.36, 1] }}
+              >
+                {heroClaims[claimIndex]}
+              </motion.span>
+            </AnimatePresence>
+          </span>
         </h1>
         <p className="hint">{pick(language, "Una sola cuenta para Wee. Entras, eliges comunidad y ya estás con tu gente.", "One account for all Wee. Log in, pick your community, and you are in with your people.", "Unha soa conta para Wee. Entras, escolles comunidade e xa estás coa túa xente.")}</p>
 

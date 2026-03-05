@@ -3449,6 +3449,17 @@ textarea::placeholder {
   gap: 0.62rem;
 }
 
+.community-picker-card-skeleton {
+  border: 1px solid rgb(63 88 130 / 62%);
+  border-radius: 12px;
+  min-height: 104px;
+  padding: 0.72rem 0.68rem;
+  display: grid;
+  align-content: center;
+  gap: 0.42rem;
+  background: linear-gradient(165deg, rgb(24 39 66 / 56%), rgb(17 30 52 / 52%));
+}
+
 .community-picker-card-item {
   --community-accent-hue: 220;
   border: 1px solid rgb(63 88 130 / 86%);
@@ -3563,7 +3574,12 @@ textarea::placeholder {
   -webkit-background-clip: text;
   background-clip: text;
   -webkit-text-fill-color: transparent;
-  animation: auth-claim-flow 6.4s var(--ease-standard) infinite;
+}
+
+.auth-hero-claim-wrap {
+  display: block;
+  min-height: 1.8rem;
+  overflow: hidden;
 }
 
 .auth-entry-actions {
@@ -3645,21 +3661,6 @@ textarea::placeholder {
 .auth-link-btn:hover {
   color: #c0daff;
   text-decoration: underline;
-}
-
-@keyframes auth-claim-flow {
-  0% {
-    background-position: 0 50%;
-    opacity: 0.9;
-  }
-  50% {
-    background-position: 100% 50%;
-    opacity: 1;
-  }
-  100% {
-    background-position: 0 50%;
-    opacity: 0.9;
-  }
 }
 
 .auth-form-grid {
@@ -3894,6 +3895,19 @@ textarea::placeholder {
   gap: 0.7rem;
 }
 
+.community-page-grid {
+  grid-template-columns: 1fr;
+}
+
+.community-switch-card .user-option {
+  padding: 0.45rem 0.5rem;
+}
+
+.community-switch-card .btn {
+  min-height: 30px;
+  padding: 0.26rem 0.52rem;
+}
+
 .settings-card {
   border: 1px solid #35517a;
   border-radius: 10px;
@@ -4012,6 +4026,13 @@ textarea::placeholder {
 
 .alias-form {
   margin-top: 0.5rem;
+}
+
+@media (min-width: 960px) {
+  .community-page-grid {
+    grid-template-columns: 1.1fr 1fr;
+    align-items: start;
+  }
 }
 
 .alias-row {

@@ -9,6 +9,7 @@ import { shouldAutoEnterDefaultCommunity } from "../lib/communityNavigation";
 
 interface CommunitiesPickerPageProps {
   communities: CommunityListItem[];
+  loading?: boolean;
   defaultCommunityId?: string;
   skipPicker?: boolean;
   onReload: () => Promise<void>;
@@ -25,6 +26,7 @@ interface CommunitiesPickerPageProps {
 
 export const CommunitiesPickerPage = ({
   communities,
+  loading = false,
   defaultCommunityId,
   skipPicker,
   onReload,
@@ -138,19 +140,32 @@ export const CommunitiesPickerPage = ({
           </button>
         </div>
         <p className="section-intro">
-          {communities.length > 0
+          {loading && communities.length === 0
+            ? pick(language, "Cargando tus comunidades...", "Loading your communities...", "Cargando as túas comunidades...")
+            : communities.length > 0
             ? pick(language, "Elige dónde quieres entrar hoy.", "Pick where you want to jump in today.", "Escolle onde queres entrar hoxe.")
             : pick(language, "Todavía no estás en ninguna comunidad. Crea una o únete con un código y arrancamos.", "You are not in any community yet. Create one or join with a code and let's get going.", "Aínda non estás en ningunha comunidade. Crea unha ou únete cun código e arrincamos.")}
         </p>
 
         <div className="community-picker-grid">
-          {communities.map((community) => {
+          {loading && communities.length === 0 ? (
+            <article className="community-picker-card-skeleton" aria-hidden="true">
+              <span className="sk sk-line sk-line-mid" />
+              <span className="sk sk-line sk-line-short" />
+            </article>
+          ) : null}
+          <AnimatePresence initial={false}>
+            {communities.map((community) => {
             const isActive = selectedCommunityId === community.community_id;
             return (
               <motion.article
                 key={community.community_id}
                 className={`community-picker-card-item${isActive ? " is-active" : ""}`}
                 onClick={() => setSelectedCommunityId(community.community_id)}
+                layout
+                initial={{ opacity: 0, y: 8, scale: 0.985 }}
+                animate={{ opacity: 1, y: 0, scale: 1 }}
+                exit={{ opacity: 0, y: -6, scale: 0.985 }}
                 whileHover={{ y: -2 }}
                 whileTap={{ scale: 0.995 }}
                 transition={{ duration: 0.2, ease: "easeOut" }}
@@ -159,7 +174,8 @@ export const CommunitiesPickerPage = ({
                 <p className="hint">{pick(language, "Rol", "Role", "Rol")}: {community.role}</p>
               </motion.article>
             );
-          })}
+            })}
+          </AnimatePresence>
         </div>
 
         {selectedCommunityId ? (
@@ -203,7 +219,7 @@ export const CommunitiesPickerPage = ({
                 : pick(language, "Nueva comunidad", "New community", "Nova comunidade")}
             </button>
           ) : null}
-          <button type="button" className="btn" onClick={() => navigate(`/join${location.search}`)}>
+          <button type="button" className="btn" onClick={() => navigate(`/join${location.search}`)} disabled={loading}>
             <Icon name="link" /> {pick(language, "Unirme por código", "Join with code", "Unirme con código")}
           </button>
         </div>

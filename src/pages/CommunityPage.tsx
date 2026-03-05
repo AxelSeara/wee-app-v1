@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { TopBar } from "../components/TopBar";
 import { Icon } from "../components/Icon";
 import { pick, useI18n } from "../lib/i18n";
@@ -9,9 +9,11 @@ interface CommunityPageProps {
   activeUser: User;
   selectedCommunity: { id: string; name: string; description?: string; rulesText?: string } | null;
   members: Array<{ id: string; alias: string; role: "admin" | "member" }>;
+  communities: Array<{ community_id: string; name: string; role: "admin" | "member" }>;
   rulesText: string;
   onUpdateCommunity: (input: { name?: string; description?: string; rulesText?: string }) => Promise<unknown>;
   onCreateInvite: () => Promise<{ id: string; code: string; token: string; link: string }>;
+  onSwitchCommunity: (communityId: string) => Promise<void>;
   onLeaveCommunity: () => Promise<void> | void;
   onLogout: () => void;
   onOpenShareModal?: () => void;
@@ -22,15 +24,18 @@ export const CommunityPage = ({
   activeUser,
   selectedCommunity,
   members,
+  communities,
   rulesText,
   onUpdateCommunity,
   onCreateInvite,
+  onSwitchCommunity,
   onLeaveCommunity,
   onLogout,
   onOpenShareModal,
   onToast
 }: CommunityPageProps) => {
   const { language } = useI18n();
+  const navigate = useNavigate();
   const isAdmin = activeUser.role === "admin";
 
   const [nameInput, setNameInput] = useState(selectedCommunity?.name ?? "");
@@ -38,8 +43,10 @@ export const CommunityPage = ({
   const [rulesInput, setRulesInput] = useState(rulesText ?? "");
   const [invite, setInvite] = useState<{ code: string; token: string; link: string } | null>(null);
   const [saving, setSaving] = useState(false);
+  const [switchingCommunityId, setSwitchingCommunityId] = useState<string | null>(null);
   const [copyNotice, setCopyNotice] = useState<string | null>(null);
   const [isEditingSettings, setIsEditingSettings] = useState(false);
+  const otherCommunities = communities.filter((entry) => entry.community_id !== selectedCommunity?.id);
 
   useEffect(() => {
     setNameInput(selectedCommunity?.name ?? "");
@@ -116,6 +123,24 @@ export const CommunityPage = ({
     await copy(link, pick(language, "Enlace", "Link", "Ligazón"));
   };
 
+  const switchCommunity = async (communityId: string) => {
+    if (!communityId || switchingCommunityId) return;
+    setSwitchingCommunityId(communityId);
+    try {
+      await onSwitchCommunity(communityId);
+      onToast?.(pick(language, "Comunidad cambiada. Vamos al inicio.", "Community switched. Taking you home.", "Comunidade cambiada. Imos ao inicio."));
+      navigate("/home");
+    } catch (error) {
+      onToast?.(
+        error instanceof Error
+          ? error.message
+          : pick(language, "No pudimos cambiar de comunidad.", "Could not switch community.", "Non puidemos cambiar de comunidade.")
+      );
+    } finally {
+      setSwitchingCommunityId(null);
+    }
+  };
+
   return (
     <main>
       <TopBar
@@ -132,9 +157,14 @@ export const CommunityPage = ({
       <section className="page-section">
         <div className="section-head">
           <h2><Icon name="users" /> {pick(language, "Comunidad", "Community", "Comunidade")}</h2>
-          <Link to="/home" className="btn">
-            <Icon name="arrowLeft" /> {pick(language, "Volver al feed", "Back to feed", "Volver ao feed")}
-          </Link>
+          <div className="page-head-actions">
+            <Link to="/home" className="btn btn-nav">
+              <Icon name="home" /> {pick(language, "Inicio", "Home", "Inicio")}
+            </Link>
+            <Link to="/communities" className="btn btn-nav">
+              <Icon name="users" /> {pick(language, "Comunidades", "Communities", "Comunidades")}
+            </Link>
+          </div>
         </div>
 
         <article className="settings-card community-settings-card">
@@ -221,7 +251,38 @@ export const CommunityPage = ({
           </div>
         </article>
 
-        <div className="settings-grid">
+        <div className="settings-grid community-page-grid">
+          <article className="settings-card community-switch-card">
+            <h3><Icon name="spiral" /> {pick(language, "Tus comunidades", "Your communities", "As túas comunidades")}</h3>
+            <p className="hint">
+              {selectedCommunity?.name
+                ? pick(language, `Ahora mismo estás en ${selectedCommunity.name}.`, `Right now you are in ${selectedCommunity.name}.`, `Agora mesmo estás en ${selectedCommunity.name}.`)
+                : pick(language, "Elige comunidad para seguir.", "Pick a community to continue.", "Escolle comunidade para continuar.")}
+            </p>
+            {otherCommunities.length === 0 ? (
+              <p className="hint">{pick(language, "No tienes más comunidades por ahora.", "No other communities yet.", "Aínda non tes máis comunidades.")}</p>
+            ) : (
+              <ul className="user-list">
+                {otherCommunities.map((community) => (
+                  <li key={community.community_id} className="user-option user-option-spread">
+                    <span>{community.name}</span>
+                    <button
+                      type="button"
+                      className="btn btn-nav"
+                      onClick={() => void switchCommunity(community.community_id)}
+                      disabled={switchingCommunityId === community.community_id}
+                    >
+                      <Icon name="arrowLeft" />
+                      {switchingCommunityId === community.community_id
+                        ? pick(language, "Entrando...", "Entering...", "Entrando...")
+                        : pick(language, "Entrar", "Enter", "Entrar")}
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </article>
+
           <article className="settings-card">
             <h3><Icon name="users" /> {pick(language, "Miembros", "Members", "Membros")}</h3>
             <p className="hint">{pick(language, "Aquí ves quién está dentro y quién puede moderar.", "Here you can see who is in and who can moderate.", "Aquí ves quen está dentro e quen pode moderar.")}</p>

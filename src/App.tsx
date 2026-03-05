@@ -1,5 +1,5 @@
 import { AnimatePresence } from "framer-motion";
-import { useCallback, useEffect, useLayoutEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { HashRouter, Navigate, Route, Routes, useLocation } from "react-router-dom";
 import { AppFooter } from "./components/AppFooter";
 import { CommunityLoadingScreen } from "./components/CommunityLoadingScreen";
@@ -17,7 +17,7 @@ import { listPosts as listPostsFromStore, reportPostById } from "./lib/store";
 import { consumeRateLimit } from "./lib/rateLimit";
 import type { AppLanguage, AuraRulesetVersion, ExportBundle } from "./lib/types";
 import { canonicalizeUrl, duplicateUrlKeys, generateId, normalizeSpace, sha256Hex } from "./lib/utils";
-import { resolveRootRoute } from "./lib/communityNavigation";
+import { resolveRootRoute, shouldAutoEnterDefaultCommunity } from "./lib/communityNavigation";
 import { HomePage } from "./pages/HomePage";
 import { AuthPage } from "./pages/AuthPage";
 import { PostDetailPage } from "./pages/PostDetailPage";
@@ -83,7 +83,10 @@ const AppRoutes = () => {
   const [shareModalOpen, setShareModalOpen] = useState(false);
   const [notificationsReadAt, setNotificationsReadAt] = useState(0);
   const [myCommunities, setMyCommunities] = useState<Array<{ community_id: string; name: string; description?: string; role: "admin" | "member" }>>([]);
+  const [communitiesLoading, setCommunitiesLoading] = useState(false);
+  const [autoEnteringDefaultCommunity, setAutoEnteringDefaultCommunity] = useState(false);
   const [showLoadingOverlay, setShowLoadingOverlay] = useState(true);
+  const autoEnterAttempts = useRef<Set<string>>(new Set());
   const [guestLanguage, setGuestLanguage] = useState<AppLanguage>(() => {
     try {
       return normalizeLanguage(localStorage.getItem("wee:guest-language") ?? undefined);
@@ -113,13 +116,17 @@ const AppRoutes = () => {
   const reloadMyCommunities = useCallback(async () => {
     if (!globalSession) {
       setMyCommunities([]);
+      setCommunitiesLoading(false);
       return;
     }
+    setCommunitiesLoading(true);
     try {
       const data = await fetchCommunities();
       setMyCommunities(data.communities);
     } catch {
       setMyCommunities([]);
+    } finally {
+      setCommunitiesLoading(false);
     }
   }, [fetchCommunities, globalSession]);
 
@@ -136,13 +143,43 @@ const AppRoutes = () => {
   }, [location.pathname]);
 
   useEffect(() => {
-    if (loading) {
+    if (loading || autoEnteringDefaultCommunity) {
       setShowLoadingOverlay(true);
       return;
     }
     const timeout = window.setTimeout(() => setShowLoadingOverlay(false), 320);
     return () => window.clearTimeout(timeout);
-  }, [loading]);
+  }, [loading, autoEnteringDefaultCommunity]);
+
+  useEffect(() => {
+    if (!globalSession || activeUser || loading || communitiesLoading) return;
+    const params = new URLSearchParams(location.search);
+    const hasInviteOrCodeQuery = Boolean(params.get("invite") || params.get("code"));
+    const canAutoEnter = shouldAutoEnterDefaultCommunity({
+      skipPicker: globalSettings.skipPicker,
+      defaultCommunityId: globalSettings.defaultCommunityId,
+      availableCommunityIds: myCommunities.map((entry) => entry.community_id),
+      hasInviteQuery: hasInviteOrCodeQuery
+    });
+    if (!canAutoEnter || !globalSettings.defaultCommunityId) return;
+    const attemptKey = `${globalSession.sessionToken}:${globalSettings.defaultCommunityId}`;
+    if (autoEnterAttempts.current.has(attemptKey)) return;
+    autoEnterAttempts.current.add(attemptKey);
+    setAutoEnteringDefaultCommunity(true);
+    void setCommunityAsActive(globalSettings.defaultCommunityId)
+      .catch(() => undefined)
+      .finally(() => setAutoEnteringDefaultCommunity(false));
+  }, [
+    activeUser,
+    communitiesLoading,
+    globalSession,
+    globalSettings.defaultCommunityId,
+    globalSettings.skipPicker,
+    loading,
+    location.search,
+    myCommunities,
+    setCommunityAsActive
+  ]);
 
   const knownTopics = useMemo(
     () => Array.from(new Set(posts.flatMap((post) => post.topics))).sort(),
@@ -1093,18 +1130,23 @@ const AppRoutes = () => {
           path="/communities"
           element={
             globalSession ? (
-              <PageTransition>
-                <CommunitiesPickerPage
-                  communities={myCommunities}
-                  defaultCommunityId={globalSettings.defaultCommunityId}
-                  skipPicker={globalSettings.skipPicker}
-                  onReload={reloadMyCommunities}
-                  onEnterCommunity={setCommunityAsActive}
-                  onCreateCommunity={createCommunityFlow}
-                  onSaveSettings={saveGlobalSettings}
-                  onLogout={logoutGlobal}
-                />
-              </PageTransition>
+              activeUser ? (
+                <Navigate to="/home" replace />
+              ) : (
+                <PageTransition>
+                  <CommunitiesPickerPage
+                    communities={myCommunities}
+                    loading={communitiesLoading}
+                    defaultCommunityId={globalSettings.defaultCommunityId}
+                    skipPicker={globalSettings.skipPicker}
+                    onReload={reloadMyCommunities}
+                    onEnterCommunity={setCommunityAsActive}
+                    onCreateCommunity={createCommunityFlow}
+                    onSaveSettings={saveGlobalSettings}
+                    onLogout={logoutGlobal}
+                  />
+                </PageTransition>
+              )
             ) : <Navigate to={`/login${location.search}`} replace />
           }
         />
@@ -1290,9 +1332,11 @@ const AppRoutes = () => {
                   activeUser={activeUser as NonNullable<typeof activeUser>}
                   selectedCommunity={selectedCommunity}
                   members={communityMembers}
+                  communities={myCommunities}
                   rulesText={communityRulesText}
                   onUpdateCommunity={updateCommunityDetails}
                   onCreateInvite={createCommunityInvite}
+                  onSwitchCommunity={setCommunityAsActive}
                   onLeaveCommunity={leaveCurrentCommunity}
                   onLogout={logoutGlobal}
                   onOpenShareModal={() => setShareModalOpen(true)}

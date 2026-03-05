@@ -1,6 +1,7 @@
 import { type FormEvent, useEffect, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { useLocation, useNavigate } from "react-router-dom";
+import { CommunityLoadingScreen } from "../components/CommunityLoadingScreen";
 import { Icon } from "../components/Icon";
 import { pick, useI18n } from "../lib/i18n";
 import type { CommunitySelection } from "../lib/communitySession";
@@ -48,6 +49,7 @@ export const CommunitiesPickerPage = ({
   const [creatingCommunity, setCreatingCommunity] = useState(false);
   const [loggingOut, setLoggingOut] = useState(false);
   const [selectedCommunityId, setSelectedCommunityId] = useState<string | null>(null);
+  const [enteringCommunityName, setEnteringCommunityName] = useState<string | null>(null);
 
   useEffect(() => {
     setPersistChoice(Boolean(skipPicker));
@@ -82,6 +84,8 @@ export const CommunitiesPickerPage = ({
   const enter = async (communityId: string) => {
     setError(null);
     setLoadingId(communityId);
+    const currentCommunity = communities.find((entry) => entry.community_id === communityId);
+    setEnteringCommunityName(currentCommunity?.name ?? null);
     try {
       await onEnterCommunity(communityId);
       if (persistChoice) {
@@ -92,6 +96,7 @@ export const CommunitiesPickerPage = ({
       navigate("/home");
     } catch (err) {
       setError(toFriendlyError(err, "No pudimos entrar en esa comunidad.", "Could not enter that community.", "Non puidemos entrar nesa comunidade."));
+      setEnteringCommunityName(null);
     } finally {
       setLoadingId(null);
     }
@@ -147,7 +152,7 @@ export const CommunitiesPickerPage = ({
             : pick(language, "Todavía no estás en ninguna comunidad. Crea una o únete con un código y arrancamos.", "You are not in any community yet. Create one or join with a code and let's get going.", "Aínda non estás en ningunha comunidade. Crea unha ou únete cun código e arrincamos.")}
         </p>
 
-        <div className="community-picker-grid">
+        <div className={`community-picker-grid${loading && communities.length === 0 ? " is-loading" : ""}`}>
           {loading && communities.length === 0 ? (
             Array.from({ length: 3 }).map((_, index) => (
               <article className="community-picker-card-skeleton" aria-hidden="true" key={`community-skeleton-${index}`}>
@@ -254,6 +259,14 @@ export const CommunitiesPickerPage = ({
 
         {error ? <p className="error community-picker-error">{error}</p> : null}
       </section>
+      {loadingId ? (
+        <CommunityLoadingScreen
+          communityName={enteringCommunityName ?? undefined}
+          topics={[]}
+          usersCount={0}
+          finishing={false}
+        />
+      ) : null}
     </main>
   );
 };

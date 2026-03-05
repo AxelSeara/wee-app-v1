@@ -3,6 +3,7 @@ import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } fr
 import { HashRouter, Navigate, Route, Routes, useLocation } from "react-router-dom";
 import { AppFooter } from "./components/AppFooter";
 import { CommunityLoadingScreen } from "./components/CommunityLoadingScreen";
+import { Icon } from "./components/Icon";
 import { PageTransition } from "./components/PageTransition";
 import { ShareLinkModal } from "./components/ShareLinkModal";
 import { Toast } from "./components/Toast";
@@ -1356,6 +1357,17 @@ const AppRoutes = () => {
         <Route path="*" element={<Navigate to={resolveRootRoute({ hasGlobalSession: Boolean(globalSession), hasActiveCommunitySession: Boolean(activeUser) })} replace />} />
         </Routes>
         </AnimatePresence>
+        {activeUser && location.pathname !== "/share" ? (
+          <button
+            type="button"
+            className="mobile-share-fab"
+            onClick={() => setShareModalOpen(true)}
+            aria-label={pick(language, "Compartir link", "Share link", "Compartir ligazón")}
+            title={pick(language, "Compartir link", "Share link", "Compartir ligazón")}
+          >
+            <Icon name="plus" size={18} />
+          </button>
+        ) : null}
         <Toast message={toast} />
         <ShareLinkModal
           open={shareModalOpen}

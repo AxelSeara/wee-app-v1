@@ -38,6 +38,10 @@ body,
   min-height: 100%;
 }
 
+html {
+  background: #0a1223;
+}
+
 body {
   margin: 0;
   color: var(--ink-0);
@@ -53,6 +57,7 @@ body {
   line-height: 1.45;
   scroll-behavior: smooth;
   background-attachment: fixed;
+  background-color: #0a1223;
 }
 
 a {
@@ -1019,6 +1024,10 @@ h3 svg,
 .home-sidebar-extras {
   display: grid;
   gap: 0.55rem;
+}
+
+.mobile-share-fab {
+  display: none;
 }
 
 .home-sidebar-search {
@@ -3462,6 +3471,9 @@ textarea::placeholder {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(170px, 1fr));
   gap: 0.62rem;
+}
+
+.community-picker-grid.is-loading {
   min-height: 112px;
 }
 
@@ -4293,7 +4305,13 @@ textarea:focus-visible {
   }
 
   .brand-tag {
-    display: none;
+    display: inline-flex;
+    max-width: 38vw;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    padding: 0.12rem 0.4rem;
+    font-size: 0.58rem;
   }
 
   .brand {
@@ -4324,10 +4342,7 @@ textarea:focus-visible {
   }
 
   .topbar-right .btn.btn-primary {
-    min-height: 34px;
-    padding: 0.32rem 0.52rem;
-    font-size: 0.78rem;
-    gap: 0.26rem;
+    display: none;
   }
 
   .notification-trigger {
@@ -4484,7 +4499,7 @@ textarea:focus-visible {
     margin-top: 0.72rem;
   }
 
-  .community-picker-grid {
+  .community-picker-grid.is-loading {
     min-height: 218px;
   }
 
@@ -4594,8 +4609,24 @@ textarea:focus-visible {
   .toast {
     right: 0.72rem;
     left: 0.72rem;
-    bottom: calc(5.2rem + env(safe-area-inset-bottom));
+    bottom: calc(8.7rem + env(safe-area-inset-bottom));
     text-align: center;
+  }
+
+  .mobile-share-fab {
+    position: fixed;
+    right: 0.82rem;
+    bottom: calc(5.2rem + env(safe-area-inset-bottom));
+    z-index: 49;
+    width: 48px;
+    height: 48px;
+    border-radius: 999px;
+    border: 1px solid #78a6e7;
+    background: linear-gradient(180deg, rgb(42 88 149 / 92%), rgb(26 58 102 / 94%));
+    color: #eaf3ff;
+    display: inline-grid;
+    place-items: center;
+    box-shadow: 0 14px 24px rgb(5 13 26 / 34%);
   }
 }
 
